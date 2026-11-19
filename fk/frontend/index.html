@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>详情页复刻 · 照着别人的详情页一键换成我的产品</title>
+<!-- 设计令牌：COS 直链优先（快），失败回落站内路由（server.py 白名单 /accounts/static/）。
+     子应用在 /pattern/fk/ 下，写 ../static/ui.css 会解析成 /pattern/static/ui.css → 401（dtl 踩过）。 -->
+<link rel="stylesheet" href="../accounts/static/ui.css">
+<style>
+/* 令牌兜底：ui.css 两条路都取不到时，页面也不会退化成裸布局 */
+:root{
+  /* 2026-11-19 与 static/ui.css 同步：深色能影风（此段仅作 ui.css 加载失败时的兜底，值必须与 ui.css 一致） */
+  --pri:#ffffff; --pri2:#d8dade; --pri-dark:#d8dade;
+  --pri-050:rgba(255,255,255,.07); --pri-100:rgba(255,255,255,.11); --pri-200:rgba(255,255,255,.22); --pri-300:#c9ccd2; --pri-bg:rgba(255,255,255,.05);
+  --grad-pri:linear-gradient(135deg,#ffffff,#d8dade);
+  --on-pri:#111214;
+  --bg:#090a0e; --card:#15171d; --card2:#0c0e16; --shell:#121212;
+  --tx:#e5e7eb; --sub:#9ca3af; --faint:#6b7280; --bd:rgba(255,255,255,.08); --hair:rgba(255,255,255,.045); --fill:#1a1c22; --gold:#f5af38;
+  --ok:#4ade80; --ok-bg:rgba(74,222,128,.14); --ok-bd:rgba(74,222,128,.32);
+  --err:#f87171; --err-bg:rgba(248,113,113,.14); --err-bd:rgba(248,113,113,.32); --bad:#f87171;
+  --warn:#fbbf24; --warn-bg:rgba(251,191,36,.14); --warn-bd:rgba(251,191,36,.32);
+  --r-card:16px; --r-ctl:10px; --r-sm:10px; --r-pill:999px;
+  --shadow-card:0 0 0 1px rgba(255,255,255,.045); --shadow-pop:0 12px 32px rgba(0,0,0,.6);
+  --ring:0 0 0 3px rgba(255,255,255,.18);
+  --font:-apple-system,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);font-size:14px;padding:18px 20px 48px}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:19px;font-weight:800;margin-bottom:4px}
+.sub{color:var(--sub);font-size:12.5px;margin-bottom:16px}
+.sub b{color:var(--pri)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:18px;box-shadow:var(--shadow-card);margin-bottom:16px}
+.card h2{font-size:15px;font-weight:800;margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h2 .cnt{font-size:12px;font-weight:700;padding:2px 9px;border-radius:var(--r-pill)}
+.cnt.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+.cnt.bad{background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
+.cnt.warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
+/* 步骤条（3 步：上传素材 → 拆解与文案 → 出图） */
+.steps{display:flex;align-items:flex-start;justify-content:center;gap:0;margin:0 auto 20px;max-width:560px;position:relative}
+.steps:before{content:"";position:absolute;top:19px;left:16.7%;right:16.7%;height:2px;background:var(--bd);z-index:0}
+.st{display:flex;flex-direction:column;align-items:center;gap:8px;width:33.3333%;position:relative;z-index:1;background:var(--bg)}
+.st .dot{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;background:var(--card);color:var(--faint);border:2px solid var(--bd);transition:.18s}
+.st.on .dot{background:var(--pri);color:var(--on-pri);border-color:var(--pri);box-shadow:0 0 0 5px var(--pri-100)}
+.st.done .dot{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-bd)}
+.st .lb{font-size:12.5px;font-weight:600;color:var(--faint);text-align:center}
+.st.on .lb{color:var(--pri-dark);font-weight:800}
+.st.can{cursor:pointer}
+/* 恢复上次任务条 */
+.resume{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--pri-050);border:1px solid var(--pri-100);border-radius:var(--r-card);padding:11px 16px;margin:0 auto 16px;max-width:900px}
+.resume .rtxt{font-size:13.5px;font-weight:700;color:var(--pri-dark);flex:1;min-width:190px}
+.resume .ract{display:flex;gap:8px;flex-wrap:wrap}
+/* 高级区（原来的「复刻提示词」这一步，降级成折叠面板） */
+.adv{margin-top:16px}
+.adv>details{border:1px solid var(--bd);border-radius:var(--r-card);background:var(--card);box-shadow:var(--shadow-card)}
+.adv>details>summary{cursor:pointer;list-style:none;padding:14px 18px;font-size:14px;font-weight:800;display:flex;align-items:center;gap:9px;color:var(--sub)}
+.adv>details>summary::-webkit-details-marker{display:none}
+.adv>details>summary:before{content:"▸";color:var(--pri);font-size:13px;transition:.15s}
+.adv>details[open]>summary:before{transform:rotate(90deg)}
+.adv>details>summary:hover{color:var(--pri-dark)}
+.adv .advbody{padding:0 18px 18px}
+.adv .advtip{font-size:12.5px;color:var(--faint);font-weight:600;margin-left:auto}
+/* 布局 */
+.grid{display:grid;grid-template-columns:5fr 7fr;gap:16px;align-items:start}
+.grid.even{grid-template-columns:1fr 1fr}
+@media (max-width:900px){.grid,.grid.even{grid-template-columns:1fr}}
+/* 上传 */
+#drop,#dropP{border:2px dashed #cbd5d5;border-radius:12px;padding:22px 16px;text-align:center;color:var(--sub);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:14px}
+#drop.on,#dropP.on{border-color:var(--pri);background:var(--pri-050)}
+#drop .ic,#dropP .ic{width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--pri);flex:none}
+#drop .big,#dropP .big{font-size:14px;font-weight:700;color:var(--tx);margin-bottom:3px;text-align:left}
+#drop .sm,#dropP .sm{font-size:12px;color:var(--faint);text-align:left}
+.pv{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+.pv .it{position:relative;border-radius:9px;overflow:hidden;border:1px solid var(--bd);background:var(--fill)}
+.pv .it img{width:100%;display:block}
+.pv .it .x{position:absolute;right:4px;top:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;border:none;font-size:13px;cursor:pointer;line-height:1;opacity:0;transition:.15s}
+.pv .it:hover .x{opacity:1}
+.pv .it .no{position:absolute;left:5px;top:5px;background:rgba(0,0,0,.6);color:#fff;font-size:10.5px;font-weight:800;border-radius:var(--r-pill);padding:1px 7px}
+/* 表单 */
+label.fl{display:block;font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:6px}
+textarea,input[type=text],select{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:var(--r-ctl);background:var(--fill);font-family:inherit;font-size:13.5px;color:var(--tx);outline:none;transition:.15s}
+textarea:focus,input[type=text]:focus,select:focus{border-color:var(--pri);background:var(--card);box-shadow:var(--ring)}
+textarea{resize:vertical;line-height:1.65}
+.fld{margin-bottom:14px}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:620px){.pgrid{grid-template-columns:1fr}}
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;border-radius:var(--r-ctl);padding:13px 22px;font-size:14.5px;font-weight:800;cursor:pointer;background:var(--grad-pri);color:var(--on-pri);width:100%;transition:.15s}
+.btn:hover{opacity:.92}
+.btn:disabled{background:#d1d5db;color:#9ca3af;cursor:not-allowed;opacity:1}
+.btn.stop{background:var(--err)}
+.btn.ghost{background:var(--card);color:var(--tx);border:1px solid var(--bd);width:auto;padding:7px 14px;font-size:12.5px;font-weight:700}
+.btn.ghost:hover{background:var(--fill);border-color:var(--sub)}
+.btn.ghost.on{background:var(--pri-050);color:var(--pri-dark);border-color:var(--pri-200)}
+.btn.sm{width:auto;padding:6px 12px;font-size:12px;border-radius:var(--r-sm)}
+.cost{text-align:center;font-size:12px;font-weight:700;color:var(--sub);margin-top:8px}
+.cost.bad{color:var(--err)}
+/* 强度卡 */
+.agrid{display:grid;grid-template-columns:1fr;gap:10px}
+.acard{padding:12px 13px;border:2px solid var(--bd);border-radius:12px;background:var(--fill);cursor:pointer;transition:.15s;text-align:left;font-family:inherit}
+.acard:hover{border-color:var(--pri-200)}
+.acard.on{border-color:var(--pri);background:var(--pri-050)}
+.acard .at{font-size:13.5px;font-weight:800;margin-bottom:4px}
+.acard.on .at{color:var(--pri-dark)}
+.acard .ad{font-size:12px;color:var(--sub);line-height:1.55}
+.note{padding:10px 13px;border-radius:var(--r-ctl);font-size:12.5px;font-weight:600;line-height:1.6;margin-bottom:12px}
+.note.warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
+.note.bad{background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
+.note.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+.note.info{background:var(--pri-050);color:var(--pri-dark);border:1px solid var(--pri-200)}
+/* 拆解卡 */
+.pcard{border:1px solid var(--bd);border-radius:12px;background:var(--card);margin-bottom:13px;overflow:hidden}
+.pcard.glob{border-color:var(--pri-200);background:var(--pri-bg)}
+.pcard .ch{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--fill);border-bottom:1px solid var(--bd);flex-wrap:wrap}
+.pcard.glob .ch{background:var(--pri-050)}
+.pcard .no{width:26px;height:26px;border-radius:50%;background:var(--pri);color:var(--on-pri);flex:none;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800}
+.pcard .ct{flex:1;min-width:150px}
+.pcard .ct .t1{font-size:13.5px;font-weight:800;line-height:1.4}
+.pcard .ct .t2{font-size:11.5px;color:var(--sub);margin-top:2px;line-height:1.5}
+.pcard .ca{display:flex;gap:6px;flex:none;align-items:center}
+.pcard .cb{padding:13px 15px}
+.pcard textarea.pe{height:260px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.7}
+.pnav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:13px;border-bottom:1px solid var(--bd)}
+.pnav .np{padding:5px 12px;border:1px solid var(--bd);border-radius:var(--r-pill);background:var(--card);font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit}
+.pnav .np:hover{border-color:var(--pri);color:var(--pri-dark);background:var(--pri-050)}
+/* 参考屏列表 */
+.rlist{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.rlist .ri{border:1px solid var(--bd);border-radius:9px;overflow:hidden;background:var(--fill);cursor:zoom-in}
+.rlist .ri img{width:100%;display:block}
+.rlist .ri .rn{font-size:11px;font-weight:700;color:var(--sub);padding:5px 8px;border-top:1px solid var(--bd);background:var(--card)}
+/* 结果 */
+.rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media (max-width:900px){.rgrid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.rgrid{grid-template-columns:1fr}}
+.rc{border:1px solid var(--bd);border-radius:12px;overflow:hidden;background:var(--fill);display:flex;flex-direction:column}
+.rc .im{position:relative;background:var(--card);display:flex;align-items:center;justify-content:center;min-height:170px}
+.rc .im img{width:100%;display:block}
+.rc .ph{padding:28px 14px;text-align:center;color:var(--faint);font-size:12.5px;width:100%}
+.rc .bar{height:5px;background:var(--bd);border-radius:3px;overflow:hidden;margin:9px auto 0;width:80%}
+.rc .bar i{display:block;height:100%;background:var(--pri);width:40%;animation:slide 1.3s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-40%}100%{margin-left:100%}}
+.rc .ft{padding:8px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-top:1px solid var(--bd);background:var(--card)}
+.rc .no{font-size:11.5px;font-weight:800;color:var(--sub);margin-right:auto}
+.rc .er{color:var(--err);font-size:11.5px;line-height:1.55;padding:0 4px}
+/* 批量重出（2026-11-19）：勾选框 + 选中态 + 失败标记 */
+.rc .ck{position:absolute;left:7px;top:7px;width:19px;height:19px;cursor:pointer;z-index:3;
+  accent-color:var(--pri)}
+.rc.sel{border-color:var(--pri);box-shadow:0 0 0 2px rgba(13,148,136,.16)}
+.rc .badbadge{position:absolute;right:7px;top:7px;z-index:2;font-size:10.5px;font-weight:800;
+  background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd);
+  border-radius:var(--r-pill);padding:2px 8px}
+.batchbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 13px;margin-top:12px;
+  border:1px solid var(--pri-200);background:var(--pri-050);border-radius:var(--r-ctl)}
+.batchbar .cnt{font-size:12.5px;font-weight:800;color:var(--pri-dark)}
+.batchbar .sp{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap}
+.btn.sm{padding:5px 11px;font-size:12px}
+.btn.warnfill{background:var(--err);color:#fff;border-color:var(--err)}
+.btn.warnfill:hover{filter:brightness(1.08)}
+.spin{width:15px;height:15px;border:2px solid var(--pri-200);border-top-color:var(--pri);border-radius:50%;animation:sp .8s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ===== 原图对比滑块（2026-11-19）=====
+   🔴 两张图各占一层，标签放进自己那一层 → 随 clip-path 一起被裁掉。
+      否则分割线拖到底时「效果图/原图」的字还挂在别人的图上。 */
+.cmp{position:relative;overflow:hidden;background:var(--card2);touch-action:none;cursor:ew-resize;
+  outline:none;user-select:none;width:100%;display:block}
+.cmp:focus-visible{box-shadow:0 0 0 3px var(--pri-200)}
+.cmp img{position:absolute;inset:0;width:100%;height:100%;display:block;
+  -webkit-user-drag:none;user-select:none;pointer-events:none;background:#fff}
+.cmp .lyr{position:absolute;inset:0}
+.cmp .cmptop{position:absolute;inset:0;will-change:clip-path}
+.cmp .cdiv{position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;background:#fff;
+  box-shadow:0 0 0 1px rgba(15,23,42,.3),0 0 10px rgba(0,0,0,.28);z-index:5}
+.cmp .cgrip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:34px;height:34px;border-radius:50%;background:#fff;border:2px solid var(--pri);
+  box-shadow:0 3px 10px rgba(15,23,42,.3);z-index:6}
+.cmp .cgrip::before,.cmp .cgrip::after{content:"";position:absolute;top:50%;width:0;height:0;
+  border-top:4px solid transparent;border-bottom:4px solid transparent;margin-top:-4px}
+.cmp .cgrip::before{left:7px;border-right:5px solid var(--pri)}
+.cmp .cgrip::after{right:7px;border-left:5px solid var(--pri)}
+.cmp .clab{position:absolute;z-index:4;font-size:10.5px;font-weight:800;color:#fff;
+  padding:2px 7px;border-radius:5px;background:rgba(15,23,42,.82);pointer-events:none;
+  white-space:nowrap;transition:opacity .18s ease}
+.cmp .clab.l{left:6px;bottom:6px}
+.cmp .clab.r{right:6px;bottom:6px;background:rgba(124,77,191,.9)}
+.cmp .clab.dim{opacity:0}
+.cmp .cerr{position:absolute;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.04);color:var(--faint);font-size:11.5px;text-align:center;padding:8px}
+.cmp.fit-contain img{object-fit:contain}
+.cmp.fit-stretch img{object-fit:fill}
+.cmp.fit-top img{object-fit:cover;object-position:50% 0}
+.cmp.fit-stretch::after{content:"参考图已拉伸对齐 · 仅供版式比对";position:absolute;left:0;right:0;
+  bottom:0;z-index:7;font-size:10px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.14);
+  padding:2px 4px;text-align:center;pointer-events:none}
+
+/* 全屏对比层 */
+/* 🔴 必须不透明：rgba(...,.95) 会让背后的结果卡透出来发虚（窄屏实测） */
+#cmpFs{position:fixed;inset:0;z-index:120;background:#080f1a;display:none;
+  flex-direction:column;align-items:center;padding:12px}
+#cmpFs.on{display:flex}
+#cmpFs .fb{width:100%;max-width:1100px;display:flex;align-items:center;gap:8px;
+  color:rgba(96,165,250,.14);font-size:12.5px;padding-bottom:10px;flex-wrap:wrap}
+#cmpFs .fb b{font-size:14px}
+#cmpFs .fb .sp{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+#cmpFs .fsbtn{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:var(--r-pill);
+  background:rgba(255,255,255,.12);color:rgba(96,165,250,.14);border:1px solid rgba(255,255,255,.24);cursor:pointer}
+#cmpFs .fsbtn:hover{background:rgba(255,255,255,.24)}
+#cmpFs .fsbtn.on{background:#fff;color:#0f172a;border-color:#fff}
+#cmpFs .fsstage{flex:1;width:100%;display:flex;align-items:center;justify-content:center;
+  min-height:0;position:relative}
+#cmpFs .cmp{width:auto;height:100%;box-shadow:0 18px 50px rgba(0,0,0,.55)}
+#cmpFs .farr{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;
+  border-radius:50%;background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.55);
+  color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;z-index:8;user-select:none;box-shadow:0 2px 10px rgba(0,0,0,.45)}
+#cmpFs .farr:hover{background:rgba(255,255,255,.4)}
+#cmpFs .farr.prev{left:4px}#cmpFs .farr.next{right:4px}
+@media (max-width:560px){
+  #cmpFs{padding:8px 6px}
+  #cmpFs .fb{font-size:11.5px;gap:5px;padding-bottom:7px}
+  #cmpFs .fsbtn{font-size:10.5px;padding:3px 8px}
+  #cmpFs .farr{width:34px;height:34px;font-size:16px;background:rgba(255,255,255,.3);
+    border-color:rgba(255,255,255,.65)}
+}
+.pbar{height:7px;background:var(--bd);border-radius:4px;overflow:hidden;max-width:340px;margin:12px auto 0}
+.pbar i{display:block;height:100%;background:var(--pri);transition:width .35s}
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--tx);color:#fff;padding:11px 20px;border-radius:var(--r-ctl);font-size:13px;font-weight:600;box-shadow:var(--shadow-pop);z-index:999;display:none;max-width:86vw;text-align:center;line-height:1.6}
+.hide{display:none!important}
+.mini{font-size:11.5px;color:var(--faint);line-height:1.6;margin-top:8px}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.sw{display:inline-block;width:18px;height:18px;border-radius:5px;border:1px solid var(--bd);vertical-align:-3px;margin-right:4px}
+.tagx{display:inline-block;font-size:11px;background:var(--pri-100);color:var(--pri-dark);border-radius:var(--r-pill);padding:1px 8px;margin:0 4px 4px 0;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>详情页复刻</h1>
+  <div class="sub">上传<b>别人的详情页</b> + 我的产品图 → 逐屏拆解版式与风格 → <b>一键出同版式的整套详情页</b></div>
+
+  <div class="resume hide" id="resumeBar">
+    <div class="rtxt" id="resumeTxt"></div>
+    <div class="ract">
+      <button class="btn sm" id="btnResume">继续这个任务</button>
+      <button class="btn ghost sm" id="btnDropResume">新做一个</button>
+    </div>
+  </div>
+
+  <div class="steps" id="steps"></div>
+
+  <!-- ================= 步骤1 ================= -->
+  <div id="s1" class="grid">
+    <div>
+      <div class="card">
+        <h2>① 参考详情页（别人的）<span class="cnt ok" id="cRef">0/8</span></h2>
+        <div id="drop">
+          <div class="ic">↑</div>
+          <div><div class="big">点击或拖拽上传参考详情页</div>
+            <div class="sm">按屏截图最准：一屏一张（最多 8 屏）；也可以整张长图上传，下面自动切屏</div></div>
+        </div>
+        <input type="file" id="fileRef" accept="image/*" multiple class="hide">
+        <div class="pv hide" id="pvRef"></div>
+        <div id="sliceBox" class="hide" style="margin-top:12px;border-top:1px dashed var(--bd);padding-top:12px">
+          <div class="note info" id="sliceTip">检测到长图：建议先按屏切开，逐屏复刻的还原度明显更高。</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <label class="fl" style="margin:0">切几屏</label>
+            <select id="sliceN" style="width:auto;min-width:96px"></select>
+            <button class="btn ghost" id="btnSlice">按长图自动切屏</button>
+          </div>
+          <div class="mini">等分切分，切完会替换掉当前第 1 张参考图；切歪了可以重新上传再切。</div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>② 我的产品图<span class="cnt ok" id="cProd">0/6</span></h2>
+        <div id="dropP">
+          <div class="ic">↑</div>
+          <div><div class="big">上传我的商品</div>
+            <div class="sm">1~6 张，正面/侧面/细节都可；商品外观只认这里（参考图里的商品会被替换掉）</div></div>
+        </div>
+        <input type="file" id="fileProd" accept="image/*" multiple class="hide">
+        <div class="pv hide" id="pvProd"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>③ 复刻设置</h2>
+        <div class="fld"><label class="fl">复刻强度</label><div class="agrid" id="strength"></div></div>
+        <div class="pgrid">
+          <div class="fld"><label class="fl">目标平台</label><select id="platform"></select></div>
+          <div class="fld"><label class="fl">画面语言</label><select id="lang"></select></div>
+          <div class="fld"><label class="fl">单屏比例</label><select id="ratio"></select></div>
+          <div class="fld"><label class="fl">清晰度</label><select id="res"></select></div>
+        </div>
+        <div class="fld"><label class="fl">我的商品名（可空，AI 从产品图判断）</label>
+          <input type="text" id="product" placeholder="如：磨砂肤感磁吸手机壳"></div>
+        <div class="fld"><label class="fl">我的核心卖点（建议填写：不填时 AI 只能按品类泛写，容易跟参考页文案撞车）</label>
+          <textarea id="selling" rows="3" placeholder="如：磨砂肤感不沾指纹｜磁吸强吸不脱落｜四角气囊防摔"></textarea></div>
+        <div class="fld"><label class="fl">我的文案（可选，按屏填；不填由 AI 按参考页句式改写）</label>
+          <textarea id="copy" rows="4" placeholder="第1屏：主标题｜副标题&#10;第2屏：主标题｜标签1、标签2"></textarea>
+          <div class="mini">填了就以你为准，没填的屏 AI 自动改写。文字会逐字进画面，越短越清晰。</div>
+        </div>
+        <div style="border-top:1px solid var(--bd);padding-top:15px">
+          <button class="btn" id="btnAnalyze">下一步：拆解参考页</button>
+          <div class="cost">拆解与提示词<b style="color:var(--ok)">不消耗积分</b>；出图 3 积分 / 屏</div>
+        </div>
+      </div>
+      <div class="card" id="histCard">
+        <h2>最近复刻任务</h2>
+        <div id="hist" class="mini">暂无</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 步骤2 ================= -->
+  <div id="s2" class="hide">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>参考屏 <span class="cnt ok" id="cRef2">0</span></h2>
+          <div class="rlist" id="refList"></div>
+          <div class="mini">点图可看大图。一屏对一屏出图，顺序即参考图上传顺序。</div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h2>整体风格 DNA（改这里会影响全部屏）</h2>
+          <div id="dnaBox"></div>
+          <div class="fld"><label class="fl">必须保留</label><input type="text" id="keepList" placeholder="用顿号或逗号分隔"></div>
+          <div class="fld"><label class="fl">必须移除（品牌/价格/促销/原商品）</label><input type="text" id="removeList" placeholder="用顿号或逗号分隔"></div>
+          <button class="btn ghost" id="btnSaveAna">保存修改并重拼提示词</button>
+        </div>
+        <div class="card">
+          <h2>逐屏拆解 <span class="cnt ok" id="cScr">0</span></h2>
+          <div class="note warn hide" id="copyNote" style="margin-bottom:12px"></div>
+          <div id="scrBox"></div>
+          <div style="border-top:1px solid var(--bd);padding-top:15px;margin-top:6px">
+            <button class="btn" id="btnToPrompt">开始出图</button>
+            <div class="cost" id="genCost">0 屏 · 0 积分</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 高级：逐屏复刻提示词（原来是独立的一步，现在降级成折叠区，不影响主流程） -->
+    <div class="adv">
+      <details id="advBox">
+        <summary>高级：逐屏复刻提示词<span class="advtip">要微调版式或文案时才展开</span></summary>
+        <div class="advbody">
+          <div class="hd" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+            <div style="font-size:15px;font-weight:800">逐屏复刻提示词 <span class="cnt ok" id="cPrm">0</span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn ghost" id="btnRebuild">按当前参数重拼全部</button>
+              <button class="btn ghost" id="btnSavePrm">保存修改</button>
+            </div>
+          </div>
+          <div class="note info">每屏一条提示词：<b>图1 = 版式参考</b>（只给结构，不带品牌与商品），<b>图2 起 = 我的商品</b>。
+            文案要短、要逐字，画面里不加字就不加。关掉某屏的开关可以少出这一屏（省钱）。</div>
+          <div class="pnav" id="pnav"></div>
+          <div id="pBox"></div>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- ================= 步骤3（出图） ================= -->
+  <div id="s4" class="hide">
+    <div class="card">
+      <div class="hd">
+        <div style="font-size:15px;font-weight:800" id="rTitle">出图中</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost" id="btnStop">停止</button>
+          <button class="btn ghost" id="btnSelFail">选中失败屏</button>
+          <button class="btn ghost" id="btnLong">下载整套长图</button>
+          <button class="btn ghost" id="btnZip">打包 ZIP</button>
+          <button class="btn ghost" id="btnBack3">回到拆解 / 改提示词</button>
+        </div>
+      </div>
+      <div id="progWrap"><div class="pbar"><i id="prog" style="width:0%"></i></div>
+        <div class="mini" id="progTxt" style="text-align:center">准备中…</div></div>
+      <div class="batchbar hide" id="batchBar">
+        <span class="cnt" id="batchCnt">已选 0 屏</span>
+        <span class="mini" id="batchCost"></span>
+        <span class="sp">
+          <button class="btn ghost sm" id="btnSelAll">全选</button>
+          <button class="btn ghost sm" id="btnSelNone">取消选择</button>
+          <button class="btn sm" id="btnRedoSel">重新生成选中</button>
+        </span>
+      </div>
+      <div class="rgrid" id="rBox" style="margin-top:14px"></div>
+      <div class="note warn hide" id="refundNote" style="margin-top:14px"></div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<!-- 全屏原图对比层（方案 C 的「全屏精比」入口） -->
+<div id="cmpFs">
+  <div class="fb">
+    <b id="fsName">原图对比</b>
+    <span id="fsMeta"></span>
+    <div class="sp">
+      <span class="fsbtn on" data-ffit="contain">等比完整</span>
+      <span class="fsbtn" data-ffit="stretch">拉伸对齐</span>
+      <span class="fsbtn" data-ffit="top">宽度顶对齐</span>
+      <span class="fsbtn" id="fsClose">✕ 关闭</span>
+    </div>
+  </div>
+  <div class="fsstage">
+    <div class="cmp fit-contain" id="fsCmp" tabindex="0" aria-label="原图对比滑块，左右方向键调整">
+      <div class="lyr"><img data-role="base" alt="原图"><span class="clab r">原图</span></div>
+      <div class="lyr cmptop" data-role="top"><img data-role="topimg" alt="效果图"><span class="clab l">效果图</span></div>
+      <div class="cdiv"><div class="cgrip"></div></div>
+    </div>
+    <div class="farr prev" id="fsPrev">‹</div>
+    <div class="farr next" id="fsNext">›</div>
+  </div>
+</div>
+
+<script>
+var BASE = location.pathname.replace(/\/index\.html$/i, '').replace(/\/+$/, '');
+var S = {tid:'', opt:{}, meta:null, ana:null, screens:[], pages:[], step:1, nRef:0, nProd:0, timer:null,
+         /* 原图对比：位置按屏记，模式全局记，轮询重绘后要能还原 */
+         cmpPos:{}, cmpFit:'contain', fsOpen:false, fsIdx:0,
+         /* prmDirty: 高级区提示词是否被手改过（没改就不回写，免得白跑一次重拼）
+            genStarted: 本次会话已点过「开始出图」（进第 3 步的凭据） */
+         prmDirty:false, genStarted:false};
+var STEPS = ['上传素材','拆解与文案','出图'];
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function toast(msg, ms){
+  var t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._h); t._h = setTimeout(function(){ t.style.display='none'; }, ms || 2600);
+}
+function api(path, opt){
+  return fetch(BASE + '/' + path, opt || {}).then(function(r){
+    return r.json().catch(function(){ return {ok:false, error:'返回不是 JSON（HTTP '+r.status+'）'}; })
+      .then(function(d){ if (!d.ok && d.error) throw new Error(d.error); return d; });
+  });
+}
+function postJSON(path, body){
+  return api(path, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{})});
+}
+
+/* ---------------- 步骤条 ---------------- */
+function renderSteps(){
+  var h = '';
+  for (var i=0;i<STEPS.length;i++){
+    var n = i+1, cls = 'st';
+    if (n === S.step) cls += ' on';
+    else if (n < S.step) cls += ' done can';
+    h += '<div class="'+cls+'" data-n="'+n+'"><div class="dot">'+(n<S.step?'✓':n)+'</div><div class="lb">'+STEPS[i]+'</div></div>';
+  }
+  $('steps').innerHTML = h;
+  Array.prototype.forEach.call(document.querySelectorAll('.st.can'), function(el){
+    el.onclick = function(){ goStep(parseInt(el.getAttribute('data-n'),10)); };
+  });
+}
+/* 三个面板：s1=上传素材、s2=拆解与文案（含高级折叠区）、s4=出图。
+   原「复刻提示词」独立一步已并进 s2 的折叠区，所以面板 id 与步骤号不再一一对应。 */
+var PANELS = ['s1', 's2', 's4'];
+function goStep(n){
+  if (n >= 2 && !S.tid) { toast('请先上传参考详情页与产品图'); return; }
+  if (n >= 3 && !(S.pages || []).length && !S.genStarted) { toast('还没有出图，请先点「开始出图」'); return; }
+  S.step = n; renderSteps();
+  for (var i=0;i<PANELS.length;i++) $(PANELS[i]).classList.toggle('hide', i !== n-1);
+  if (n === 2) { renderStep2(); updCost(); if ($('advBox').open) renderStep3(); }
+  if (n === 3) renderStep4();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ---------------- 元信息 / 表单 ---------------- */
+function fillSel(id, arr, val){
+  var el = $(id); el.innerHTML = '';
+  arr.forEach(function(x){
+    var o = document.createElement('option');
+    if (typeof x === 'object') { o.value = x.id; o.textContent = x.name; }
+    else { o.value = x; o.textContent = x; }
+    el.appendChild(o);
+  });
+  if (val) el.value = val;
+}
+function readOpt(){
+  var on = $('strength').querySelector('.acard.on');
+  return {
+    strength: on ? on.getAttribute('data-id') : 'layout',
+    ratio: $('ratio').value, res: $('res').value, lang: $('lang').value, platform: $('platform').value,
+    product: $('product').value.trim(), selling: $('selling').value.trim(), copy: $('copy').value.trim()
+  };
+}
+api('api/meta').then(function(d){
+  S.meta = d;
+  fillSel('platform', d.platforms, '淘宝');
+  fillSel('lang', d.langs, '中文');
+  fillSel('ratio', d.ratios, '3:4');
+  fillSel('res', d.resolutions, '2K');
+  var sn = $('sliceN'), h = '';
+  for (var i=2;i<=d.maxRefs;i++) h += '<option value="'+i+'"'+(i===4?' selected':'')+'>'+i+' 屏</option>';
+  sn.innerHTML = h;
+  var sh = '';
+  d.strengths.forEach(function(x, i){
+    sh += '<button class="acard'+(i===0?' on':'')+'" data-id="'+x.id+'"><div class="at">'+esc(x.name)+'</div><div class="ad">'+esc(x.desc)+'</div></button>';
+  });
+  $('strength').innerHTML = sh;
+  Array.prototype.forEach.call($('strength').querySelectorAll('.acard'), function(el){
+    el.onclick = function(){
+      Array.prototype.forEach.call($('strength').querySelectorAll('.acard'), function(x){ x.classList.remove('on'); });
+      el.classList.add('on');
+    };
+  });
+  loadHist();
+}).catch(function(e){ toast('初始化失败：'+e.message); });
+
+/* ---------------- 上传 ---------------- */
+function bindDrop(dropId, fileId, kind){
+  var d = $(dropId), f = $(fileId);
+  d.onclick = function(){ f.click(); };
+  d.ondragover = function(e){ e.preventDefault(); d.classList.add('on'); };
+  d.ondragleave = function(){ d.classList.remove('on'); };
+  d.ondrop = function(e){ e.preventDefault(); d.classList.remove('on'); upload(kind, e.dataTransfer.files); };
+  f.onchange = function(){ upload(kind, f.files); f.value = ''; };
+}
+function upload(kind, files){
+  if (!files || !files.length) return;
+  var fd = new FormData(), i;
+  if (!S.tid){
+    for (i=0;i<files.length;i++) fd.append(kind === 'ref' ? 'refs' : 'prods', files[i]);
+    api('api/session', {method:'POST', body: fd}).then(function(d){
+      S.tid = d.tid; S.nRef = d.n_ref; S.nProd = d.n_prod;
+      saveTid(d.tid);
+      toast('已建立会话，上传成功'); refreshSession();
+    }).catch(function(e){ toast(e.message); });
+    return;
+  }
+  for (i=0;i<files.length;i++) fd.append('files', files[i]);
+  fd.append('kind', kind);
+  api('api/session/' + S.tid + '/upload', {method:'POST', body: fd}).then(function(d){
+    S.nRef = d.n_ref; S.nProd = d.n_prod; toast('已添加'); refreshSession();
+  }).catch(function(e){ toast(e.message); });
+}
+function refreshSession(){
+  if (!S.tid) return;
+  api('api/session/' + S.tid).then(function(d){
+    S.nRef = d.refs.length; S.nProd = d.prods.length;
+    S.ana = d.analysis; S.screens = d.screens || []; S.pages = d.pages || [];
+    $('cRef').textContent = S.nRef + '/8'; $('cRef').className = 'cnt ' + (S.nRef ? 'ok' : 'bad');
+    $('cProd').textContent = S.nProd + '/6'; $('cProd').className = 'cnt ' + (S.nProd ? 'ok' : 'bad');
+    var h = '';
+    d.refs.forEach(function(u, i){
+      h += '<div class="it"><img src="'+u+'" alt="参考'+ (i+1) +'"><span class="no">第'+(i+1)+'屏</span>'+
+           '<button class="x" data-k="ref" data-i="'+i+'">×</button></div>';
+    });
+    $('pvRef').innerHTML = h; $('pvRef').classList.toggle('hide', !d.refs.length);
+    h = '';
+    d.prods.forEach(function(u, i){
+      h += '<div class="it"><img src="'+u+'" alt="产品'+ (i+1) +'"><button class="x" data-k="prod" data-i="'+i+'">×</button></div>';
+    });
+    $('pvProd').innerHTML = h; $('pvProd').classList.toggle('hide', !d.prods.length);
+    Array.prototype.forEach.call(document.querySelectorAll('.pv .x'), function(b){
+      b.onclick = function(e){
+        e.stopPropagation();
+        postJSON('api/session/' + S.tid + '/remove', {kind: b.getAttribute('data-k'), idx: +b.getAttribute('data-i')})
+          .then(refreshSession).catch(function(err){ toast(err.message); });
+      };
+    });
+    // 长图检测：只上传 1 张且高宽比 > 2.2 → 提示切屏
+    var showSlice = false;
+    if (d.refs.length === 1){
+      var img = new Image();
+      img.onload = function(){
+        if (img.height / img.width > 2.2) { $('sliceBox').classList.remove('hide'); }
+        else $('sliceBox').classList.add('hide');
+      };
+      img.src = d.refs[0];
+      showSlice = true;
+    }
+    if (!showSlice) $('sliceBox').classList.add('hide');
+    if (S.step === 2) { renderStep2(); if ($('advBox').open) renderStep3(); }
+  }).catch(function(e){ toast(e.message); });
+}
+bindDrop('drop', 'fileRef', 'ref');
+bindDrop('dropP', 'fileProd', 'prod');
+$('btnSlice').onclick = function(){
+  if (!S.tid) return;
+  var btn = this; btn.disabled = true;
+  postJSON('api/session/' + S.tid + '/slice', {count: +$('sliceN').value}).then(function(d){
+    toast('已切成 ' + d.n_ref + ' 屏'); refreshSession();
+  }).catch(function(e){ toast(e.message); }).finally(function(){ btn.disabled = false; });
+};
+
+/* ---------------- 步骤1 → 拆解 ---------------- */
+$('btnAnalyze').onclick = function(){
+  if (!S.tid) { toast('请先上传参考详情页'); return; }
+  if (!S.nRef) { toast('请先上传参考详情页'); return; }
+  var btn = this; btn.disabled = true; btn.textContent = '拆解中…（约 30~90 秒）';
+  postJSON('api/analyze', {tid: S.tid, opt: readOpt()}).then(function(d){
+    S.ana = d.analysis; S.screens = d.screens || [];
+    if (d.warn) toast(d.warn, 5000);
+    /* 文案守卫：拆解把参考页文案照抄了，后端已按我的商品重写过一遍 */
+    var cn = $('copyNote');
+    if (cn) {
+      if (d.copy_note) { cn.textContent = '✎ ' + d.copy_note; cn.classList.remove('hide'); }
+      else { cn.classList.add('hide'); }
+    }
+    goStep(2);
+  }).catch(function(e){ toast(e.message, 5000); })
+    .finally(function(){ btn.disabled = false; btn.textContent = '下一步：拆解参考页'; });
+};
+
+/* ---------------- 步骤2 ---------------- */
+function renderStep2(){
+  var d = S.ana || {};
+  $('cRef2').textContent = S.nRef;
+  var h = '';
+  for (var i=0;i<S.nRef;i++){
+    h += '<div class="ri" data-i="'+i+'"><img src="'+BASE+'/api/session/'+S.tid+'/src/ref/'+i+'" alt="参考'+(i+1)+'">'+
+         '<div class="rn">第 '+(i+1)+' 屏</div></div>';
+  }
+  $('refList').innerHTML = h || '<div class="mini">无</div>';
+  Array.prototype.forEach.call($('refList').querySelectorAll('.ri'), function(el){
+    el.onclick = function(){
+      var i = +el.getAttribute('data-i');
+      window.open(BASE + '/api/session/' + S.tid + '/src/ref/' + i, '_blank');
+    };
+  });
+
+  var dna = d.style_dna || {};
+  var pal = (dna.palette || []).join('、');
+  var sw = (dna.palette || []).map(function(c){ return '<span class="sw" style="background:'+esc(c)+'"></span>'; }).join('');
+  $('dnaBox').innerHTML =
+    '<div class="fld"><label class="fl">配色（色值，顿号分隔）'+sw+'</label><input type="text" id="dnaPal" value="'+esc(pal)+'"></div>'+
+    '<div class="pgrid">'+
+      '<div class="fld"><label class="fl">字体层级</label><input type="text" id="dnaFont" value="'+esc(dna.font||'')+'"></div>'+
+      '<div class="fld"><label class="fl">留白节奏</label><input type="text" id="dnaWs" value="'+esc(dna.whitespace||'')+'"></div>'+
+      '<div class="fld"><label class="fl">光线调性</label><input type="text" id="dnaLight" value="'+esc(dna.lighting||'')+'"></div>'+
+      '<div class="fld"><label class="fl">图形语言</label><input type="text" id="dnaGfx" value="'+esc(dna.graphic||'')+'"></div>'+
+    '</div>';
+  $('keepList').value = (d.keep_list || []).join('、');
+  $('removeList').value = (d.remove_list || []).join('、');
+
+  var sc = (d.screens || []);
+  $('cScr').textContent = sc.length;
+  var sh = '';
+  sc.forEach(function(s, i){
+    sh += '<div class="pcard"><div class="ch"><div class="no">'+(i+1)+'</div>'+
+      '<div class="ct"><div class="t1">'+esc(s.title || ('第 '+(i+1)+' 屏'))+'</div>'+
+      '<div class="t2">'+esc(s.goal || '')+'</div></div>'+
+      '<div class="ca"><label class="mini" style="margin:0;display:flex;gap:5px;align-items:center">'+
+      '<input type="checkbox" class="sen" data-i="'+i+'" '+(s.enabled===false?'':'checked')+'> 出这屏</label></div></div>'+
+      '<div class="cb">'+
+      '<div class="fld"><label class="fl">版式（位置 / 占比 / 对齐）</label><textarea rows="3" class="sl" data-i="'+i+'">'+esc(s.layout||'')+'</textarea></div>'+
+      '<div class="pgrid">'+
+        '<div class="fld"><label class="fl">我的主标题</label><input type="text" class="sh1" data-i="'+i+'" value="'+esc(s.my_headline||'')+'"></div>'+
+        '<div class="fld"><label class="fl">副标题</label><input type="text" class="sh2" data-i="'+i+'" value="'+esc(s.my_sub||'')+'"></div>'+
+      '</div>'+
+      '<div class="pgrid">'+
+        '<div class="fld"><label class="fl">标签（顿号分隔）</label><input type="text" class="slb" data-i="'+i+'" value="'+esc((s.my_labels||[]).join('、'))+'"></div>'+
+        '<div class="fld"><label class="fl">背景</label><input type="text" class="sbg" data-i="'+i+'" value="'+esc(s.bg||'')+'"></div>'+
+      '</div>'+
+      '<div class="fld"><label class="fl">视觉元素</label><textarea rows="2" class="sel" data-i="'+i+'">'+esc(s.elements||'')+'</textarea></div>'+
+      '<div class="fld" style="margin:0"><label class="fl">这一屏必须移除</label><input type="text" class="srm" data-i="'+i+'" value="'+esc((s.brand_marks||[]).join('、'))+'"></div>'+
+      '</div></div>';
+  });
+  $('scrBox').innerHTML = sh || '<div class="mini">暂无拆解结果</div>';
+}
+function collectAna(){
+  var d = S.ana || {}, sc = d.screens || [];
+  var pal = $('dnaPal').value.split(/[、,，]/).map(function(x){ return x.trim(); }).filter(Boolean).slice(0,5);
+  var keep = $('keepList').value.split(/[、,，]/).map(function(x){ return x.trim(); }).filter(Boolean);
+  var rmv = $('removeList').value.split(/[、,，]/).map(function(x){ return x.trim(); }).filter(Boolean);
+  var out = {style_dna:{palette: pal, font: $('dnaFont').value.trim(), whitespace: $('dnaWs').value.trim(),
+                        lighting: $('dnaLight').value.trim(), graphic: $('dnaGfx').value.trim()},
+             keep_list: keep, remove_list: rmv, screens: []};
+  sc.forEach(function(s, i){
+    var g = function(cls){ var el = document.querySelector('.'+cls+'[data-i="'+i+'"]'); return el ? el.value : ''; };
+    var en = document.querySelector('.sen[data-i="'+i+'"]');
+    out.screens.push({
+      goal: s.goal || '', title: s.title || '', layout: g('sl'), elements: g('sel'), bg: g('sbg'),
+      my_headline: g('sh1'), my_sub: g('sh2'),
+      my_labels: g('slb').split(/[、,，]/).map(function(x){return x.trim();}).filter(Boolean),
+      brand_marks: g('srm').split(/[、,，]/).map(function(x){return x.trim();}).filter(Boolean),
+      enabled: en ? en.checked : true
+    });
+  });
+  return out;
+}
+$('btnSaveAna').onclick = function(){
+  if (!S.tid) return;
+  var btn = this; btn.disabled = true;
+  postJSON('api/analysis/save', {tid: S.tid, opt: readOpt(), analysis: collectAna()}).then(function(d){
+    S.screens = d.screens || []; toast('已保存，提示词已重拼'); renderStep2();
+  }).catch(function(e){ toast(e.message); }).finally(function(){ btn.disabled = false; });
+};
+/* ---------------- 开始出图（原「查看提示词」→「开始出图」两步，现已合并成一键） ---------------- */
+function startGen(){
+  if (!S.tid) return;
+  var btn = $('btnToPrompt');
+  var n = (S.screens||[]).filter(function(s){ return s.enabled !== false; }).length;
+  if (!n) { toast('请至少开启一屏'); return; }
+  if (!confirm('本次将出 ' + n + ' 屏，消耗 ' + (n*3) + ' 积分（未出图的屏自动退回）。继续？')) return;
+  btn.disabled = true;
+  postJSON('api/analysis/save', {tid: S.tid, opt: readOpt(), analysis: collectAna()})
+    .then(function(d){
+      S.screens = d.screens || S.screens;
+      /* 🔴 只有用户真在高级区改过提示词才回写：否则 collectPrm() 拿到的是刚重拼出来的值，
+         虽然内容一样，但多一次保存会让服务端又走一遍重拼，白等几秒。 */
+      if (S.prmDirty) return postJSON('api/prompt/save', {tid: S.tid, screens: collectPrm()});
+    })
+    .then(function(){ return postJSON('api/generate', {tid: S.tid, n: n, opt: readOpt()}); })
+    .then(function(){
+      S.prmDirty = false; S.genStarted = true; S.pages = [];
+      goStep(3); poll();
+    })
+    .catch(function(e){ toast(e.message, 5000); })
+    .finally(function(){ btn.disabled = false; });
+}
+$('btnToPrompt').onclick = startGen;
+
+/* ---------------- 高级区：逐屏提示词 ---------------- */
+function renderStep3(){
+  var sc = S.screens || [];
+  if (!$('pBox')) return;
+  $('cPrm').textContent = sc.length;
+  var nav = '';
+  sc.forEach(function(s, i){ nav += '<button class="np" data-i="'+i+'">第 '+(i+1)+' 屏</button>'; });
+  $('pnav').innerHTML = nav;
+  Array.prototype.forEach.call($('pnav').querySelectorAll('.np'), function(b){
+    b.onclick = function(){
+      var el = document.querySelector('.pcard[data-i="'+b.getAttribute('data-i')+'"]');
+      if (el) el.scrollIntoView({behavior:'smooth', block:'center'});
+    };
+  });
+  var h = '';
+  sc.forEach(function(s, i){
+    h += '<div class="pcard" data-i="'+i+'"><div class="ch"><div class="no">'+(i+1)+'</div>'+
+      '<div class="ct"><div class="t1">'+esc(s.title || ('第 '+(i+1)+' 屏'))+'</div>'+
+      '<div class="t2">'+esc(s.goal || '')+'</div></div>'+
+      '<div class="ca"><label class="mini" style="margin:0;display:flex;gap:5px;align-items:center">'+
+      '<input type="checkbox" class="pen" data-i="'+i+'" '+(s.enabled===false?'':'checked')+'> 出这屏</label></div></div>'+
+      '<div class="cb"><textarea class="pe" data-i="'+i+'">'+esc(s.prompt||'')+'</textarea></div></div>';
+  });
+  $('pBox').innerHTML = h || '<div class="mini">暂无提示词</div>';
+  Array.prototype.forEach.call(document.querySelectorAll('.pen'), function(c){
+    c.onchange = function(){ S.screens[+c.getAttribute('data-i')].enabled = c.checked; S.prmDirty = true; updCost(); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.pe'), function(t){
+    t.oninput = function(){ S.prmDirty = true; };
+  });
+  updCost();
+}
+function updCost(){
+  var n = (S.screens || []).filter(function(s){ return s.enabled !== false; }).length;
+  if ($('genCost')) $('genCost').textContent = n + ' 屏 · ' + (n * 3) + ' 积分';
+}
+function collectPrm(){
+  return (S.screens || []).map(function(s, i){
+    var t = document.querySelector('.pe[data-i="'+i+'"]');
+    var e = document.querySelector('.pen[data-i="'+i+'"]');
+    return {prompt: t ? t.value : (s.prompt||''), title: s.title, enabled: e ? e.checked : (s.enabled !== false)};
+  });
+}
+$('btnSavePrm').onclick = function(){
+  if (!S.tid) return;
+  postJSON('api/prompt/save', {tid: S.tid, screens: collectPrm()}).then(function(d){
+    S.screens = collectPrm().map(function(x, i){ return Object.assign({}, S.screens[i], x); });
+    S.prmDirty = false;
+    toast('已保存'); updCost();
+  }).catch(function(e){ toast(e.message); });
+};
+$('btnRebuild').onclick = function(){
+  if (!S.tid) return;
+  if (!confirm('会按当前参数（强度/比例/语言/文案）重拼全部提示词，手改的内容会被覆盖。继续？')) return;
+  postJSON('api/prompt', {tid: S.tid, opt: readOpt(), force: true}).then(function(d){
+    S.screens = d.screens || []; S.prmDirty = false; renderStep3(); toast('已重拼');
+  }).catch(function(e){ toast(e.message); });
+};
+/* 展开折叠区时才渲染提示词（省一次 DOM 重建） */
+$('advBox').addEventListener('toggle', function(){
+  if ($('advBox').open) renderStep3();
+});
+
+/* ---------------- 步骤3：出图 ---------------- */
+function poll(){
+  clearTimeout(S.timer);
+  api('api/tasks/' + S.tid).then(function(d){
+    S.pages = d.pages || [];
+    renderPages(d);
+    if (d.status === 'running') { S.timer = setTimeout(poll, 2500); }
+    else {
+      $('btnStop').classList.add('hide');
+      $('rTitle').textContent = d.status === 'stopped' ? '已停止' : '出图完成';
+      $('progWrap').classList.add('hide');
+      var bad = S.pages.filter(function(p){ return p.status !== 'done'; }).length;
+      if (bad > 0){
+        postJSON('api/tasks/' + S.tid + '/refund', {}).then(function(r){
+          var n = $('refundNote');
+          n.classList.remove('hide');
+          n.textContent = '有 ' + bad + ' 屏没出图' + (r.refunded ? '，已退回 ' + r.refunded + ' 积分。' : '（管理员不计费）。') +
+                          '可以直接点「重出」再试，失败多为上游超时。';
+        }).catch(function(){});
+      }
+      if (window.parent && window.parent.refreshPoints) window.parent.refreshPoints();
+    }
+  }).catch(function(e){ toast(e.message); S.timer = setTimeout(poll, 3000); });
+}
+/* 批量重出选择态（2026-11-19）。S.sel 存屏号，跨轮询保留。 */
+function selArr(){ return S.sel || (S.sel = []); }
+function selHas(i){ return selArr().indexOf(i) >= 0; }
+function selToggle(i, on){
+  var a = selArr(), k = a.indexOf(i);
+  if(on){ if(k < 0) a.push(i); } else if(k >= 0) a.splice(k, 1);
+  a.sort(function(x,y){ return x-y; });
+}
+function updBatch(){
+  var pgs = S.pages || [], a = selArr();
+  /* 清掉已不存在或正在跑的屏号，避免提交时被后端拦 */
+  S.sel = a.filter(function(i){
+    var p = pgs[i-1];
+    return p && p.status !== 'running';
+  });
+  a = S.sel;
+  var bar = $('batchBar');
+  bar.classList.toggle('hide', pgs.length === 0);
+  $('batchCnt').textContent = '已选 ' + a.length + ' 屏';
+  $('batchCost').textContent = a.length ? ('消耗 ' + (a.length*3) + ' 积分（每屏 3）') : '勾选要重出的屏，可多选';
+  var b = $('btnRedoSel');
+  b.disabled = a.length === 0;
+  b.textContent = a.length ? ('重新生成选中 (' + a.length + ')') : '重新生成选中';
+  var nFail = pgs.filter(function(p){ return p.status === 'failed' || p.status === 'skipped'; }).length;
+  $('btnSelFail').disabled = nFail === 0;
+  $('btnSelFail').textContent = nFail ? ('选中失败屏 (' + nFail + ')') : '选中失败屏';
+}
+function renderPages(d){
+  var pgs = d.pages || [];
+  S.pages = pgs;
+  $('rTitle').textContent = d.status === 'running' ? '出图中…' : '出图结果';
+  var done = pgs.filter(function(p){ return p.status === 'done'; }).length;
+  var pct = pgs.length ? Math.round(done * 100 / pgs.length) : 0;
+  $('prog').style.width = pct + '%';
+  $('progTxt').textContent = done + ' / ' + pgs.length + ' 屏完成';
+  var h = '';
+  pgs.forEach(function(p, i){
+    var no = i + 1, body, badge = '';
+    /* 正在跑的屏不给勾选（避免重复提交）；其余都可选 */
+    var canSel = p.status !== 'running';
+    var ck = canSel ? '<input type="checkbox" class="ck" data-ck="'+no+'"'+(selHas(no)?' checked':'')+'>' : '';
+    if (p.status === 'done') {
+      /* 有参考图就上对比滑块（左效果图 / 右原图）；没有就退回普通大图 */
+      if (p.ref) {
+        body = '<div class="cmp fit-contain" data-cmpbox="'+no+'" data-out="'+p.url+'" data-ref="'+p.ref+'"'+
+               ' style="aspect-ratio:'+(p.w||3)+'/'+(p.h||4)+'" tabindex="0" aria-label="第'+no+'屏 原图对比">'+
+               '<div class="lyr"><img data-role="base" alt="原图"><span class="clab r">原图</span></div>'+
+               '<div class="lyr cmptop" data-role="top"><img data-role="topimg" alt="效果图"><span class="clab l">效果图</span></div>'+
+               '<div class="cdiv"><div class="cgrip"></div></div>'+
+               '<div class="cerr" style="display:none"></div></div>';
+      } else {
+        body = '<a href="'+p.url+'" target="_blank"><img src="'+p.url+'" alt="第'+no+'屏"></a>';
+      }
+    }
+    else if (p.status === 'running') body = '<div class="ph"><span class="spin"></span><div style="margin-top:8px">AI 出图中…</div><div class="bar"><i></i></div></div>';
+    else if (p.status === 'failed') { body = '<div class="ph" style="color:var(--err)">'+esc(p.err||'失败')+'</div>'; badge = '<span class="badbadge">失败</span>'; }
+    else if (p.status === 'skipped') { body = '<div class="ph">已停止，未出图</div>'; badge = '<span class="badbadge">未出图</span>'; }
+    else body = '<div class="ph">排队中…</div>';
+    h += '<div class="rc'+(selHas(no)?' sel':'')+'" data-card="'+no+'"><div class="im">'+ck+badge+body+'</div>'+
+         '<div class="ft"><span class="no">第 '+no+' 屏</span>'+
+         '<button class="btn ghost sm" data-redo="'+no+'">'+(p.status==='running'?'卡住了？重试':'重出')+'</button>'+
+         (p.status==='done' && p.ref ? '<button class="btn ghost sm" data-cmpfs="'+no+'" title="全屏对比原图">⛶ 对比</button>' : '')+
+         (p.status==='done' ? '<a class="btn ghost sm" href="'+p.url+'" download>下载</a>' : '')+
+         '</div></div>';
+  });
+  $('rBox').innerHTML = h;
+  /* 🔴 事件委托绑容器：renderPages 每次重写 innerHTML，逐个绑 onclick 会在下次重绘后失效 */
+  if(!$('rBox')._bound){
+    $('rBox')._bound = true;
+    $('rBox').addEventListener('change', function(e){
+      var c = e.target.closest ? e.target.closest('[data-ck]') : null;
+      if(!c) return;
+      var no = +c.getAttribute('data-ck');
+      selToggle(no, c.checked);
+      var card = $('rBox').querySelector('[data-card="'+no+'"]');
+      if(card) card.classList.toggle('sel', c.checked);
+      updBatch();
+    });
+    $('rBox').addEventListener('click', function(e){
+      /* 全屏对比入口（滑块本身的拖动走 pointer 事件，不从这里过） */
+      var f = e.target.closest ? e.target.closest('[data-cmpfs]') : null;
+      if (f) { CMP.openFs(+f.getAttribute('data-cmpfs')); return; }
+      var b = e.target.closest ? e.target.closest('[data-redo]') : null;
+      if(!b) return;
+      var no = +b.getAttribute('data-redo');
+      if (!confirm('重出第 ' + no + ' 屏，消耗 3 积分。继续？')) return;
+      b.disabled = true;
+      postJSON('api/tasks/' + S.tid + '/redo', {idx: no}).then(function(){
+        selToggle(no, false);
+        $('rTitle').textContent = '出图中…'; $('progWrap').classList.remove('hide'); poll();
+      }).catch(function(err){ toast(err.message); b.disabled = false; });
+    });
+  }
+  /* 重绘后重新挂载对比滑块（位置/模式从 S 还原，轮询不会把拖动结果重置） */
+  CMP.mountAll();
+  updBatch();
+}
+function renderStep4(){
+  if (!S.pages || !S.pages.length) {
+    $('rBox').innerHTML = '<div class="mini">还没有出图</div>';
+    return;
+  }
+  api('api/tasks/' + S.tid).then(function(d){ renderPages(d); });
+}
+$('btnStop').onclick = function(){
+  postJSON('api/tasks/' + S.tid + '/stop', {}).then(function(){ toast('已请求停止'); }).catch(function(e){ toast(e.message); });
+};
+/* ---------------- 批量重出（2026-11-19）---------------- */
+$('btnSelAll').onclick = function(){
+  S.sel = [];
+  (S.pages||[]).forEach(function(p,i){ if(p.status !== 'running') S.sel.push(i+1); });
+  renderPages({pages:S.pages||[], status:($('rTitle').textContent.indexOf('出图中')>=0?'running':'done')});
+};
+$('btnSelNone').onclick = function(){
+  S.sel = [];
+  renderPages({pages:S.pages||[], status:($('rTitle').textContent.indexOf('出图中')>=0?'running':'done')});
+};
+$('btnSelFail').onclick = function(){
+  S.sel = [];
+  (S.pages||[]).forEach(function(p,i){
+    if(p.status === 'failed' || p.status === 'skipped') S.sel.push(i+1);
+  });
+  if(!S.sel.length){ toast('没有失败或未出图的屏'); return; }
+  renderPages({pages:S.pages||[], status:'done'});
+  toast('已选中 ' + S.sel.length + ' 屏，点「重新生成选中」即可一次重出');
+};
+$('btnRedoSel').onclick = function(){
+  var a = (S.sel||[]).slice();
+  if(!a.length){ toast('请先勾选要重出的屏'); return; }
+  if(!confirm('一次重出 ' + a.length + ' 屏（第 ' + a.join('、') + ' 屏），消耗 ' + (a.length*3) + ' 积分。继续？')) return;
+  var b = this; b.disabled = true;
+  postJSON('api/tasks/' + S.tid + '/redo', {idxs: a}).then(function(r){
+    S.sel = [];
+    toast('已提交 ' + (r.n||a.length) + ' 屏重出，正在出图…', 4000);
+    $('rTitle').textContent = '出图中…'; $('progWrap').classList.remove('hide'); poll();
+  }).catch(function(e){ toast(e.message, 5000); b.disabled = false; updBatch(); });
+};
+$('btnZip').onclick = function(){ window.open(BASE + '/api/tasks/' + S.tid + '/zip', '_blank'); };
+$('btnLong').onclick = function(){ window.open(BASE + '/api/tasks/' + S.tid + '/long', '_blank'); };
+/* 回到步骤2 并展开高级区（原来叫「回到提示词」，提示词已并进步骤2） */
+$('btnBack3').onclick = function(){
+  goStep(2);
+  $('advBox').open = true;
+  renderStep3();
+};
+
+/* ---------------- 历史 ---------------- */
+function loadHist(){
+  api('api/tasks?limit=8').then(function(d){
+    var ts = d.tasks || [];
+    if (!ts.length) { $('hist').textContent = '暂无'; return; }
+    var h = '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+    ts.forEach(function(t){
+      var dt = new Date((t.ts || 0) * 1000);
+      var when = (dt.getMonth()+1) + '/' + dt.getDate() + ' ' + ('0'+dt.getHours()).slice(-2) + ':' + ('0'+dt.getMinutes()).slice(-2);
+      h += '<div style="border:1px solid var(--bd);border-radius:9px;overflow:hidden;width:86px;background:var(--card);cursor:pointer" data-tid="'+t.tid+'">'+
+        (t.thumb ? '<img src="'+t.thumb+'" style="width:100%;display:block">' : '<div style="height:60px;display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:11px">无图</div>')+
+        '<div style="font-size:10.5px;color:var(--sub);padding:3px 5px;text-align:center">'+when+' · '+t.n_done+'/'+t.n+'</div></div>';
+    });
+    h += '</div>';
+    $('hist').innerHTML = h;
+    Array.prototype.forEach.call($('hist').querySelectorAll('[data-tid]'), function(el){
+      el.onclick = function(){
+        S.tid = el.getAttribute('data-tid');
+        saveTid(S.tid);
+        api('api/session/' + S.tid).then(function(d){
+          S.ana = d.analysis; S.screens = d.screens || []; S.pages = d.pages || [];
+          S.nRef = d.refs.length; S.nProd = d.prods.length;
+          goStep(d.pages && d.pages.length ? 3 : 2);
+          refreshSession();
+        }).catch(function(e){ toast(e.message); });
+      };
+    });
+  }).catch(function(){});
+}
+
+/* ---------------- 恢复上次任务（2026-11-19）----------------
+   问题：fk 页在父站是常驻 iframe，切菜单不丢状态，但**刷新一次就全清零**
+   （无 localStorage、无 ?tid=、无「最近任务」入口），做到一半刷没了只能重传。
+   对策：tid 落 localStorage + 顶部恢复条 + 支持 ?tid=xxx 直进。 */
+function saveTid(tid){
+  try { localStorage.setItem('fk_tid', tid || ''); } catch(e) {}
+}
+function readTid(){
+  try { return localStorage.getItem('fk_tid') || ''; } catch(e) { return ''; }
+}
+function hideResume(){ $('resumeBar').classList.add('hide'); }
+function showResume(tid, stepNo, nDone, nTotal){
+  var tip = stepNo >= 3 ? ('已出图 ' + nDone + '/' + nTotal + ' 屏')
+                        : (stepNo === 2 ? ('已拆解 ' + nTotal + ' 屏，还没出图')
+                                        : '素材已上传，还没拆解');
+  $('resumeTxt').textContent = '上次的任务还在：' + tip;
+  $('resumeBar').classList.remove('hide');
+  $('btnResume').onclick = function(){ loadTask(tid); };
+  $('btnDropResume').onclick = function(){
+    saveTid('');
+    S.tid = ''; S.ana = null; S.screens = []; S.pages = []; S.prmDirty = false; S.genStarted = false;
+    hideResume(); goStep(1); toast('已清除，可以新做一个');
+  };
+}
+function loadTask(tid){
+  return api('api/session/' + tid).then(function(d){
+    S.tid = tid; saveTid(tid);
+    S.ana = d.analysis; S.screens = d.screens || []; S.pages = d.pages || [];
+    S.nRef = d.refs.length; S.nProd = d.prods.length;
+    S.genStarted = !!(d.pages && d.pages.length);
+    hideResume();
+    var st = d.pages && d.pages.length ? 3 : (d.screens && d.screens.length ? 2 : 1);
+    goStep(st);
+    refreshSession();
+    /* 只有素材时停在步骤1，界面变化不明显 → 明确告诉用户素材已经回来了 */
+    if (st === 1) toast('已载入上次的素材，点「下一步：拆解参考页」继续', 4000);
+    /* 上次还没跑完（刷新/关页中断）→ 接着轮询；僵死状态由后端 _reap_stale 复位 */
+    if (d.status === 'running' && d.pages && d.pages.length) poll();
+  }).catch(function(e){ toast(e.message); });
+}
+function bootResume(){
+  var qs = '';
+  try { qs = new URLSearchParams(location.search).get('tid') || ''; } catch(e) {}
+  var tid = qs || readTid();
+  if (!tid) return;
+  api('api/session/' + tid).then(function(d){
+    var pgs = d.pages || [], scs = d.screens || [];
+    /* 🔴 判「空会话」要看有没有素材，不能只看拆解/出图记录：
+       上传完还没拆解的任务同样值得恢复（实测写成只看 pages/screens 会把刚传完的活清掉）。 */
+    if (!pgs.length && !scs.length && !(d.refs || []).length && !(d.prods || []).length) {
+      saveTid(''); return;
+    }
+    var nDone = pgs.filter(function(p){ return p.status === 'done'; }).length;
+    var st = pgs.length ? 3 : (scs.length ? 2 : 1);
+    saveTid(tid);
+    showResume(tid, st, nDone, pgs.length || scs.length);
+    if (qs) loadTask(qs);        // ?tid= 直进，不再问
+  }).catch(function(){ saveTid(''); });
+}
+
+/* ================= 原图对比滑块（2026-11-19）=================
+   方案 C：结果卡内嵌小滑块（快扫）+ 全屏对比层（精比），共用一套引擎。
+   左 = 效果图（成品），右 = 原图（该屏出图时实际用的参考图）。
+   🔴 标签放进各自图层，随 clip-path 一起被裁掉；可见区装不下时整体淡出。 */
+var CMP = (function(){
+  var FS = {pos:50};
+
+  function q(root, sel){ return root.querySelector(sel); }
+  function pageOf(idx){ return (S.pages || [])[idx - 1] || null; }
+
+  function paint(root, pos){
+    if (!root) return;
+    var top = q(root, '[data-role="top"]'), div = q(root, '.cdiv');
+    if (!top || !div) return;
+    top.style.clipPath = 'inset(0 ' + (100 - pos) + '% 0 0)';
+    div.style.left = pos + '%';
+    var lb = q(root, '.clab.l'), rb = q(root, '.clab.r'), cw = root.clientWidth || 1;
+    if (lb) lb.classList.toggle('dim', pos * cw / 100 < (lb.offsetWidth || 0) + 16);
+    if (rb) rb.classList.toggle('dim', (100 - pos) * cw / 100 < (rb.offsetWidth || 0) + 16);
+  }
+
+  function setFitClass(el, fit){
+    if (!el) return;
+    el.classList.remove('fit-contain','fit-stretch','fit-top');
+    el.classList.add('fit-' + fit);
+  }
+
+  function setFit(fit){
+    S.cmpFit = fit;
+    setFitClass($('fsCmp'), fit);
+    Array.prototype.forEach.call(document.querySelectorAll('#rBox .cmp'), function(e){ setFitClass(e, fit); });
+    Array.prototype.forEach.call(document.querySelectorAll('#cmpFs [data-ffit]'), function(c){
+      c.classList.toggle('on', c.getAttribute('data-ffit') === fit);
+    });
+    if (S.fsOpen) meta(pageOf(S.fsIdx));
+  }
+
+  function meta(p){
+    if (!p) return;
+    var m = $('fsMeta');
+    if (S.cmpFit === 'stretch') {
+      m.textContent = '⚠ 参考图已拉伸对齐 · 仅供版式比对，产品形状不代表真实比例';
+      m.style.background = 'rgba(201,130,31,.92)'; m.style.color = '#fff8ec';
+      m.style.borderRadius = '6px'; m.style.padding = '2px 9px';
+    } else {
+      m.textContent = '参考第 ' + (p.refNo || '?') + ' 张 · 成品 ' + (p.w || '?') + '×' + (p.h || '?');
+      m.style.background = ''; m.style.color = ''; m.style.borderRadius = ''; m.style.padding = '';
+    }
+  }
+
+  /* 两张图都 onload 之后才算就绪；任一张失败给明确文案（别出现半张图的假对比） */
+  function load(root, outUrl, refUrl, onReady){
+    var base = q(root, '[data-role="base"]'), top = q(root, '[data-role="topimg"]');
+    var err = q(root, '.cerr');
+    var n = 0, bad = 0;
+    function ok(){ n++; if (n >= 2 && !bad && onReady) onReady(); }
+    function no(){
+      bad++;
+      if (err) { err.textContent = '图片加载失败（可能已过 72h 清理）'; err.style.display = 'flex'; }
+    }
+    [[base, refUrl], [top, outUrl]].forEach(function(pair){
+      if (!pair[0]) return;
+      pair[0].onload = ok; pair[0].onerror = no;
+      pair[0].src = pair[1] || '';
+      if (pair[0].complete && pair[0].naturalWidth) ok();
+    });
+  }
+
+  function bind(root, kind, idx){
+    if (!root || root._cmpBound) return;
+    root._cmpBound = true;
+    var dragging = false;
+    function cur(){ return kind === 'fs' ? FS.pos : (S.cmpPos[idx] == null ? 50 : S.cmpPos[idx]); }
+    function put(p){
+      p = Math.max(0, Math.min(100, p));
+      if (kind === 'fs') FS.pos = p; else S.cmpPos[idx] = p;
+      paint(root, p);
+    }
+    function fromEvent(e){
+      var r = root.getBoundingClientRect();
+      if (!r.width) return;
+      put((e.clientX - r.left) / r.width * 100);
+    }
+    root.addEventListener('pointerdown', function(e){
+      if (e.button !== undefined && e.button !== 0) return;
+      try { root.setPointerCapture(e.pointerId); } catch (err) {}
+      dragging = true;
+      try { root.focus({preventScroll:true}); } catch (err) {}
+      fromEvent(e); e.preventDefault();
+    });
+    root.addEventListener('pointermove', function(e){ if (dragging) fromEvent(e); });
+    function end(e){
+      if (!dragging) return;
+      dragging = false;
+      try { if (root.hasPointerCapture && root.hasPointerCapture(e.pointerId)) root.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
+    root.addEventListener('pointerup', end);
+    root.addEventListener('pointercancel', end);
+    root.addEventListener('dblclick', function(){ put(50); });
+    root.addEventListener('keydown', function(e){
+      var st = e.shiftKey ? 5 : 1, c = cur(), nv = null;
+      if (e.key === 'ArrowLeft') nv = c - st;
+      else if (e.key === 'ArrowRight') nv = c + st;
+      else if (e.key === 'Home') nv = 0;
+      else if (e.key === 'End') nv = 100;
+      if (nv === null) return;
+      e.preventDefault(); put(nv);
+    });
+  }
+
+  /* 结果卡里的内嵌滑块：每次 renderPages 重写 innerHTML 后重新挂载 */
+  function mountAll(){
+    Array.prototype.forEach.call(document.querySelectorAll('#rBox [data-cmpbox]'), function(box){
+      var idx = +box.getAttribute('data-cmpbox');
+      setFitClass(box, S.cmpFit);
+      bind(box, 'inline', idx);
+      var pos = (S.cmpPos[idx] == null) ? 50 : S.cmpPos[idx];
+      load(box, box.getAttribute('data-out'), box.getAttribute('data-ref'), function(){ paint(box, pos); });
+      paint(box, pos);
+    });
+  }
+
+  function openFs(idx){
+    var p = pageOf(idx);
+    if (!p || !p.ref) { toast('这一屏没有可对比的参考图'); return; }
+    var root = $('fsCmp');
+    S.fsOpen = true; S.fsIdx = idx;
+    FS.pos = (S.cmpPos[idx] == null) ? 50 : S.cmpPos[idx];
+    $('fsName').textContent = '第 ' + idx + ' 屏 · 原图对比';
+    /* 🔴 高度同时受视口宽高约束：只写 height:100% 会在窄屏撑出横向溢出 */
+    var w = p.w || 3, h = p.h || 4;
+    root.style.aspectRatio = w + ' / ' + h;
+    root.style.height = 'min(100%, calc((100vw - 34px) * ' + (h / w).toFixed(4) + '))';
+    setFitClass(root, S.cmpFit);
+    meta(p);
+    $('cmpFs').classList.add('on');
+    document.body.style.overflow = 'hidden';
+    bind(root, 'fs', 0);
+    load(root, p.url, p.ref, function(){ paint(root, FS.pos); try { root.focus({preventScroll:true}); } catch (e) {} });
+    paint(root, FS.pos);
+  }
+
+  function closeFs(){
+    S.fsOpen = false;
+    $('cmpFs').classList.remove('on');
+    document.body.style.overflow = '';
+    /* 全屏里调过的位置回写到该屏，卡片上的滑块跟着同步 */
+    S.cmpPos[S.fsIdx] = FS.pos;
+    mountAll();
+  }
+
+  function step(d){
+    var n = (S.pages || []).length;
+    if (!n) return;
+    var i = S.fsIdx, tries = 0;
+    do { i = (i - 1 + d + n) % n + 1; tries++; } while (tries <= n && !(pageOf(i) && pageOf(i).ref));
+    openFs(i);
+  }
+
+  return {paint:paint, mountAll:mountAll, openFs:openFs, closeFs:closeFs, setFit:setFit, step:step};
+})();
+
+Array.prototype.forEach.call(document.querySelectorAll('#cmpFs [data-ffit]'), function(c){
+  c.onclick = function(){ CMP.setFit(c.getAttribute('data-ffit')); };
+});
+$('fsClose').onclick = function(){ CMP.closeFs(); };
+$('cmpFs').onclick = function(e){
+  if (e.target === this || e.target.className === 'fsstage') CMP.closeFs();
+};
+$('fsPrev').onclick = function(e){ e.stopPropagation(); CMP.step(-1); };
+$('fsNext').onclick = function(e){ e.stopPropagation(); CMP.step(1); };
+document.addEventListener('keydown', function(e){
+  if (!S.fsOpen) return;
+  if (e.key === 'Escape') { CMP.closeFs(); return; }
+  var t = e.target;
+  if (e.altKey || (t && t.closest && t.closest('#fsCmp'))) return;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); CMP.step(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); CMP.step(1); }
+});
+
+renderSteps();
+/* 启动时问一句「要不要继续上次的任务」（?tid= 则直接进） */
+bootResume();
+</script>
+</body>
+</html>

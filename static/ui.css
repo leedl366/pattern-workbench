@@ -1,0 +1,93 @@
+/* ============================================================
+   速图AIGC · 全站统一设计令牌与共享组件（ui.css）
+   所有页面 <link> 引入本文件后用 var(--xxx) 取色/圆角/阴影，
+   不再各自硬编码色值。改主题只改这一份。
+
+   2026-11-19 换肤：按「能影」站点实测值改为深色体系（强调色为中性黑白灰）
+   （nengly3c.app.workbuddy.link，1440 视口 getComputedStyle 实测）
+     shell #121212 ｜ 页底 #090a0e ｜ 卡片 #15171d ｜ 图底 #0c0e16
+     正文 #e5e7eb ｜ 次级 #9ca3af ｜ 弱 #6b7280 ｜ 积分金 #f5af38
+     卡片圆角 16 ｜ 控件 10 ｜ 胶囊 21~999
+   变量名一个没改，子应用照旧吃 var()。
+   ============================================================ */
+:root{
+  /* 强调色 · 中性黑白灰
+     🔴 2026-11-19 修正：上一版把能影 logo 渐变里的蓝紫当成了品牌主色铺满全站
+     （按钮/选中态/徽章/导航全紫），整页发花。能影真实做法是整站黑白灰，
+     蓝紫只出现在 logo 和右下浮动按钮这种"点"上，不参与主色体系。
+     因此主色改为中性：实心白做最高层级，浅白做选中底，文字走 --tx 三档。 */
+  --pri:#ffffff;        /* 主按钮底、选中态实心 */
+  --pri2:#d8dade;       /* 次强调（hover 边框、渐变末端） */
+  --pri-dark:#d8dade;   /* hover 时浅一档 */
+  --pri-050:rgba(255,255,255,.07);   /* 选中底色 */
+  --pri-100:rgba(255,255,255,.11);   /* 徽章底 */
+  --pri-200:rgba(255,255,255,.22);   /* 徽章边、选中边 */
+  --pri-300:#c9ccd2;    /* 深底上的强调字 */
+  --pri-bg:rgba(255,255,255,.05);    /* hover 底色 */
+  --grad-pri:linear-gradient(135deg,#ffffff 0%,#d8dade 100%);
+  --on-pri:#111214;     /* 🔴 主色上的文字：白底必须配深字，否则白底白字 */
+
+  /* 中性色（深色体系） */
+  --bg:#090a0e;         /* 页面底色 */
+  --card:#15171d;       /* 卡片底 */
+  --card2:#0c0e16;      /* 图片/内嵌深底 */
+  --shell:#121212;      /* 侧边栏/外壳底（比页底亮一档） */
+  --tx:#e5e7eb;         /* 正文 */
+  --sub:#9ca3af;        /* 弱化文字 */
+  --faint:#6b7280;      /* 更弱（占位、脚注） */
+  --bd:rgba(255,255,255,.08);      /* 边框 */
+  --hair:rgba(255,255,255,.045);   /* 极细描边（能影卡片用的那一档） */
+  --fill:#1a1c22;       /* 浅填充（表头、次级卡片） */
+  --gold:#f5af38;       /* 积分数字 */
+
+  /* 语义色（深色底：字提亮 + 底半透明） */
+  --ok:#4ade80;  --ok-bg:rgba(74,222,128,.14);  --ok-bd:rgba(74,222,128,.32);
+  --err:#f87171; --err-bg:rgba(248,113,113,.14); --err-bd:rgba(248,113,113,.32);
+  --bad:#f87171; /* = --err，兼容旧变量名 */
+  --warn:#fbbf24; --warn-bg:rgba(251,191,36,.14); --warn-bd:rgba(251,191,36,.32);
+
+  /* 圆角三档 + 胶囊（能影：卡片 16 / 控件 10 / 徽章胶囊） */
+  --r-card:16px;        /* 卡片/大面板 */
+  --r-ctl:10px;         /* 控件（按钮/输入框/小卡） */
+  --r-sm:10px;          /* 小元素（缩略图、标签） */
+  --r-pill:999px;       /* 胶囊徽章 */
+
+  /* 阴影 / 聚焦环（深色底用描边代替投影） */
+  --shadow-card:0 0 0 1px rgba(255,255,255,.045);
+  --shadow-pop:0 12px 32px rgba(0,0,0,.6);
+  --ring:0 0 0 3px rgba(255,255,255,.18);
+
+  /* 字体（全站统一系统栈，不引外链字体） */
+  --font:-apple-system,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  color-scheme:dark;
+}
+
+/* ---------- 共享组件 ---------- */
+
+/* 问号说明气泡：hover 或点击触发（触屏可点），点空白处关闭。
+   用法：<span class="q">?<span class="tip">说明 <b>重点</b></span></span>
+   靠右元素加 .q.r 右对齐变体防溢出。JS（点空白关闭）各页自带同一段。 */
+.q{position:relative;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;
+   background:var(--pri-100);color:var(--pri-300);border:1px solid var(--pri-200);font-size:11px;font-weight:700;cursor:pointer;
+   flex:none;user-select:none;vertical-align:middle;line-height:1;margin-left:7px;-webkit-tap-highlight-color:transparent}
+.q:hover{background:var(--pri-200)}
+.q .tip{display:none;position:absolute;z-index:99;top:calc(100% + 9px);left:50%;transform:translateX(-50%);
+   width:max-content;max-width:min(360px,80vw);background:#1f2126;color:var(--tx);font-size:12.5px;font-weight:400;
+   line-height:1.75;padding:10px 13px;border-radius:var(--r-ctl);box-shadow:var(--shadow-pop);text-align:left;
+   white-space:pre-line;letter-spacing:0;border:1px solid var(--bd)}
+.q .tip b{color:var(--pri-300);font-weight:700}
+.q .tip::before{content:"";position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+   border:6px solid transparent;border-bottom-color:#1f2126}
+.q:hover .tip,.q.open .tip{display:block}
+.q.r .tip{left:auto;right:0;transform:none}
+.q.r .tip::before{left:auto;right:12px;transform:none}
+
+/* 主按钮（渐变）——页面有特殊尺寸时在页内再覆盖 padding/字号 */
+.btn-pri-grad{background:var(--grad-pri);color:var(--on-pri);border:none;font-weight:700;cursor:pointer}
+.btn-pri-grad:hover{opacity:.88}
+.btn-pri-grad:disabled{background:rgba(255,255,255,.09);color:var(--faint);border:1px solid rgba(255,255,255,.10);opacity:1;cursor:not-allowed}
+
+/* ---------- 新增：能影风外壳辅助类 ---------- */
+/* 深色底上的"图片铺满 + 底部渐变压字"卡片，供结果区/入口卡复用 */
+.ny-veil{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(to top,rgba(0,0,0,.92) 0%,rgba(0,0,0,.34) 42%,rgba(0,0,0,0) 72%)}

@@ -1,0 +1,40 @@
+# ===== 运行时数据：每单都在涨，绝不入库 =====
+data/
+deliver/
+models/
+venv/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# ===== 备份文件：每次改动都生成，量极大 =====
+*.bak
+*.bak_*
+*.bak-*
+*.bak.*
+_bak_*/
+bak_*/
+
+# ===== 明文密钥：永不入库 =====
+.apib_key
+ai_sites.json
+cos_config.json
+*.pem
+*.key
+*.p12
+.env
+.env.*
+
+# ===== 日志 =====
+*.log
+logs/
+_server.log
+_server_out.log
+_server_err.log
+
+# ===== 系统垃圾 =====
+.DS_Store
+Thumbs.db
+
+# 注：本仓库内嵌 duotu 子应用（server.py 按目录名 duotu 动态加载），
+#     故此处不再 ignore duotu/ —— 与原线上仓库的 .gitignore 有意不同。

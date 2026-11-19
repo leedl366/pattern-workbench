@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>多图融合编辑工作台 · 分部位编辑方案（待确认）</title>
+<style>
+:root{
+  --ink:#0f172a; --sub:#64748b; --line:#e2e8f0; --bg:#f6f8fb; --card:#fff;
+  --brand:#2563eb; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; --purple:#7c3aed;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14.5px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px 80px}
+header.top{background:linear-gradient(120deg,#4c1d95,#7c3aed 55%,#2563eb);color:#fff;padding:30px 0 26px;margin-bottom:22px}
+header.top .wrap{padding-bottom:0}
+header.top h1{margin:0 0 6px;font-size:24px;letter-spacing:.3px}
+header.top .desc{opacity:.92;font-size:13.5px}
+header.top .meta{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+header.top .meta a,header.top .meta span{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
+  color:#fff;text-decoration:none;padding:5px 12px;border-radius:99px;font-size:12.5px}
+nav.toc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:22px;
+  display:flex;flex-wrap:wrap;gap:8px}
+nav.toc a{font-size:12.8px;color:var(--purple);text-decoration:none;background:#f5f3ff;border:1px solid #ddd6fe;
+  padding:4px 11px;border-radius:99px}
+nav.toc a:hover{background:#ddd6fe}
+section.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin-bottom:18px}
+section.card h2{margin:0 0 4px;font-size:17.5px;display:flex;align-items:center;gap:9px}
+section.card h2 .n{width:24px;height:24px;border-radius:8px;background:var(--purple);color:#fff;font-size:12.5px;
+  display:inline-flex;align-items:center;justify-content:center;font-style:normal;flex:0 0 auto}
+section.card h3{margin:20px 0 8px;font-size:14.5px;color:#1e293b;border-left:3px solid var(--purple);padding-left:9px}
+.lead{color:var(--sub);font-size:13.2px;margin:0 0 12px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 4px}
+th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:#f1f5f9;font-weight:600;white-space:nowrap}
+td code,li code,p code{background:#f1f5f9;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12.4px}
+ul,ol{margin:6px 0 6px;padding-left:22px}
+li{margin:3px 0}
+.pill{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:99px;border:1px solid;vertical-align:middle}
+.pill.blue{color:var(--brand);border-color:#bfdbfe;background:#eff6ff}
+.pill.green{color:var(--ok);border-color:#bbf7d0;background:#f0fdf4}
+.pill.red{color:var(--bad);border-color:#fecaca;background:#fef2f2}
+.pill.amber{color:var(--warn);border-color:#fde68a;background:#fffbeb}
+.pill.purple{color:var(--purple);border-color:#ddd6fe;background:#f5f3ff}
+.box{border-radius:11px;padding:11px 14px;margin:10px 0;font-size:13px;border:1px solid}
+.box.tip{background:#f0fdf4;border-color:#bbf7d0;color:#14532d}
+.box.warn{background:#fffbeb;border-color:#fde68a;color:#78350f}
+.box.info{background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a}
+.box b{color:inherit}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+.flow .s{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:7px 12px;font-size:12.8px}
+.flow .ar{color:var(--sub)}
+.prompt{background:#0f172a;color:#e2e8f0;border-radius:11px;padding:13px 15px;font:12.6px/1.65 Consolas,Menlo,monospace;
+  overflow-x:auto;white-space:pre-wrap;margin:8px 0;border:1px solid #1e293b}
+.prompt .c{color:#94a3b8}
+.prompt .v{color:#7dd3fc}
+footer{color:var(--sub);font-size:12.5px;text-align:center;padding:24px 0 0}
+a.ext{color:var(--brand);text-decoration:none}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <h1>分部位编辑方案 · 手机壳 + 挂绳 + 支架</h1>
+  <div class="desc">把一张图拆成「壳体 / 挂绳 / 支架 / 摄像头孔位」四个部位，每个部位单独配指令、单独重改、多部位合并出图 —— 先出方案，确认后执行</div>
+  <div class="meta">
+    <span>版本 v1 · 2026-10-05</span>
+    <span>状态：待雪碧确认</span>
+    <a href="/duotu/">打开工作台 →</a>
+    <a href="/duotu/help.html">功能说明书 →</a>
+  </div>
+</div></header>
+<div class="wrap">
+
+<nav class="toc">
+  <a href="#matrix">① 需求→部位矩阵</a>
+  <a href="#probe">② 实测依据</a>
+  <a href="#arch">③ 总体架构</a>
+  <a href="#prompt">④ 提示词库</a>
+  <a href="#merge">⑤ 多部位一起改</a>
+  <a href="#rerun">⑥ 单环节重改</a>
+  <a href="#ui">⑦ 界面落地</a>
+  <a href="#steps">⑧ 执行排期</a>
+  <a href="#risk">⑨ 边界与风险</a>
+</nav>
+
+<section class="card">
+<h2><i class="n">①</i>你的需求 → 部位 × 操作矩阵</h2>
+<p class="lead">你列的所有改图需求，全部归位到 4 个部位 × 6 种操作。以后任何新需求，都能用「部位 + 操作 + 参考图/参数」三件套表达。</p>
+<table>
+<tr><th>部位</th><th>操作</th><th>你的原话</th><th>需要什么输入</th></tr>
+<tr><td rowspan="2"><b>挂绳</b><br><span class="pill purple">lanyard</span></td><td>去除</td><td>「把手机挂绳去掉」</td><td>只要底图</td></tr>
+<tr><td>换参考</td><td>「换成我提供的手机挂绳」</td><td>底图 + 挂绳参考图</td></tr>
+<tr><td rowspan="4"><b>支架</b><br><span class="pill purple">stand</span></td><td>去除</td><td>「把手机支架去掉」</td><td>只要底图</td></tr>
+<tr><td>改图案</td><td>「手机支架改图案」</td><td>底图 + 图案描述或图案参考图</td></tr>
+<tr><td>改颜色</td><td>「手机支架……改颜色」</td><td>底图 + 颜色描述</td></tr>
+<tr><td>换参考</td><td>「手机支架换成我的」</td><td>底图 + 支架参考图</td></tr>
+<tr><td rowspan="4"><b>壳体</b><br><span class="pill purple">case</span></td><td>换材质（整壳）</td><td>「手机壳换成我提供的参考材质」</td><td>底图 + 材质参考图</td></tr>
+<tr><td>换图案（整壳）</td><td>「手机壳换成我提供的图案」</td><td>底图 + 图案参考图</td></tr>
+<tr><td>换材质 + 保图案</td><td>「换成参考材质，保持原来的手机壳图案不变」</td><td>底图 + 材质参考图（图案从原图继承）</td></tr>
+<tr><td>只改摄像头孔位区</td><td>「只改摄像头孔位区域，其他不改动」</td><td>底图 + 孔位区修改描述（或参考图）</td></tr>
+</table>
+<div class="box info"><b>组合即插即用：</b>任何几个部位一起改都行，比如「挂绳去掉 + 支架换我的 + 壳换材质保图案」三处同改——见第 ⑤ 节的两种合并方式。</div>
+</section>
+
+<section class="card">
+<h2><i class="n">②</i>今天的三项实测（方案的可行性依据，不是猜的）</h2>
+<p class="lead">写方案前我用你的 apib.ai key 实测了三个关键能力，各出一张小图验证（花费极小）。</p>
+<table>
+<tr><th>#</th><th>实测什么</th><th>结果</th><th>对方案的意义</th></tr>
+<tr><td>1</td><td>视觉模型 <code>gpt-5.4</code> 能否输出部位 bbox</td><td><span class="pill green">通过</span> 严格 JSON、坐标格式准确、能诚实回答「部位不存在」</td><td>部位识别层可行，不用你手动画框（但保留手调）</td></tr>
+<tr><td>2</td><td><code>/v1/images/edits</code>（局部重绘端点）</td><td><span class="pill amber">只支持 Grok</span> gpt-image-2 不走这个端点</td><td>局部编辑有专用通道，但仅 Grok 系可用</td></tr>
+<tr><td>3</td><td>Grok edits 的 mask 是否「硬约束」</td><td><span class="pill red">软约束</span> 实测中央大改、四周也被轻微重绘、尺寸还会变（256 进 960 出）</td><td><b>关键结论</b>：精准局部重改不能只信 API 的 mask，必须加程序级合成保底</td></tr>
+</table>
+<div class="box warn"><b>第 3 项实测决定技术路线：</b>AI 模型「守住边界」的能力不可靠，所以「不改的地方一个像素都不动」这件事由程序来做（贴回原图像素），AI 只负责 mask 内的创意区域。这是确定性保证，不靠运气。</div>
+</section>
+
+<section class="card">
+<h2><i class="n">③</i>总体架构：三层流水线</h2>
+<p class="lead">在现有工作台上新增一个「分部位编辑」模式，不推翻已有功能。</p>
+<div class="flow">
+  <span class="s">📷 底图上传</span><span class="ar">→</span>
+  <span class="s"><b>L1 部位识别</b>（gpt-5.4 视觉模型，出 4 个部位的框）</span><span class="ar">→</span>
+  <span class="s"><b>L2 指令装配</b>（每个部位一张编辑卡：操作/参考图/提示词）</span><span class="ar">→</span>
+  <span class="s"><b>L3 执行合成</b>（逐部位出图 + 程序贴回保底）</span><span class="ar">→</span>
+  <span class="s">🖼 合并成品</span>
+</div>
+<h3>L1 部位识别层</h3>
+<ul>
+<li>上传底图后点「<b>识别部位</b>」→ 视觉模型返回：壳体 / 挂绳 / 支架 / 摄像头孔位，各带一个框（相对坐标）和一句描述。</li>
+<li>识别出的框直接画在底图上，<b>每个框四角可拖</b>，识别不准时手动修正（挂绳细长、容易被框大，默认框会自动外扩 10% 容错）。</li>
+<li>底图里没有挂绳/支架时，对应部位卡自动隐藏（或显示「图里没有」）。</li>
+</ul>
+<h3>L2 指令装配层（你要的「单独提示词」就在这层）</h3>
+<ul>
+<li>每个部位一张卡片：操作下拉（不动 / 去除 / 换参考 / 改颜色 / 改图案 / 只改这块）+ 参考图槽（从 5 个图位选，或现场传）+ 参数（颜色词、图案描述）。</li>
+<li>卡片上有「<b>生成提示词</b>」按钮：不花钱，先把这条部位的完整英文提示词展示出来，<b>你可以直接改文字</b>再执行——这就是你要的「不断优化到精准」的抓手。</li>
+<li>改过的提示词可保存为版本（v1/v2/v3…），下轮默认用最新的，可以回退。</li>
+</ul>
+<h3>L3 执行合成层</h3>
+<ul>
+<li>逐部位执行：第 k 步的输入 = 第 k-1 步的输出图 + 该部位指令 + 参考图 + 该部位 mask。</li>
+<li>AI 出图后，程序立即做「<b>保底贴回</b>」：mask 外区域 100% 用输入图原像素覆盖回去（边缘羽化 5px），保证没让你改的地方一个像素不变。</li>
+<li>每一步的「输入图 + 指令 + 参考图 + mask + 输出图」全部存档 —— 这是单环节重改的基础（第 ⑥ 节）。</li>
+</ul>
+</section>
+
+<section class="card">
+<h2><i class="n">④</i>提示词库 v1（每个部位单独一套，后续持续打磨）</h2>
+<p class="lead">出图模型吃英文更稳，所以执行用英文提示词；中文是你界面上看到的说明。<span class="pill blue">生成后可改</span> 表示这条在界面里可以手动编辑后再执行。</p>
+
+<h3>A. 挂绳部位（lanyard / strap）</h3>
+<table>
+<tr><th>操作</th><th>中文说明</th></tr>
+<tr><td>去除</td><td>整条挂绳抹掉，原来被挂绳挡住的地方自然补全，别的什么都不动</td></tr>
+<tr><td>换参考</td><td>挂绳换成参考图的款式，材质、编织、五金细节都对齐参考图</td></tr>
+</table>
+<div class="prompt"><span class="c">!A1 挂绳-去除（默认提示词 v1，可改）</span>
+Remove the phone lanyard / strap completely from the image, including its attachment hardware.
+Naturally fill the area where the strap was with the surrounding background, as if the strap never existed.
+<span class="v">PROTECT: Keep the phone case, its printed artwork, the camera module, the stand and the background exactly unchanged — identical colors, patterns and lighting.</span></div>
+<div class="prompt"><span class="c">!A2 挂绳-换参考（{ref} 为挂绳参考图）</span>
+Replace the current phone lanyard with the one shown in {ref}.
+Match its material, color, weave pattern and hardware details exactly.
+Keep the attachment point natural and physically plausible.
+<span class="v">PROTECT: Everything else (case, artwork, stand, background, lighting) stays exactly as the original.</span></div>
+
+<h3>B. 支架部位（stand / holder / ring grip）</h3>
+<table>
+<tr><th>操作</th><th>中文说明</th></tr>
+<tr><td>去除</td><td>支架抹掉并补全背景</td></tr>
+<tr><td>改图案</td><td>支架表面图案重新设计（图案可描述或给参考图），形状大小不变</td></tr>
+<tr><td>改颜色</td><td>支架整体换色，保留原有质感光影</td></tr>
+<tr><td>换参考</td><td>支架整个换成参考图的支架</td></tr>
+</table>
+<div class="prompt"><span class="c">!B1 支架-去除</span>
+Remove the phone stand / holder completely from the image.
+Fill the area naturally with the surrounding background.
+<span class="v">PROTECT: The case, its artwork, the lanyard and everything else remain exactly unchanged.</span></div>
+<div class="prompt"><span class="c">!B2 支架-改图案（{pattern} = 新图案描述或参考图）</span>
+Redesign ONLY the surface artwork of the phone stand with: {pattern}.
+Keep the stand's exact shape, size, position, material and perspective.
+<span class="v">PROTECT: The case and all other areas remain exactly unchanged.</span></div>
+<div class="prompt"><span class="c">!B3 支架-改颜色（{color} = 颜色）</span>
+Change the color of the phone stand to {color}.
+Preserve its original shape, texture, shading, highlights and position.
+<span class="v">PROTECT: The case and all other areas remain exactly unchanged.</span></div>
+<div class="prompt"><span class="c">!B4 支架-换参考</span>
+Replace the phone stand with the one shown in {ref}, matching its shape, color and structure.
+Scale and position it naturally in the same spot.
+<span class="v">PROTECT: The case and all other areas remain exactly unchanged.</span></div>
+
+<h3>C. 壳体部位（case）</h3>
+<table>
+<tr><th>操作</th><th>中文说明</th></tr>
+<tr><td>换材质（整壳）</td><td>壳整体换成参考材质，原彩绘随新材质重铸（图案不保留）</td></tr>
+<tr><td>换图案（整壳）</td><td>壳的图案整体换成参考图案，材质底色不变</td></tr>
+<tr><td>换材质 + 保图案</td><td>只换底材质感，原彩绘图案一笔不改</td></tr>
+<tr><td>只改摄像头孔位区</td><td>壳只动孔位那一小块，其余原样</td></tr>
+</table>
+<div class="prompt"><span class="c">!C1 壳-换材质（整壳）</span>
+Replace the material and finish of the phone case with the material from {ref}
+(color, texture, reflectiveness must match the reference).
+Keep the case silhouette, camera cutout position and overall composition of the original.
+<span class="v">PROTECT: Lanyard, stand and background remain unchanged.</span></div>
+<div class="prompt"><span class="c">!C2 壳-换图案（整壳）</span>
+Replace the printed artwork on the case back with the artwork from {ref}.
+Full coverage across the case back, no distortion, wrap naturally around edges and camera cutout.
+<span class="v">PROTECT: Case material/color, lanyard, stand and background remain unchanged.</span></div>
+<div class="prompt"><span class="c">!C3 壳-换材质+保图案</span>
+Replace ONLY the base material and surface finish of the case with the material from {ref}.
+The printed artwork must remain EXACTLY as the original — identical shapes, colors and positions, pixel-faithful.
+Only the material texture and finish change underneath it.
+<span class="v">PROTECT: Lanyard, stand, background remain unchanged.</span></div>
+<div class="prompt"><span class="c">!C4 壳-只改摄像头孔位区（{edit} = 孔位区要怎么改）</span>
+Edit ONLY the camera cutout region of the phone case: {edit}.
+Keep lens holes and glass highlights intact.
+<span class="v">PROTECT: Every pixel outside this small region must remain identical to the original.</span></div>
+</section>
+
+<section class="card">
+<h2><i class="n">⑤</i>多部位一起改，两种方式怎么选</h2>
+<table>
+<tr><th></th><th>方式一：整图融合</th><th>方式二：分层管线（推荐精修）</th></tr>
+<tr><td>原理</td><td>所有部位指令拼成一条大 prompt，一次 gpt-image-2 调用出图</td><td>逐部位出图，程序贴回合成，一步一档</td></tr>
+<tr><td>整体协调</td><td><span class="pill green">最好</span> 光影透视一次成型</td><td><span class="pill amber">较好</span> 每步独立，边缘靠羽化衔接</td></tr>
+<tr><td>单部位重改</td><td><span class="pill red">不行</span> 任何改动都是整图重抽</td><td><span class="pill green">可以</span> 哪步不满意重跑哪步（第 ⑥ 节）</td></tr>
+<tr><td>花钱</td><td>一次调用（多张候选则 ×n）</td><td>每个改动部位各一次调用</td></tr>
+<tr><td>适合</td><td>初稿、大改（多处一起动）</td><td>定稿、精修、微调</td></tr>
+</table>
+<div class="box tip"><b>推荐工作流：</b>整图融合出 2 张初稿 → 挑一张满意的 → 切分层管线逐部位精修（哪里不对改哪里，一次只花一次调用的钱）。两步之间底图自动传递，不用重传。</div>
+<div class="prompt"><span class="c">!合并拼装示例（整图融合模式，三个部位同时动）</span>
+TASK: Product photo editing, based on the TARGET image (a phone with case and accessories).
+Apply these edits in order:
+1. Remove the phone lanyard completely; fill the area with background.
+2. Replace the phone stand with the one in {ref_2}, matching shape and color.
+3. Replace ONLY the case base material with the material of {ref_1}; keep the printed artwork exactly unchanged.
+<span class="v">GLOBAL: Keep original composition, camera angle, product scale, background and lighting. Clean studio product photo, sharp edges, no text, no watermark, no extra objects.</span></div>
+</section>
+
+<section class="card">
+<h2><i class="n">⑥</i>单环节重改（你最关心的「不用整张改」）</h2>
+<p class="lead">分层管线的每一步都留档，所以任何一步可以单独重跑，其他步骤的结果原封不动。</p>
+<div class="flow">
+  <span class="s">P0 底图</span><span class="ar">→</span>
+  <span class="s">P1 壳体编辑</span><span class="ar">→</span>
+  <span class="s">P2 挂绳编辑</span><span class="ar">→</span>
+  <span class="s">P3 支架编辑</span><span class="ar">→</span>
+  <span class="s"><b>合并成品</b></span>
+</div>
+<h3>重跑规则</h3>
+<ul>
+<li>点某一步的「<b>重跑此步</b>：从上一步的输出出发、只执行这一步的部位指令 → 出新结果后，<b>自动重放</b>后面的步骤（用它们已存档的指令）。</li>
+<li>改指令再跑：先在卡片上改提示词（或换参考图），再点重跑 —— 新版本自动存为 v2。</li>
+<li>「上一步满意、下一步不行」永远成立：因为每步的输入输出都独立存档，改后面不会污染前面。</li>
+</ul>
+<h3>为什么敢承诺「不改的地方一个像素都不动」</h3>
+<ul>
+<li>每步 AI 出图后，程序立刻做<b>保底贴回</b>：mask 外区域用该步输入图的原像素覆盖（边缘羽化 5px 过渡）。</li>
+<li>实测依据（第 ② 节 #3）：Grok edits 的 mask 只是「软引导」，四周也会被轻改、尺寸还会变——所以保底贴回是必须的，也是这个方案和「直接让 AI 一次改完」的本质区别。</li>
+<li>贴回发生在服务器端，PIL 确定性执行，零随机。</li>
+</ul>
+</section>
+
+<section class="card">
+<h2><i class="n">⑦</i>界面落地（加在工作台上，不动已有功能）</h2>
+<table>
+<tr><th>区块</th><th>内容</th></tr>
+<tr><td>新页签「分部位编辑」</td><td>与现有「融合工作台」并排，互不影响</td></tr>
+<tr><td>底图区</td><td>上传/从图廊选 →「识别部位」按钮 → 四个部位框叠加显示，可拖角修正</td></tr>
+<tr><td>部位卡 × 4</td><td>操作下拉 + 参考图槽 + 参数输入 + 「生成提示词」（免费预览可改）+ 「执行此部位」</td></tr>
+<tr><td>管线条</td><td>P1→P2→P3 每步缩略图 + 状态 + 「重跑此步」+ 点开看该步输入/输出对比</td></tr>
+<tr><td>模式开关</td><td>「整图融合」/「分层管线」一键切换；整图融合走提示词拼装器（免费预览）</td></tr>
+<tr><td>成品区</td><td>合并结果直接进现有图廊，支持设为基准、加入图位、单张删除——全部沿用</td></tr>
+</table>
+</section>
+
+<section class="card">
+<h2><i class="n">⑧</i>执行排期（你确认后我就动工）</h2>
+<table>
+<tr><th>步</th><th>交付什么</th><th>说明</th></tr>
+<tr><td><b>第 1 步</b></td><td>部位识别 + 部位卡 + 提示词库</td><td>识别部位、装配指令、免费预览提示词（可编辑）——先让你看到并调整每条提示词，还不花钱</td></tr>
+<tr><td><b>第 2 步</b></td><td>分层管线执行 + 保底贴回 + 单步重跑</td><td>核心能力：逐部位改、程序保底、哪步不行重跑哪步</td></tr>
+<tr><td><b>第 3 步</b></td><td>整图融合模式</td><td>多指令拼装、一次出图、免费预览拼装结果</td></tr>
+<tr><td><b>第 4 步</b></td><td>提示词版本管理</td><td>每条提示词 v1/v2/v3 存档、效果备注、一键回退——持续优化的抓手</td></tr>
+<tr><td><b>每步收尾</b></td><td>部署上线 + 真机验证</td><td>每步完成即部署 <code>https://chule.top:8443/duotu/</code>，真机点通再交</td></tr>
+</table>
+</section>
+
+<section class="card">
+<h2><i class="n">⑨</i>边界与风险（提前说清楚）</h2>
+<ul>
+<li><b>部位遮挡</b>：挂绳如果压在壳的图案上，去除挂绳后那块图案需要 AI「脑补」补全——补全质量取决于遮挡面积，大面积遮挡可能一次不满意，多跑两次即可（只重跑这一步，很便宜）。</li>
+<li><b>框的精度</b>：视觉模型给的是矩形框，挂绳这种弯曲细长物可能一个框盖不全——支持手动拖大；保底贴回只会保证「框外不动」，框内 AI 自由发挥。</li>
+<li><b>尺寸放大</b>：Grok edits 会把 256 放大成 960 之类——保底贴回前会先缩放对齐原图尺寸，不影响成品。</li>
+<li><b>花费</b>：分层管线每部位一次调用；整图融合一次调用出 n 张。按你现在的用法（1024×1024、每次 1-2 张），每步成本与现有 AI 生成持平。</li>
+<li><b>gpt-image-2 不支持 mask 端点</b>：所以壳/支架/挂绳的「区域限定」在 gpt-image-2 上靠提示词 + 程序保底实现；Grok edit 模型可用真 mask 通道做引导（两侧都能跑，第 2 步实测后择优做默认）。</li>
+</ul>
+</section>
+
+<footer>多图融合编辑工作台 · 分部位编辑方案 v1 · 2026-10-05 · 等雪碧确认后执行</footer>
+</div>
+</body>
+</html>

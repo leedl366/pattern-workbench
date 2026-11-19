@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>高清修复 · AI 重绘 1:1 高清 + 两层 PSD</title>
+<style>
+/* 2026-11-19：本页不走 ui.css，令牌必须自带全，否则 var(--tx) 失效退回纯黑字 */
+:root{ --primary:#ffffff; --ink:#e5e7eb; --line:rgba(255,255,255,.08); --bg:#090a0e;
+  --tx:#e5e7eb; --sub:#9ca3af; --faint:#6b7280; --card:#15171d; --card2:#0c0e16; }
+*{box-sizing:border-box; margin:0; padding:0}
+body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif; background:var(--bg); color:var(--ink); font-size:14px; padding:18px 20px 40px;}
+.wrap{max-width:1080px; margin:0 auto}
+h1{font-size:19px; font-weight:800; margin-bottom:4px}
+.sub{color:var(--sub); font-size:12.5px; margin-bottom:16px}
+.sub b{color:var(--primary)}
+/* ---- 上传区 ---- */
+.up{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:18px}
+#drop{border:2px dashed rgba(255,255,255,.20); border-radius:12px; padding:26px 16px; text-align:center; color:var(--sub); cursor:pointer; transition:.15s}
+#drop.on{border-color:var(--primary); background:rgba(255,255,255,.10)}
+#drop .big{font-size:15px; font-weight:700; color:var(--tx); margin-bottom:4px}
+.pv{display:flex; flex-wrap:wrap; gap:10px; margin-top:12px}
+.pv .it{position:relative; width:86px}
+.pv .it img{width:86px; height:86px; object-fit:cover; border-radius:9px; border:1px solid var(--line); display:block}
+.pv .it .x{position:absolute; right:-6px; top:-6px; width:20px; height:20px; border-radius:50%; background:rgba(255,255,255,.16); color:#fff; border:none; font-size:12px; cursor:pointer; line-height:1}
+.row{display:flex; align-items:center; gap:12px; margin-top:14px; flex-wrap:wrap}
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; border:none; border-radius:10px; padding:10px 22px; font-size:14px; font-weight:700; cursor:pointer; background:var(--primary); color:#111214; box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.btn:hover{filter:brightness(1.06)}
+.btn:disabled{background:#9ca3af; box-shadow:none; cursor:not-allowed}
+.btn.ghost{background:var(--card); color:var(--tx); border:1px solid var(--line); box-shadow:none; padding:7px 14px; font-size:12.5px; font-weight:600}
+.btn.sm{padding:6px 12px; font-size:12px; border-radius:8px; box-shadow:none}
+.hint{color:var(--sub); font-size:12px}
+/* ---- 输入类型：两个大卡片（2026-11-15 从角落小下拉提上来）----
+   起因：原来的下拉默认就是「满幅图案（平铺图）」，雪碧上传人物照时没注意 →
+   AI 按提示词把手机壳上的碎花抽出来铺满画布，人物/背景全丢，看着像「修复坏了」。
+   现在改成上传框正下方两张卡片，把两种模式的后果直接写在卡片上，绕不过去。 */
+.modes{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px}
+@media (max-width:600px){ .modes{grid-template-columns:1fr} }
+.mcard{display:flex; align-items:flex-start; gap:10px; text-align:left; padding:11px 13px;
+  border:1.5px solid var(--line); border-radius:12px; background:var(--card); color:var(--ink); cursor:pointer;
+  font-family:inherit; transition:border-color .15s, background .15s, box-shadow .15s}
+.mcard:hover{border-color:rgba(255,255,255,.28); background:rgba(255,255,255,.05)}
+.mcard.on{border-color:var(--primary); background:rgba(255,255,255,.10); box-shadow:0 0 0 3px rgba(255,255,255,.12)}
+.mcard .mi{font-size:19px; line-height:1.15; flex:none}
+.mcard .mb{display:flex; flex-direction:column; gap:3px; min-width:0}
+.mcard .mt{font-size:13.5px; font-weight:800; color:var(--tx)}
+.mcard.on .mt{color:#e5e7eb}
+.mcard .md{font-size:11.5px; color:var(--sub); line-height:1.55}
+.mcard .md b{color:#fbbf24; font-weight:700}
+/* 尺寸预览（原在 opts 行，2026-11-15 移到双区域下方，选完立刻能看到结果） */
+.dim{color:var(--primary); font-size:12.5px; font-weight:800; letter-spacing:.3px}
+.dim.warn{color:#fbbf24}
+.mnote{color:var(--sub); font-size:11.5px; margin-top:9px; line-height:1.6}
+/* ---- 输出尺寸：双区域（比例 × 分辨率）· 2026-11-15 ----
+   与图案提取板块同一套交互：① 比例决定成品形状 ② 分辨率决定成品长边。
+   注意 hd 的 AI 请求尺寸**始终不变**（保住版式死锁），这两项只作用于出图之后的适配。 */
+.szbox{margin-top:10px; padding:12px 13px; background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:11px}
+.szlab{font-size:12.5px; font-weight:700; color:var(--tx); margin-bottom:8px; display:flex; align-items:center; gap:7px}
+.szlab .sdim{font-size:11px; font-weight:500; color:var(--sub)}
+.segs{display:flex; gap:7px; flex-wrap:wrap; width:100%}
+.seg{padding:6px 12px; border:1px solid var(--line); border-radius:8px; background:var(--card); cursor:pointer;
+     font-size:12.5px; font-weight:600; color:var(--tx); user-select:none; transition:.12s}
+.seg:hover{border-color:#c7d0d0}
+.seg.on{background:var(--primary); border-color:var(--primary); color:#111214}
+.seg.off{opacity:.38; pointer-events:none}
+.szinp{width:100%; margin-top:8px; border:1px solid var(--line); border-radius:8px; padding:7px 10px;
+       font-size:12.5px; outline:none; background:var(--card); color:var(--tx)}
+.szinp:focus{border-color:var(--primary); box-shadow:0 0 0 3px rgba(13,148,136,.12)}
+.hide{display:none !important}
+/* ---- 任务卡 ---- */
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px}
+.card{background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; display:flex; flex-direction:column}
+.card .hd{display:flex; align-items:center; gap:10px; padding:9px 12px; background:rgba(255,255,255,.10); border-bottom:1px solid rgba(255,255,255,.10); flex-wrap:wrap}
+.card .hd .no{display:inline-flex; align-items:center; justify-content:center; min-width:40px; height:28px; padding:0 8px; border-radius:9px; background:var(--primary); color:#111214; font-size:15px; font-weight:800; letter-spacing:1px; box-shadow:0 2px 5px rgba(13,148,136,.20); flex:none}
+.card .hd .nm{font-weight:700; font-size:13px; word-break:break-all; flex:1; min-width:100px}
+.rst{display:inline-flex; align-items:center; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; flex:none}
+.rst.queued{color:#fbbf24; background:rgba(251,191,36,.14); border:1px solid rgba(251,191,36,.35)}
+.rst.running{color:#93c5fd; background:rgba(96,165,250,.14); border:1px solid rgba(96,165,250,.35)}
+.rst.done{color:#4ade80; background:rgba(74,222,128,.14); border:1px solid rgba(74,222,128,.30)}
+.rst.failed{color:#f87171; background:rgba(248,113,113,.14); border:1px solid #fecaca}
+.card .bd{padding:12px; display:flex; gap:12px; align-items:flex-start; flex:1}
+.card .bd img{width:112px; height:112px; object-fit:cover; border-radius:10px; border:1px solid var(--line); background:rgba(255,255,255,.06); flex:none; cursor:pointer}
+/* 「原图 / 高清图」并排对比（组件样式由 cmp.js 自注入，这里只做本页贴合）：
+   展开时图区由 112px 缩略图撑满整行，且所在 .card 被组件拉成整行（grid-column:1/-1），
+   否则 300px 的卡片里两格并排后每格才 150px，比原来还小。
+   .meta 紧跟 .thumb，用相邻兄弟选择器隐藏，免得 flex 换行把版面挤乱。 */
+.card .bd .thumb{width:112px; flex:none}
+/* 处理中占位（2026-11-15）：修复过程中还没有成品缩略图。
+   以前这里塞一张残缺的 base64 GIF → 浏览器渲染成「破图图标」，看着像失败。
+   改为进度条占位：底部不定长进度条 + 轻微流光，明确表达「正在生成，没出错」。 */
+.card .bd .ph{width:112px; height:112px; border-radius:10px; border:1px solid var(--line);
+  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.05)); position:relative; overflow:hidden;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px}
+.card .bd .ph::after{content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(100deg,transparent 25%,rgba(255,255,255,.12) 45%,rgba(13,148,136,.18) 50%,rgba(255,255,255,.12) 55%,transparent 75%);
+  transform:translateX(-100%); animation:phshim 1.7s ease-in-out infinite}
+@keyframes phshim{to{transform:translateX(100%)}}
+.card .bd .ph .sp{width:26px; height:26px; border-radius:50%; border:3px solid rgba(255,255,255,.16);
+  border-top-color:var(--primary); animation:phspin .9s linear infinite}
+@keyframes phspin{to{transform:rotate(360deg)}}
+.card .bd .ph .tx{font-size:11px; color:#e5e7eb; font-weight:700; letter-spacing:.3px; text-align:center; padding:0 6px}
+.card .bd .ph .pb{position:absolute; left:11px; right:11px; bottom:11px; height:4px;
+  border-radius:99px; background:rgba(255,255,255,.10); overflow:hidden}
+.card .bd .ph .pb i{position:absolute; top:0; bottom:0; width:44%; border-radius:99px;
+  background:linear-gradient(90deg,rgba(255,255,255,.75),rgba(255,255,255,.35)); animation:pbrun 1.25s ease-in-out infinite}
+@keyframes pbrun{0%{left:-44%}100%{left:100%}}
+.card .bd .ph.none{background:rgba(255,255,255,.05); border-style:dashed}
+.card .bd .ph.none::after{display:none}
+.card .bd .ph.none .tx{color:var(--sub); font-weight:600}
+@media (prefers-reduced-motion: reduce){
+  .card .bd .ph::after{animation:none}
+  .card .bd .ph .sp{animation-duration:2.4s}
+  .card .bd .ph .pb i{animation-duration:2.4s}
+}
+.card .bd .thumb.cmp-open{width:100%; flex:0 0 100%}
+.card .bd .thumb.cmp-open + .meta{display:none}
+.card .ops .cmp-btn{flex:none}
+.card .bd .meta{flex:1; min-width:0; font-size:12.5px; color:var(--sub); line-height:1.7}
+.card .bd .meta .dim{color:var(--sub)}
+.card .ops{display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); flex-wrap:wrap}
+.card .ops a{text-decoration:none}
+.err{color:#f87171; font-size:12px; margin-top:4px; word-break:break-all}
+.empty{text-align:center; color:var(--sub); padding:36px 0; font-size:13px}
+</style>
+<script src="../accounts/static/cmp-20261014e.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <h1>高清修复</h1>
+
+  <div class="up">
+    <div id="drop">
+      <div class="big">点击或拖拽图片到这里</div>
+    </div>
+    <input type="file" id="file" accept="image/*" multiple hidden>
+    <div class="pv" id="pv"></div>
+
+    <!-- 输入类型：放上传框正下方，两种模式的后果直接写在卡片上（2026-11-15） -->
+    <div class="modes" id="modePick">
+      <button type="button" class="mcard on" data-m="pattern">
+        <span class="mi">🖼</span>
+        <span class="mb">
+          <span class="mt">图案平铺图</span>
+          <span class="md">画面里只有印花、没有实物<br>→ 提取并提纯成高清图案</span>
+        </span>
+      </button>
+      <button type="button" class="mcard" data-m="photo">
+        <span class="mi">📷</span>
+        <span class="mb">
+          <span class="mt">产品实拍照片</span>
+          <span class="md">有人 / 手 / 桌面 / 背景<br>→ 只提画质，<b>内容一点不变</b></span>
+        </span>
+      </button>
+      <select id="mode" hidden>
+        <option value="pattern">满幅图案（平铺图）</option>
+        <option value="photo">产品实拍图</option>
+      </select>
+    </div>
+    <div class="mnote" id="optNote">非原图比例 = 等比适配 + 四周留底色，图案绝不拉伸</div>
+
+    <div class="szbox">
+      <div class="szlab">① 输出比例<span class="sdim">决定成品形状 · 只做等比适配 + 补边，构图不变</span></div>
+      <div class="segs" id="hdRatio">
+        <div class="seg on" data-v="" title="按原图长宽比出成品（推荐，构图完全不变）">原图比例</div>
+        <div class="seg" data-v="1:1" title="1:1 方图 · 淘宝主图">1:1</div>
+        <div class="seg" data-v="3:4" title="3:4 竖版 · 详情页主力尺寸">3:4</div>
+        <div class="seg" data-v="9:16" title="9:16 竖屏 · 手机全屏 / 短视频封面">9:16</div>
+        <div class="seg" data-v="2:3" title="2:3 竖版 · 偏窄竖图">2:3</div>
+        <div class="seg" data-v="4:3" title="4:3 横版">4:3</div>
+        <div class="seg" data-v="3:2" title="3:2 横版 · 相机经典比例">3:2</div>
+        <div class="seg" data-v="16:9" title="16:9 横屏 · 视频封面">16:9</div>
+        <div class="seg" data-v="custom" title="自定义宽 × 高（256~4096；选此项后分辨率区被忽略）">自定义…</div>
+      </div>
+      <input type="text" id="hdRatioCustom" class="szinp hide" placeholder="宽 × 高，如 1200x1600（256~4096）">
+
+      <div class="szlab" style="margin-top:13px">② 输出分辨率<span class="sdim">决定成品长边像素</span></div>
+      <div class="segs" id="hdRes">
+        <div class="seg on" data-v="0" title="保持 AI 重绘出来的原始像素（历史行为）">自动（AI 原始）</div>
+        <div class="seg" data-v="1024" title="成品长边 1024px">标准 1024</div>
+        <div class="seg" data-v="2048" title="成品长边 2048px · 2K">高清 2K</div>
+        <div class="seg" data-v="4096" title="成品长边 4096px · 4K">超清 4K</div>
+        <div class="seg" data-v="custom" title="自定义长边（256~4096，向下取偶）">自定义长边…</div>
+      </div>
+      <input type="text" id="hdResCustom" class="szinp hide" placeholder="长边像素，如 3000（256~4096）">
+
+      <div class="dim" id="dimOut" style="margin-top:10px; min-height:17px">—</div>
+    </div>
+    <div class="row">
+      <button class="btn" id="go" disabled>开始修复</button>
+      <span class="hint" id="hint"></span>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty">还没有任务 · 上传图片开始</div>
+</div>
+<script>
+/* 高清修复版块（/hd/ 下相对路径即 /pattern/hd/api/...，无前缀问题） */
+var files = [];
+var timer = null, polledOnce = false, lastSig = '';
+var lastRatio = 0;          /* 首张源图的 h/w，用于「原图比例」下估算成品尺寸 */
+var srcW = 0, srcH = 0;     /* 首张源图真实像素，用于「目标尺寸小于原图」的护栏 */
+
+var drop = document.getElementById('drop'), fileEl = document.getElementById('file'),
+    pv = document.getElementById('pv'), go = document.getElementById('go'),
+    grid = document.getElementById('grid'), empty = document.getElementById('empty'),
+    hint = document.getElementById('hint'),
+    modeEl = document.getElementById('mode'),
+    dimOut = document.getElementById('dimOut'), optNote = document.getElementById('optNote');
+
+drop.onclick = function(){ fileEl.click(); };
+drop.ondragover = function(e){ e.preventDefault(); drop.classList.add('on'); };
+drop.ondragleave = function(){ drop.classList.remove('on'); };
+drop.ondrop = function(e){ e.preventDefault(); drop.classList.remove('on'); addFiles(e.dataTransfer.files); };
+fileEl.onchange = function(){ addFiles(fileEl.files); fileEl.value = ''; };
+
+function addFiles(list){
+  for (var i = 0; i < list.length; i++){
+    var f = list[i];
+    if (!/^image\//.test(f.type)) continue;
+    if (f.size > 12*1024*1024){ alert(f.name + ' 超过 12MB'); continue; }
+    files.push(f);
+  }
+  renderPv();
+}
+
+/* 「原图比例」下要先知道源图长宽比，才能把成品像素算准 */
+function readSrc(){
+  if (!files.length){ lastRatio = 0; srcW = 0; srcH = 0; updateDim(); return; }
+  var img = new Image();
+  img.onload = function(){
+    srcW = img.naturalWidth; srcH = img.naturalHeight;
+    lastRatio = srcH / srcW;
+    updateDim();
+  };
+  img.onerror = function(){ lastRatio = 0; srcW = 0; srcH = 0; updateDim(); };
+  img.src = URL.createObjectURL(files[0]);
+}
+
+/* ===== 输出尺寸：双区域（比例 × 分辨率）· 2026-11-15 =====
+   与图案提取板块同一套交互。合成规则：
+     · 比例「原图」+ 分辨率「自动」 → ratio="" long=0（历史行为，零变化）
+     · 比例固定 + 自动 / 池内长边   → ratio="3:4" long=2048
+     · 比例「自定义宽高」           → ratio="1200x1600" long=0（后端会忽略长边）
+     · 分辨率「自定义长边」         → long=用户值（256~4096，**向下取偶**）
+   注意：hd 的 AI 请求尺寸始终不变（保住版式死锁），这两项只作用于出图之后的适配。 */
+function hdParsePx(s){
+  var t = String(s || "").replace(/[×X*]/g, "x").replace(/：/g, ":").trim();
+  var m = t.match(/^(\d{2,5})\s*x\s*(\d{2,5})$/);
+  if (!m) return null;
+  var w = +m[1], h = +m[2];
+  if (w < 256 || w > 4096 || h < 256 || h > 4096) return null;
+  return { w: w - w % 2, h: h - h % 2 };
+}
+/* Python round() 是「银行家舍入」（.5 向偶数靠），JS Math.round 是四舍五入向上。
+   后端 _target_dim 用 Python round，前端必须复刻同一规则，否则会出现
+   「页面显示 256×342、实际出 256×343」这类 1px 静默偏差（图案提取板块已踩过）。 */
+function hdRoundEven(x){
+  var f = Math.floor(x), d = x - f;
+  if (d > 0.5) return f + 1;
+  if (d < 0.5) return f;
+  return (f % 2 === 0) ? f : f + 1;
+}
+
+/* 向下取偶，不能四舍五入：用户填 3001 时不许悄悄变成 3002（超出他自己填的值） */
+function hdParseLong(s){
+  var v = String(s || "").replace(/[^\d]/g, "");
+  if (!v) return 0;
+  var n = +v;
+  if (n < 256 || n > 4096) return 0;
+  return n - n % 2;
+}
+
+function hdBindSize(){
+  var R = { ratio: "", long: 0 };
+  function segs(id){ var el = document.getElementById(id); return el ? el.querySelectorAll(".seg") : []; }
+  function cur(id){
+    var a = segs(id);
+    for (var i = 0; i < a.length; i++) if (a[i].classList.contains("on")) return a[i].dataset.v;
+    return "";
+  }
+  function pick(id, v){
+    var a = segs(id);
+    for (var i = 0; i < a.length; i++) a[i].classList.toggle("on", a[i].dataset.v === v);
+  }
+  function grayRes(off){
+    var a = segs("hdRes");
+    for (var i = 0; i < a.length; i++) a[i].classList.toggle("off", !!off);
+  }
+  function sync(){
+    var rv = cur("hdRatio"), sv = cur("hdRes");
+    var cw = document.getElementById("hdRatioCustom"), cl = document.getElementById("hdResCustom");
+    var whMode = (rv === "custom");
+    cw.classList.toggle("hide", !whMode);
+    cl.classList.toggle("hide", whMode || sv !== "custom");
+    grayRes(whMode);          /* 自定义宽高时分辨率无意义 → 整块置灰，保留原档位 */
+    var ratio = "", L = 0, warn = "";
+    if (whMode){
+      var px = hdParsePx(cw.value);
+      if (!px){
+        /* 空值只提示、**不降级** —— 否则用户刚点开「自定义」就被弹回原图，根本填不进去 */
+        R.ratio = ""; R.long = 0;
+        updateDim(cw.value.trim() ? "宽高格式不对或超出 256~4096，本次按「原图比例」出图" : "", "", 0);
+        return R;
+      }
+      ratio = px.w + "x" + px.h;
+    } else {
+      ratio = rv;
+      L = (sv === "custom") ? hdParseLong(cl.value) : (parseInt(sv, 10) || 0);
+      if (sv === "custom" && !L && cl.value.trim()) warn = "长边需 256~4096，本次按「自动」出图";
+    }
+    R.ratio = ratio; R.long = L;
+    updateDim(warn, ratio, L);
+    return R;
+  }
+  document.getElementById("hdRatio").addEventListener("click", function(e){
+    var t = e.target.closest ? e.target.closest(".seg") : null;
+    if (!t) return;
+    pick("hdRatio", t.dataset.v); sync();
+    if (t.dataset.v === "custom") document.getElementById("hdRatioCustom").focus();
+  });
+  document.getElementById("hdRatioCustom").addEventListener("input", sync);
+  document.getElementById("hdRes").addEventListener("click", function(e){
+    var t = e.target.closest ? e.target.closest(".seg") : null;
+    if (!t || t.classList.contains("off")) return;
+    pick("hdRes", t.dataset.v); sync();
+    if (t.dataset.v === "custom") document.getElementById("hdResCustom").focus();
+  });
+  document.getElementById("hdResCustom").addEventListener("input", sync);
+  return { sync: sync, get: function(){ return R; } };
+}
+var hdSize = hdBindSize();
+
+/* 实时显示「这张图最终会出多大」—— 选了档位就让用户当场看明白，别等出图才发现不是想要的。
+   2026-10-21 加护栏：目标长边小于源图长边时直接标红警告。
+   起因：雪碧拿 3024×4032 的实拍图选了 1024，成品比原图小 9 倍，「修复」变成了降分辨率。 */
+function updateDim(warn, ratio, L){
+  /* 参数可选：外部不传就读当前控件状态；sync() 内部直接传值，避免依赖 hdSize 初始化顺序 */
+  if (ratio === undefined || L === undefined){
+    var g = hdSize.get(); ratio = g.ratio; L = g.long;
+  }
+  var isPhoto = modeEl.value === 'photo';
+  if (optNote) {
+    optNote.textContent = isPhoto
+      ? '实拍图：只提画质、保留壳/手/背景/构图；建议保持「原图比例」，长边别小于原图'
+      : '非原图比例 = 等比适配 + 四周留底色，图案绝不拉伸';
+  }
+  function show(txt, bad){
+    dimOut.textContent = txt + (warn ? ' · ' + warn : '');
+    dimOut.className = 'dim' + ((bad || warn) ? ' warn' : '');
+  }
+  if (!files.length){ dimOut.textContent = '—'; dimOut.className = 'dim'; return; }
+
+  /* 自定义宽高：像素已经明确，直接照实显示（长边被忽略） */
+  var pxm = String(ratio || "").match(/^(\d{2,5})x(\d{2,5})$/);
+  if (pxm){
+    var W0 = +pxm[1], H0 = +pxm[2];
+    show('→ ' + W0 + '×' + H0, !!(srcW && Math.max(W0, H0) < Math.max(srcW, srcH)));
+    if (srcW && Math.max(W0, H0) < Math.max(srcW, srcH))
+      dimOut.textContent = '→ ' + W0 + '×' + H0 + ' ⚠ 小于原图 ' + srcW + '×' + srcH + '，画质会下降' + (warn ? ' · ' + warn : '');
+    return;
+  }
+  if (!L){ show('AI 原始尺寸', false); return; }
+
+  var r = ratio ? (parseInt(ratio.split(':')[1], 10) / parseInt(ratio.split(':')[0], 10)) : lastRatio;
+  if (!r || !isFinite(r) || r <= 0) r = 1;
+  var W, H;
+  if (r >= 1){ H = L; W = hdRoundEven(L / r); } else { W = L; H = hdRoundEven(L * r); }
+  var txt = '→ ' + W + '×' + H;
+  if (srcW && Math.max(W, H) < Math.max(srcW, srcH)){
+    dimOut.textContent = txt + ' ⚠ 小于原图 ' + srcW + '×' + srcH + '，画质会下降' + (warn ? ' · ' + warn : '');
+    dimOut.className = 'dim warn';
+  } else {
+    show(txt, false);
+  }
+}
+
+modeEl.onchange = function(){ updateDim(); };   /* 只切提示词，不动尺寸 */
+hdSize.sync();                                  /* 初始化：把默认档位算一遍并显示 */
+
+/* 输入类型两个大卡片 ↔ 隐藏 select（2026-11-15）
+   保留 select 作为唯一真源，提交/updateDim 全部照旧读 modeEl.value，后端参数零改动。
+   点卡片时手动调 updateDim()——programmatic 改 .value 不会触发 change。 */
+(function(){
+  var box = document.getElementById('modePick');
+  if (!box) return;
+  var cards = box.querySelectorAll('.mcard');
+  function paint(){
+    var cur = modeEl.value;
+    for (var i = 0; i < cards.length; i++){
+      cards[i].classList.toggle('on', cards[i].getAttribute('data-m') === cur);
+    }
+  }
+  for (var i = 0; i < cards.length; i++){
+    cards[i].onclick = function(){
+      modeEl.value = this.getAttribute('data-m');
+      paint();
+      updateDim();
+    };
+  }
+  paint();
+})();
+
+function renderPv(){
+  pv.innerHTML = '';
+  files.forEach(function(f, i){
+    var d = document.createElement('div'); d.className = 'it';
+    var img = document.createElement('img'); img.src = URL.createObjectURL(f);
+    var x = document.createElement('button'); x.className = 'x'; x.textContent = '×';
+    x.onclick = function(ev){ ev.stopPropagation(); files.splice(i,1); renderPv(); };
+    d.appendChild(img); d.appendChild(x); pv.appendChild(d);
+  });
+  go.disabled = files.length === 0;
+  hint.textContent = files.length ? ('已选 ' + files.length + ' 张 · 消耗 ' + (files.length*3) + ' 分') : '';
+  readSrc();
+}
+
+go.onclick = function(){
+  if (!files.length) return;
+  go.disabled = true; go.textContent = '提交中…';
+  var fd = new FormData();
+  fd.append('n', files.length);
+  files.forEach(function(f){ fd.append('images', f); });
+  /* 2026-10-21 输出设置：空值 / 0 时后端行为与改动前完全一致 */
+  fd.append('mode', modeEl.value);
+  var sz = hdSize.get();
+  fd.append('ratio', sz.ratio);          /* "" = 原图比例；"3:4" = 固定比例；"1200x1600" = 自定义宽高 */
+  fd.append('long_side', sz.long);       /* 0 = 自动（保持 AI 原始像素） */
+  fetch('api/fix', {method:'POST', body:fd}).then(function(r){
+    return r.json().catch(function(){ throw new Error('HTTP ' + r.status); });
+  }).then(function(d){
+    if (!d.ok) throw new Error(d.error || ('HTTP 失败'));
+    files = []; renderPv();
+    go.textContent = '开始修复';
+    try{ parent.refreshPoints && parent.refreshPoints(); }catch(e){}
+    poll();
+  }).catch(function(e){
+    alert('提交失败：' + e.message);
+    go.disabled = false; go.textContent = '开始修复';
+  });
+};
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+var pad2 = function(n){ return String(n).padStart(2,'0'); };
+
+function sigOf(tasks){
+  return tasks.length + '|' + tasks.map(function(t){
+    return [t.tid, t.status, t.stage||'', t.queue_pos||0, t.out_w||0, t.done_ts||0,
+            t.thumb_rel||'', t.has_src?1:0, t.err?1:0].join(',');
+  }).join(';');
+}
+
+function render(tasks){
+  // 轮询指纹：数据没变就不重绘——否则用户展开的「对比原图」滑块每 2.5s 被冲掉一次。
+  var sig = sigOf(tasks);
+  if (sig === lastSig && grid.childElementCount) return;
+  lastSig = sig;
+  empty.style.display = tasks.length ? 'none' : '';
+  grid.innerHTML = '';
+  tasks.forEach(function(t, i){
+    var rstCls = t.status, rstTxt = {queued:'⏳ 排队中', running:'🔄 ' + (t.stage||'处理中'),
+      done:'✓ 完成', failed:'✗ 失败'}[t.status] || t.status;
+    if (t.status === 'queued' && t.queue_pos > 0) rstTxt = '⏳ 排队第 ' + t.queue_pos + ' 位';
+    var dims = t.out_w ? (t.out_w + '×' + t.out_h) : (t.src_w ? (t.src_w + '×' + t.src_h + '（源图）') : '');
+    // 「原图 ⇄ 高清图」并排对比（cmp.js）：原图缩略 + 高清成品齐备才给按钮。
+    // 2026-10-13 之前的老任务没有 src_rel → has_src=false → 自动不出按钮（不报错、不裂图）。
+    var cmpOn = t.status === 'done' && !!t.has_src && !!t.png_rel;
+    var q = '?t=' + (t.done_ts || t.ts || 0);
+    // 缩略图区三态：① 已出图 → 真缩略图；② 排队/生成中 → 进度条占位（不是破图）；
+    // ③ 失败且无图 → 虚线「无预览」框（明确说清没有图，也不假装在跑）。
+    var thumbHtml;
+    if (t.thumb_rel){
+      thumbHtml = '<img src="api/tasks/' + t.tid + '/thumb' + q + '" data-tid="' + t.tid + '">';
+    } else if (t.status === 'queued' || t.status === 'running'){
+      thumbHtml = '<div class="ph">'
+        + '<div class="sp"></div>'
+        + '<div class="tx">' + (t.status === 'queued'
+            ? (t.queue_pos > 0 ? '排队第 ' + t.queue_pos + ' 位' : '排队中')
+            : 'AI 重绘中') + '</div>'
+        + '<div class="pb"><i></i></div>'
+        + '</div>';
+    } else {
+      thumbHtml = '<div class="ph none"><div class="tx">无预览</div></div>';
+    }
+    var c = document.createElement('div'); c.className = 'card';
+    c.innerHTML = '<div class="hd"><span class="no">' + pad2(i+1) + '</span>'
+      + '<span class="nm">' + esc(t.name) + '</span>'
+      + '<span class="rst ' + rstCls + '">' + rstTxt + '</span></div>'
+      + '<div class="bd">'
+      + '<div class="thumb cmp-host">' + thumbHtml + '</div>'
+      + '<div class="meta">'
+      + (dims ? '尺寸 <b>' + dims + '</b><br>' : '')
+      + ((t.opt_ratio || t.opt_long || t.opt_mode)
+          ? '<span class="dim">' + (t.opt_mode === 'photo' ? '实拍图' : '满幅图案')
+            + ' · ' + esc(t.opt_ratio || '原图比例')
+            + (t.opt_long ? ' · 长边 ' + t.opt_long + 'px' : ' · 自动尺寸') + '</span><br>'
+          : '')
+      + (t.err ? '<div class="err">' + esc(t.err) + '</div>' : '')
+      + '</div></div>'
+      + '<div class="ops">'
+      + (t.status === 'done' ? '<a class="btn sm ghost" href="api/tasks/' + t.tid + '/png">下载高清图</a>'
+        + '<a class="btn sm" href="api/tasks/' + t.tid + '/psd">下载分层PSD</a>' : '')
+      + (cmpOn ? '<button type="button" class="cmp-btn" data-cmp'
+        + ' data-src="api/tasks/' + t.tid + '/src' + q + '"'
+        + ' data-out="api/tasks/' + t.tid + '/png' + q + '"'
+        + ' data-lab-src="原图" data-lab-out="高清图">⇄ 对比原图</button>' : '')
+      + (t.status === 'failed' || t.status === 'done' ? '<button class="btn sm ghost" data-redo="' + t.tid + '">重新生成</button>' : '')
+      + '<button class="btn sm ghost" data-del="' + t.tid + '">删除</button>'
+      + '</div>';
+    grid.appendChild(c);
+  });
+  grid.querySelectorAll('img[data-tid]').forEach(function(im){
+    im.onclick = function(){ window.open('api/tasks/' + im.getAttribute('data-tid') + '/png', '_blank'); };
+  });
+  grid.querySelectorAll('[data-redo]').forEach(function(b){
+    b.onclick = function(){ redo(b.getAttribute('data-redo')); };
+  });
+  grid.querySelectorAll('[data-del]').forEach(function(b){
+    b.onclick = function(){ del(b.getAttribute('data-del')); };
+  });
+}
+
+function poll(){
+  fetch('api/tasks').then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) render(d.tasks || []);
+    var busy = (d.tasks || []).some(function(t){ return t.status === 'queued' || t.status === 'running'; });
+    if (busy || !polledOnce){
+      polledOnce = true;
+      if (!timer) timer = setInterval(poll, 2500);
+    } else if (timer && !busy){
+      clearInterval(timer); timer = null;
+    }
+  }).catch(function(){});
+}
+function redo(tid){
+  if (!confirm('重新生成这张？（再次消耗 3 分）')) return;
+  fetch('api/tasks/' + tid + '/redo', {method:'POST'}).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok){ alert('重做失败：' + (d.error||'')); return; }
+      try{ parent.refreshPoints && parent.refreshPoints(); }catch(e){}
+      polledOnce = false; poll();
+    }).catch(function(e){ alert('重做失败：' + e); });
+}
+function del(tid){
+  if (!confirm('删除这个任务及其产物？')) return;
+  fetch('api/tasks/delete', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ids:[tid]})}).then(function(r){ return r.json(); })
+    .then(function(d){ if (d.ok) poll(); else alert('删除失败'); }).catch(function(){});
+}
+poll();
+</script>
+</body>
+</html>

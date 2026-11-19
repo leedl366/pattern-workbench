@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商品替换 · 一键把图1的物体换成图2</title>
+<!-- 设计令牌：COS 直链优先，失败回落站内路由。
+     子应用在 /pattern/swap/ 下，写 ../static/ui.css 会解析成 /pattern/static/ui.css → 401 -->
+<link rel="stylesheet" href="../accounts/static/ui.css">
+<style>
+/* 令牌兜底：ui.css 两条路都取不到时页面也不退化成裸布局 */
+:root{
+  /* 2026-11-19 与 static/ui.css 同步：深色能影风（此段仅作 ui.css 加载失败时的兜底，值必须与 ui.css 一致） */
+  --pri:#ffffff; --pri2:#d8dade; --pri-dark:#d8dade;
+  --pri-050:rgba(255,255,255,.07); --pri-100:rgba(255,255,255,.11); --pri-200:rgba(255,255,255,.22); --pri-300:#c9ccd2; --pri-bg:rgba(255,255,255,.05);
+  --grad-pri:linear-gradient(135deg,#ffffff,#d8dade);
+  --on-pri:#111214;
+  --bg:#090a0e; --card:#15171d; --card2:#0c0e16; --shell:#121212;
+  --tx:#e5e7eb; --sub:#9ca3af; --faint:#6b7280; --bd:rgba(255,255,255,.08); --hair:rgba(255,255,255,.045); --fill:#1a1c22; --gold:#f5af38;
+  --ok:#4ade80; --ok-bg:rgba(74,222,128,.14); --ok-bd:rgba(74,222,128,.32);
+  --err:#f87171; --err-bg:rgba(248,113,113,.14); --err-bd:rgba(248,113,113,.32); --bad:#f87171;
+  --warn:#fbbf24; --warn-bg:rgba(251,191,36,.14); --warn-bd:rgba(251,191,36,.32);
+  --r-card:16px; --r-ctl:10px; --r-sm:10px; --r-pill:999px;
+  --shadow-card:0 0 0 1px rgba(255,255,255,.045); --shadow-pop:0 12px 32px rgba(0,0,0,.6);
+  --ring:0 0 0 3px rgba(255,255,255,.18);
+  --font:-apple-system,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);
+  font:14px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--pri-dark);text-decoration:none}
+.hide{display:none !important}
+
+.wrap{max-width:1380px;margin:0 auto;padding:18px 18px 30px}
+.pagehead{margin-bottom:14px}
+.pagehead h1{font-size:20px;margin:0 0 3px;display:flex;align-items:center;gap:9px}
+.pagehead h1 .ic{width:30px;height:30px;border-radius:9px;background:linear-gradient(145deg,#3b4cf0 0%,#5b3df0 55%,#7b3af5 100%);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:16px}
+.pagehead p{margin:0;color:var(--sub);font-size:13px}
+
+.grid{display:grid;grid-template-columns:minmax(0,430px) minmax(0,1fr);gap:16px;align-items:start}
+.grid>*{min-width:0}
+
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);
+  box-shadow:0 1px 3px rgba(15,23,42,.04);overflow:hidden}
+.card .hd{padding:12px 16px;border-bottom:1px solid var(--bd);font-weight:700;font-size:14px;
+  display:flex;align-items:center;gap:8px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015))}
+.card .bd{padding:15px 16px;display:flex;flex-direction:column;gap:14px}
+
+.lbl{font-size:12.5px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lbl small{font-weight:500;color:var(--sub);font-size:11.5px}
+.lbl .req{color:var(--err);font-weight:700}
+
+.drop{border:1.5px dashed rgba(255,255,255,.22);border-radius:var(--r-ctl);background:rgba(255,255,255,.04);
+  padding:18px 12px;text-align:center;cursor:pointer;transition:.15s;position:relative;margin-top:7px}
+.drop:hover,.drop.over{border-color:var(--pri);background:var(--pri-050)}
+.drop .big{font-size:13px;font-weight:700;color:var(--tx)}
+.drop .sm{font-size:11.5px;color:var(--faint);margin-top:3px}
+.drop img{max-width:100%;max-height:170px;border-radius:var(--r-sm);display:block;margin:0 auto 7px}
+.drop .rm{position:absolute;right:7px;top:7px;width:24px;height:24px;border-radius:50%;border:0;
+  background:rgba(15,23,42,.62);color:#fff;font-size:14px;line-height:1;cursor:pointer;z-index:3}
+.drop .okmark{position:absolute;left:7px;top:7px;font-size:10.5px;font-weight:800;color:#fff;
+  background:var(--ok);padding:2px 8px;border-radius:var(--r-pill)}
+
+textarea{width:100%;min-height:70px;border:1px solid var(--bd);border-radius:var(--r-ctl);
+  padding:9px 11px;font:13px/1.65 inherit;resize:vertical;outline:none;background:var(--card2);color:var(--tx);margin-top:7px}
+textarea:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(13,148,136,.12)}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+/* 预设文案每条都是一整句，9 条会把「立即生成」推到很下面 → 固定高度可滚动 */
+#chips{max-height:132px;overflow-y:auto;padding:8px;background:rgba(255,255,255,.03);
+  border:1px solid var(--bd);border-radius:var(--r-ctl);align-content:flex-start}
+#chips::-webkit-scrollbar{width:8px}
+#chips::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:4px}
+.chip{font-size:11.5px;padding:4px 9px;border-radius:var(--r-pill);background:rgba(255,255,255,.07);color:var(--sub);
+  border:1px solid var(--bd);cursor:pointer;user-select:none;line-height:1.5;transition:.12s}
+.chip:hover{background:rgba(255,255,255,.12)}
+.chip.on{background:var(--pri-050);color:var(--pri-dark);border-color:var(--pri-200);font-weight:700}
+
+.stepper{display:flex;align-items:center;border:1px solid var(--bd);border-radius:var(--r-ctl);
+  overflow:hidden;width:116px}
+.stepper button{width:36px;height:34px;border:1px solid var(--bd);background:rgba(255,255,255,.06);cursor:pointer;font-size:16px;color:var(--tx)}
+.stepper button:hover{background:rgba(255,255,255,.12)}
+.stepper button:disabled{opacity:.4;cursor:not-allowed}
+.stepper span{flex:1;text-align:center;font:700 13.5px/1 ui-monospace,Consolas,monospace}
+
+.foot{padding:12px 16px;border-top:1px solid var(--bd);background:rgba(255,255,255,.03);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cost{margin-left:auto;font-size:12px;color:var(--sub)}
+.cost b{color:var(--pri-dark);font-size:15px;font-family:ui-monospace,Consolas,monospace}
+
+.btn{padding:9px 20px;border-radius:var(--r-ctl);border:1px solid transparent;font-size:13.5px;
+  font-weight:700;cursor:pointer;background:var(--grad-pri);color:var(--on-pri);transition:.12s}
+.btn:hover{filter:brightness(1.06)}
+.btn:disabled{opacity:.5;cursor:not-allowed;filter:none}
+.btn.ghost{background:rgba(255,255,255,.06);color:var(--tx);border-color:var(--bd)}
+.btn.ghost:hover{background:rgba(255,255,255,.06)}
+.btn.sm{padding:5px 11px;font-size:12px;border-radius:var(--r-sm)}
+.btn.danger{background:var(--err);color:#fff}
+
+.tabs{display:flex;gap:6px;padding:10px 12px 0}
+.tab{padding:7px 15px;border-radius:var(--r-ctl) var(--r-ctl) 0 0;font-size:13px;font-weight:700;
+  color:var(--sub);cursor:pointer;border:1px solid transparent;border-bottom:0;background:transparent}
+.tab.on{background:rgba(255,255,255,.92);color:#111214;border-color:transparent}
+.tabline{border-bottom:1px solid var(--bd);margin:0 12px}
+
+.result{padding:14px 16px}
+.empty{padding:44px 16px;text-align:center;color:var(--faint);font-size:13px}
+.empty .ico{font-size:30px;opacity:.5;display:block;margin-bottom:8px}
+
+.bar{height:6px;border-radius:4px;background:var(--bd);overflow:hidden;margin:10px 0 4px}
+.bar i{display:block;height:100%;background:var(--grad-pri);width:0;transition:width .4s}
+.progtxt{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+.items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
+@media(max-width:900px){.items{grid-template-columns:1fr}}
+
+/* 单张作品卡：左原图 / 右 AI 作品 */
+.rc{border:1px solid var(--bd);border-radius:var(--r-card);overflow:hidden;background:var(--card);display:flex;flex-direction:column}
+/* 卡片顶部动作条：对比按钮放图片正上方 */
+.rc .rc-act{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--bd);
+  background:rgba(255,255,255,.03)}
+.rc .rc-act .btn{padding:4px 11px;font-size:12px;border-radius:var(--r-pill)}
+.rc .rc-act .hint{margin-left:auto;font-size:11px;color:var(--faint)}
+.rc .pair{display:grid;grid-template-columns:1fr 1fr;gap:0;position:relative;background:var(--card2)}
+.rc .pair .cell{position:relative;overflow:hidden}
+.rc .pair .cell img{width:100%;display:block}
+.rc .pair .tong{position:absolute;left:6px;bottom:6px;font-size:10px;font-weight:800;color:#fff;
+  background:rgba(15,23,42,.72);padding:2px 7px;border-radius:4px;z-index:2}
+.rc .pair .tong.r{background:rgba(13,148,136,.9);left:auto;right:6px}
+.rc .pair .cell.loading{display:flex;align-items:center;justify-content:center;min-height:190px}
+.rc .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:7px;color:var(--faint);font-size:12px;background:rgba(255,255,255,.04)}
+.spin{width:18px;height:18px;border:2px solid var(--pri-200);border-top-color:var(--pri);
+  border-radius:50%;animation:sp .8s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.rc .ft{padding:8px 11px;border-top:1px solid var(--bd);display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:rgba(255,255,255,.03)}
+.rc .ft .no{font-size:11.5px;font-weight:800;color:var(--sub);margin-right:auto}
+.rc .er{font-size:11.5px;color:var(--err);padding:8px 11px;line-height:1.55;background:var(--err-bg)}
+.rc .pr{padding:8px 11px;border-top:1px dashed var(--bd);font-size:11.5px;color:var(--sub);line-height:1.6;
+  display:flex;gap:6px;align-items:flex-start;background:var(--card)}
+.rc .pr .t{flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* 我的作品列表 */
+.hist{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:11px;padding:14px 16px}
+.ht{border:1px solid var(--bd);border-radius:var(--r-ctl);overflow:hidden;background:var(--card2);cursor:pointer;transition:.12s}
+.ht:hover{border-color:var(--pri);box-shadow:0 3px 12px rgba(13,148,136,.14)}
+.ht img{width:100%;display:block;aspect-ratio:1/1;object-fit:cover;background:var(--card2)}
+.ht .n0{display:flex;align-items:center;justify-content:center;height:90px;color:var(--faint);font-size:11.5px}
+.ht .m{padding:4px 7px;font-size:10.5px;color:var(--sub);text-align:center;border-top:1px solid var(--bd)}
+
+.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(16px);opacity:0;
+  background:rgba(17,32,28,.94);color:#fff;padding:10px 20px;border-radius:var(--r-pill);
+  font-size:13px;z-index:200;pointer-events:none;transition:.22s;max-width:86vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.noteli{background:var(--warn-bg);border:1px solid var(--warn-bd);color:#fbbf24;
+  border-radius:var(--r-ctl);padding:9px 12px;font-size:12px;line-height:1.65}
+
+/* ===== 原图对比滑块（2026-11-19，复用 fk 已验收方案）=====
+   🔴 两张图各占一层，标签放进自己那一层 → 随 clip-path 一起被裁掉；
+      否则拖到底时「效果图/原图」的字还挂在别人的图上。 */
+.rc .cell.clickable{cursor:zoom-in}
+
+.cmp{position:relative;overflow:hidden;background:var(--card2);touch-action:none;cursor:ew-resize;
+  outline:none;user-select:none;display:block}
+.cmp:focus-visible{box-shadow:0 0 0 3px rgba(13,148,136,.45)}
+.cmp img{position:absolute;inset:0;width:100%;height:100%;display:block;
+  -webkit-user-drag:none;user-select:none;pointer-events:none;background:#fff}
+.cmp .lyr{position:absolute;inset:0}
+.cmp .cmptop{position:absolute;inset:0;will-change:clip-path}
+.cmp .cdiv{position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;background:#fff;
+  box-shadow:0 0 0 1px rgba(15,23,42,.3),0 0 10px rgba(0,0,0,.28);z-index:5}
+.cmp .cgrip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:38px;height:38px;
+  border-radius:50%;background:#fff;border:2px solid var(--pri);box-shadow:0 3px 10px rgba(15,23,42,.3);z-index:6}
+.cmp .cgrip::before,.cmp .cgrip::after{content:"";position:absolute;top:50%;width:0;height:0;
+  border-top:4px solid transparent;border-bottom:4px solid transparent;margin-top:-4px}
+.cmp .cgrip::before{left:8px;border-right:5px solid var(--pri)}
+.cmp .cgrip::after{right:8px;border-left:5px solid var(--pri)}
+.cmp .clab{position:absolute;top:10px;z-index:4;font-size:11.5px;font-weight:800;color:#fff;
+  padding:3px 9px;border-radius:6px;background:rgba(15,23,42,.84);pointer-events:none;
+  white-space:nowrap;transition:opacity .18s ease}
+.cmp .clab.l{left:10px}
+.cmp .clab.r{right:10px;background:rgba(13,148,136,.92)}
+.cmp .clab.dim{opacity:0}
+.cmp .cpct{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:6;
+  font:700 12px/1 ui-monospace,Consolas,monospace;color:#fff;background:rgba(15,23,42,.84);
+  padding:5px 10px;border-radius:6px;pointer-events:none}
+.cmp .cerr{position:absolute;inset:0;z-index:9;display:none;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.04);color:var(--faint);font-size:12px;text-align:center;padding:10px;flex-direction:column;gap:6px}
+.cmp.fit-contain img{object-fit:contain}
+.cmp.fit-stretch img{object-fit:fill}
+.cmp.fit-top img{object-fit:cover;object-position:50% 0}
+
+/* 全屏对比层 */
+#cmpFs{position:fixed;inset:0;z-index:130;background:#080f1a;display:none;
+  flex-direction:column;align-items:center;padding:12px}
+#cmpFs.on{display:flex}
+#cmpFs .fb{width:100%;max-width:1100px;display:flex;align-items:center;gap:8px;
+  color:rgba(96,165,250,.14);font-size:12.5px;padding-bottom:10px;flex-wrap:wrap}
+#cmpFs .fb b{font-size:14px}
+#cmpFs .fb .sp{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+#cmpFs .fsbtn{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:var(--r-pill);
+  background:rgba(255,255,255,.12);color:rgba(96,165,250,.14);border:1px solid rgba(255,255,255,.24);cursor:pointer}
+#cmpFs .fsbtn:hover{background:rgba(255,255,255,.24)}
+#cmpFs .fsbtn.on{background:#fff;color:#0f172a;border-color:#fff}
+#cmpFs .fsstage{flex:1;width:100%;display:flex;align-items:center;justify-content:center;
+  min-height:0;position:relative}
+#cmpFs .cmp{height:100%;width:auto;box-shadow:0 18px 50px rgba(0,0,0,.55)}
+/* 🔴 等比模式下较窄的那张会左右留白：留白必须跟遮罩同色系，
+   用白底会在深色全屏层上留一根大白条，看着像图坏了 */
+#cmpFs .cmp{background:#16222c}
+#cmpFs .cmp img{background:#16222c}
+#cmpFs .farr{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;
+  border-radius:50%;background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.55);
+  color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;z-index:8;user-select:none;box-shadow:0 2px 10px rgba(0,0,0,.45)}
+#cmpFs .farr:hover{background:rgba(255,255,255,.4)}
+#cmpFs .farr.prev{left:4px}#cmpFs .farr.next{right:4px}
+#cmpFs .fmeta{color:#93b4d4}
+#cmpFs .fmeta.warn{background:rgba(201,130,31,.92);color:#fff8ec;border-radius:6px;padding:2px 9px}
+
+@media(max-width:1080px){
+  .grid{grid-template-columns:1fr}
+}
+@media(max-width:720px){
+  .wrap{padding:12px 12px 24px}
+  .pagehead h1{font-size:17px}
+  .items{grid-template-columns:1fr}
+  .drop img{max-height:130px}
+  .btn{padding:8px 15px;font-size:13px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="pagehead">
+    <h1><span class="ic">⇄</span>商品替换</h1>
+    <p>无需 PS：保留图1 的场景与光影，把里面的物体换成图2 的物品，比例透视自动贴合。</p>
+  </div>
+
+  <div class="grid">
+    <!-- 左：参数配置 -->
+    <div class="card">
+      <div class="hd">⚙ 参数配置</div>
+      <div class="bd">
+        <div>
+          <div class="lbl">图 1 · 场景图 <span class="req">*</span><small>保留背景 / 光影 / 构图</small></div>
+          <div class="drop" id="drop1">
+            <div class="big">点击或拖拽上传</div>
+            <div class="sm">JPG / PNG，单张 ≤ 10MB</div>
+          </div>
+          <input type="file" id="f1" accept="image/*" hidden>
+        </div>
+        <div>
+          <div class="lbl">图 2 · 替换物品图 <span class="req">*</span><small>要换进去的东西</small></div>
+          <div class="drop" id="drop2">
+            <div class="big">点击或拖拽上传</div>
+            <div class="sm">JPG / PNG，单张 ≤ 10MB</div>
+          </div>
+          <input type="file" id="f2" accept="image/*" hidden>
+        </div>
+        <div>
+          <div class="lbl">替换需求补充 <small>可选，留空则按默认规则</small></div>
+          <textarea id="pt" placeholder="例如：保留图1场景与光影，将图1核心物体替换为图2物品，无缝融合无拼接感"></textarea>
+          <div class="chips" id="chips"></div>
+        </div>
+        <div>
+          <div class="lbl">图片比例</div>
+          <div class="chips" id="ratios"></div>
+        </div>
+        <div>
+          <div class="lbl">分辨率</div>
+          <div class="chips" id="ress"></div>
+        </div>
+      </div>
+      <div class="foot">
+        <div class="lbl" style="margin:0">数量</div>
+        <div class="stepper">
+          <button id="minus">−</button><span id="cnt">1</span><button id="plus">+</button>
+        </div>
+        <div class="cost">本次消耗 <b id="cost">3</b> 积分</div>
+        <button class="btn" id="go">✨ 立即生成</button>
+      </div>
+    </div>
+
+    <!-- 右：结果 / 我的作品 -->
+    <div class="card">
+      <div class="tabs">
+        <div class="tab on" data-tab="res">生成结果</div>
+        <div class="tab" data-tab="hist">我的作品</div>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center;padding-bottom:6px">
+          <button class="btn ghost sm hide" id="btnStop">停止</button>
+          <button class="btn ghost sm hide" id="btnZip">打包下载</button>
+        </div>
+      </div>
+      <div class="tabline"></div>
+
+      <div class="result" id="paneRes">
+        <div class="empty" id="resEmpty">
+          <span class="ico">🖼</span>
+          还没生成。左边传好两张图，点「立即生成」
+        </div>
+        <div class="hide" id="resBody">
+          <div class="progtxt">
+            <b id="resTitle" style="color:var(--tx)">出图中…</b>
+            <span id="resCnt"></span>
+          </div>
+          <div class="bar"><i id="prog"></i></div>
+          <div class="noteli hide" id="failNote" style="margin-top:10px"></div>
+          <div class="items" id="items"></div>
+        </div>
+      </div>
+
+      <div class="hide" id="paneHist">
+        <div class="hist" id="histBox"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 全屏原图对比层（点结果卡里的 AI 作品进入） -->
+<div id="cmpFs">
+  <div class="fb">
+    <b id="fsName">原图对比</b>
+    <span class="fmeta" id="fsMeta"></span>
+    <div class="sp">
+      <span class="fsbtn on" data-fobj="scene">对比 图1 场景</span>
+      <span class="fsbtn" data-fobj="item">对比 图2 物品</span>
+      <span class="fsbtn" id="fsClose">✕ 关闭</span>
+    </div>
+  </div>
+  <div class="fsstage">
+    <div class="cmp fit-contain" id="fsCmp" tabindex="0" aria-label="原图对比滑块，左右方向键调整">
+      <div class="lyr"><img data-role="base" alt="原图"><span class="clab r">原图</span></div>
+      <div class="lyr cmptop" data-role="top"><img data-role="topimg" alt="效果图"><span class="clab l">效果图</span></div>
+      <div class="cdiv"><div class="cgrip"></div></div>
+      <span class="cpct">50%</span>
+      <div class="cerr"></div>
+    </div>
+    <div class="farr prev" id="fsPrev">‹</div>
+    <div class="farr next" id="fsNext">›</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var BASE = location.pathname.replace(/\/index\.html$/i, '').replace(/\/+$/, '');
+var PRESETS = [
+  "保留图1场景与光影，将图1核心物体替换为图2物品，无缝融合无拼接感",
+  "图1场景不变，用图2物品替换图1原物体，比例、透视、色调完全匹配",
+  "替换图1中的物体为图2物品，保留图1所有背景元素，光影自然衔接",
+  "图2物品替换图1原物体，保持图1构图与风格，材质细节真实无变形",
+  "保留图1全景场景，将图2物品精准放入图1原物体位置，融合自然",
+  "图1背景/光影不变，用图2物品替换核心物体，无割裂感，高清细节",
+  "替换图1物体为图2物品，适配图1透视角度，阴影与场景逻辑一致",
+  "保留图1整体氛围，用图2物品替换原物体，边缘过渡自然，风格统一",
+  "先移除图1中的原物体并保留其接触阴影，再把图2物品放到同一位置，尺寸按原物体大小匹配，透视一致，无重影"
+];
+var RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"];
+var RESS = ["1K", "2K"];
+
+var S = {
+  src: null, item: null,          /* {rel, url, name, w, h} */
+  ratio: "1:1", res: "2K", n: 1,
+  tid: "", task: null, timer: null, busy: false, tab: "res",
+  /* 原图对比：位置按张记，对齐模式与对比对象全局记，轮询重绘后要能还原 */
+  cmpPos: {}, cmpFit: "contain", cmpObj: "scene", fsOpen: false, fsIdx: 0
+};
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+var _tt = null;
+function toast(m, ms){
+  var e = $("toast"); e.textContent = m; e.classList.add("on");
+  clearTimeout(_tt); _tt = setTimeout(function(){ e.classList.remove("on"); }, ms || 2600);
+}
+function api(path, opt){
+  return fetch(BASE + "/" + path, Object.assign({ credentials: "same-origin" }, opt || {}))
+    .then(function(r){
+      return r.json().catch(function(){ throw new Error("服务返回异常（HTTP " + r.status + "）"); })
+        .then(function(d){
+          if (!r.ok || d.ok === false) throw new Error(d.error || ("HTTP " + r.status));
+          return d;
+        });
+    });
+}
+function postJSON(path, body){
+  return api(path, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}) });
+}
+
+/* ---------------- 上传 ---------------- */
+function upload(file, slot){
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { toast("单张不能超过 10MB"); return; }
+  var fd = new FormData();
+  fd.append("file", file);
+  var drop = $(slot === "src" ? "drop1" : "drop2");
+  drop.innerHTML = '<div class="big"><span class="spin"></span></div><div class="sm">上传中…</div>';
+  api("api/upload", { method: "POST", body: fd }).then(function(d){
+    S[slot] = { rel: d.rel, url: URL.createObjectURL(file), name: file.name, w: d.w, h: d.h };
+    renderDrop(slot);
+    toast("已上传（" + d.w + "×" + d.h + "）");
+  }).catch(function(e){
+    renderDrop(slot);
+    toast(e.message, 4000);
+  });
+}
+function renderDrop(slot){
+  var drop = $(slot === "src" ? "drop1" : "drop2");
+  var v = S[slot];
+  if (!v) {
+    drop.innerHTML = '<div class="big">点击或拖拽上传</div><div class="sm">JPG / PNG，单张 ≤ 10MB</div>';
+    return;
+  }
+  drop.innerHTML = '<span class="okmark">已上传 ' + v.w + "×" + v.h + '</span>' +
+    '<button class="rm" title="移除">×</button>' +
+    '<img src="' + v.url + '" alt="">' +
+    '<div class="sm">' + esc(v.name) + '</div>';
+  drop.querySelector(".rm").onclick = function(e){
+    e.stopPropagation();
+    S[slot] = null; renderDrop(slot);
+  };
+}
+function bindDrop(slot){
+  var drop = $(slot === "src" ? "drop1" : "drop2");
+  var inp = $(slot === "src" ? "f1" : "f2");
+  drop.addEventListener("click", function(e){
+    if (e.target.classList && e.target.classList.contains("rm")) return;
+    inp.click();
+  });
+  inp.addEventListener("change", function(){
+    if (inp.files && inp.files[0]) upload(inp.files[0], slot);
+    inp.value = "";
+  });
+  drop.addEventListener("dragover", function(e){ e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", function(){ drop.classList.remove("over"); });
+  drop.addEventListener("drop", function(e){
+    e.preventDefault(); drop.classList.remove("over");
+    var f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f) return;
+    if (!/^image\//.test(f.type)) { toast("请上传图片文件"); return; }
+    upload(f, slot);
+  });
+}
+bindDrop("src"); bindDrop("item");
+
+/* ---------------- chips ---------------- */
+var chBox = $("chips");
+PRESETS.forEach(function(p, i){
+  var b = document.createElement("span");
+  b.className = "chip";
+  b.textContent = (i === 8 ? "★ " : "") + p;
+  b.title = p;
+  b.onclick = function(){
+    $("pt").value = p;
+    Array.prototype.forEach.call(chBox.children, function(c){ c.classList.remove("on"); });
+    b.classList.add("on");
+  };
+  chBox.appendChild(b);
+});
+$("pt").addEventListener("input", function(){
+  var v = $("pt").value.trim();
+  Array.prototype.forEach.call(chBox.children, function(c){
+    c.classList.toggle("on", c.title === v);
+  });
+});
+var rBox = $("ratios");
+RATIOS.forEach(function(r){
+  var b = document.createElement("span");
+  b.className = "chip" + (r === S.ratio ? " on" : "");
+  b.textContent = r;
+  b.onclick = function(){
+    S.ratio = r;
+    Array.prototype.forEach.call(rBox.children, function(c){ c.classList.remove("on"); });
+    b.classList.add("on");
+  };
+  rBox.appendChild(b);
+});
+var sBox = $("ress");
+RESS.forEach(function(r){
+  var b = document.createElement("span");
+  b.className = "chip" + (r === S.res ? " on" : "");
+  b.textContent = r + (r === "2K" ? "（推荐）" : "");
+  b.dataset.v = r;
+  b.onclick = function(){
+    S.res = r;
+    Array.prototype.forEach.call(sBox.children, function(c){ c.classList.remove("on"); });
+    b.classList.add("on");
+  };
+  sBox.appendChild(b);
+});
+function updCost(){
+  $("cnt").textContent = S.n;
+  $("cost").textContent = 3 * S.n;
+  $("minus").disabled = S.n <= 1;
+  $("plus").disabled = S.n >= 4;
+}
+$("minus").onclick = function(){ S.n = Math.max(1, S.n - 1); updCost(); };
+$("plus").onclick = function(){ S.n = Math.min(4, S.n + 1); updCost(); };
+updCost();
+
+/* ---------------- 生成 ---------------- */
+$("go").onclick = function(){
+  if (S.busy) { toast("正在生成中，请稍等"); return; }
+  if (!S.src || !S.item) { toast("图1 场景图 和 图2 替换物品图 都要上传"); return; }
+  var b = this;
+  b.disabled = true;
+  S.busy = true;
+  postJSON("api/generate", {
+    src: S.src.rel, item: S.item.rel, prompt: $("pt").value.trim(),
+    ratio: S.ratio, res: S.res, n: S.n
+  }).then(function(d){
+    S.tid = d.tid;
+    showTab("res");
+    $("resEmpty").classList.add("hide");
+    $("resBody").classList.remove("hide");
+    $("btnStop").classList.remove("hide");
+    $("btnZip").classList.add("hide");
+    $("failNote").classList.add("hide");
+    $("items").innerHTML = "";
+    $("resTitle").textContent = "出图中…";
+    $("prog").style.width = "4%";
+    $("resCnt").textContent = "0 / " + d.n + " 张完成";
+    poll();
+  }).catch(function(e){
+    toast(e.message, 4200);
+    b.disabled = false; S.busy = false;
+  });
+};
+
+function poll(){
+  clearTimeout(S.timer);
+  if (!S.tid) return;
+  api("api/tasks/" + S.tid).then(function(d){
+    S.task = d;
+    renderTask(d);
+    if (d.status === "running") {
+      S.timer = setTimeout(poll, 1600);
+    } else {
+      S.busy = false;
+      $("go").disabled = false;
+      $("btnStop").classList.add("hide");
+      var nFail = (d.items || []).filter(function(x){ return x.status !== "done"; }).length;
+      if (nFail > 0) {
+        $("btnZip").classList.toggle("hide", (d.n_done || 0) === 0);
+        autoRefund(d);
+      } else {
+        $("btnZip").classList.remove("hide");
+      }
+    }
+  }).catch(function(e){
+    toast(e.message, 4000);
+    S.busy = false; $("go").disabled = false;
+  });
+}
+
+function autoRefund(d){
+  var nFail = (d.items || []).filter(function(x){ return x.status !== "done"; }).length;
+  if (nFail <= 0 || d.refunded) return;
+  postJSON("api/tasks/" + S.tid + "/refund", {}).then(function(r){
+    if (r.refunded > 0) {
+      $("failNote").classList.remove("hide");
+      $("failNote").textContent = "有 " + r.n + " 张没出成功，已自动退回 " + r.refunded + " 积分。";
+      toast("已退回 " + r.refunded + " 积分");
+      try { if (window.parent && window.parent.refreshPoints) window.parent.refreshPoints(); } catch (e) {}
+    }
+  }).catch(function(){});
+}
+
+function renderTask(d){
+  var items = d.items || [];
+  var done = items.filter(function(x){ return x.status === "done"; }).length;
+  $("resTitle").textContent = d.status === "running" ? "出图中…" : "生成结果";
+  $("resCnt").textContent = done + " / " + items.length + " 张完成" +
+    (d.opt && d.opt.ratio ? " · " + d.opt.ratio + " · " + d.opt.res : "");
+  $("prog").style.width = (items.length ? Math.round(done * 100 / items.length) : 0) + "%";
+  if (d.status === "failed" && d.err) {
+    $("failNote").classList.remove("hide");
+    $("failNote").textContent = d.err;
+  }
+  var h = "";
+  items.forEach(function(it, i){
+    var no = i + 1;
+    var left = '<div class="cell">' +
+      (d.src ? '<img src="' + d.src + '" alt="原图">' : '') +
+      '<span class="tong">原图</span></div>';
+    var right;
+    if (it.status === "done") {
+      right = '<div class="cell clickable" data-cmpopen="' + no + '" title="点击对比原图">' +
+        '<img src="' + BASE + "/" + it.url + '" alt="AI作品">' +
+        '<span class="tong r">AI作品</span></div>';
+    } else if (it.status === "running") {
+      right = '<div class="cell loading"><div class="ph"><span class="spin"></span>生成中…</div></div>';
+    } else if (it.status === "failed") {
+      right = '<div class="cell loading"><div class="ph" style="color:var(--err)">失败</div></div>';
+    } else if (it.status === "skipped") {
+      right = '<div class="cell loading"><div class="ph">已停止</div></div>';
+    } else {
+      right = '<div class="cell loading"><div class="ph">排队中…</div></div>';
+    }
+    var act = (it.status === "done" && it.url)
+      ? '<div class="rc-act"><button class="btn ghost sm" data-cmpopen="' + no + '">⇄ 对比原图</button>' +
+        '<span class="hint">点开后左右拖动</span></div>'
+      : '';
+    h += '<div class="rc" data-rc="' + no + '">' + act +
+      '<div class="pair">' + left + right + '</div>' +
+      (it.err ? '<div class="er">' + esc(it.err) + '</div>' : '') +
+      '<div class="pr"><div style="flex:0 0 auto;font-weight:700">替换需求</div>' +
+        '<div class="t" title="' + esc(d.prompt || "") + '">' +
+          (d.extra ? esc(d.extra) : '<span style="color:var(--faint)">（未填 · 按默认规则：保持图1版式，只做物体替换）</span>') +
+        '</div>' +
+        '<button class="btn ghost sm" data-copy="' + no + '" title="复制完整提示词">复制</button></div>' +
+      '<div class="ft"><span class="no">第 ' + no + ' 张</span>' +
+        (it.status === "done"
+          ? '<a class="btn ghost sm" href="' + BASE + "/" + it.url + '" download>下载</a>'
+          : '') +
+        '<button class="btn ghost sm" data-redo="' + no + '">' +
+          (it.status === "running" ? "卡住了？重试" : "重出这张") + '</button>' +
+      '</div></div>';
+  });
+  $("items").innerHTML = h;
+}
+
+/* 事件委托：renderTask 每次重写 innerHTML */
+$("items").addEventListener("click", function(e){
+  var t = e.target;
+  /* 点 AI 作品 → 全屏对比（方案 A） */
+  var cp = t.closest ? t.closest("[data-cmpopen]") : null;
+  if (cp) { CMP.openFs(+cp.getAttribute("data-cmpopen")); return; }
+  var rb = t.closest ? t.closest("[data-redo]") : null;
+  if (rb) {
+    var no = +rb.getAttribute("data-redo");
+    if (!confirm("重出第 " + no + " 张，消耗 3 积分。继续？")) return;
+    rb.disabled = true;
+    postJSON("api/tasks/" + S.tid + "/redo", { idx: no }).then(function(){
+      S.busy = true; $("go").disabled = true;
+      $("resTitle").textContent = "出图中…";
+      $("btnStop").classList.remove("hide");
+      poll();
+    }).catch(function(err){ toast(err.message, 4200); rb.disabled = false; });
+    return;
+  }
+  var cb = t.closest ? t.closest("[data-copy]") : null;
+  if (cb) {
+    var txt = (S.task && S.task.prompt) || "";
+    copy(txt, cb);
+  }
+});
+function copy(txt, btn){
+  if (!txt) { toast("没有提示词可复制"); return; }
+  var done = function(){ btn.textContent = "已复制"; setTimeout(function(){ btn.textContent = "复制"; }, 1400); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(function(){ fb(); });
+  } else fb();
+  function fb(){
+    var ta = document.createElement("textarea");
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) { toast("复制失败，请手动选中"); }
+    document.body.removeChild(ta);
+  }
+}
+
+$("btnStop").onclick = function(){
+  if (!S.tid) return;
+  postJSON("api/tasks/" + S.tid + "/stop", {}).then(function(){
+    toast("已请求停止，未出图的张数会退回");
+  }).catch(function(e){ toast(e.message); });
+};
+$("btnZip").onclick = function(){
+  if (!S.tid) return;
+  window.open(BASE + "/api/tasks/" + S.tid + "/zip", "_blank");
+};
+
+/* ================= 原图对比滑块（方案 A：点 AI 作品 → 全屏层）=================
+   左 = 效果图（成品），右 = 原图（图1 场景 或 图2 替换物品，顶栏可切）。
+   引擎与 fk 同一套：clip-path 裁上层、标签住进各自图层、pointer capture 拖动。 */
+var CMP = (function(){
+  var FS = {pos: 50, idx: 0};
+
+  function task(){ return S.task || {items: []}; }
+  function itemOf(idx){ return (task().items || [])[idx - 1] || null; }
+  function refUrl(){
+    var t = task();
+    var u = (S.cmpObj === "item") ? t.item : t.src;
+    return u ? (BASE + "/" + u) : "";
+  }
+  function outUrl(idx){
+    var it = itemOf(idx);
+    return (it && it.url) ? (BASE + "/" + it.url) : "";
+  }
+  function q(root, sel){ return root.querySelector(sel); }
+  function setFitClass(el, fit){
+    if (!el) return;
+    el.classList.remove("fit-contain", "fit-stretch", "fit-top");
+    el.classList.add("fit-" + fit);
+  }
+
+  function paint(root, pos){
+    if (!root) return;
+    var top = q(root, '[data-role="top"]'), div = q(root, ".cdiv");
+    if (!top || !div) return;
+    top.style.clipPath = "inset(0 " + (100 - pos) + "% 0 0)";
+    div.style.left = pos + "%";
+    var pct = q(root, ".cpct");
+    if (pct) pct.textContent = Math.round(pos) + "%";
+    /* 标签在自己那一层里，clip-path 已经会裁；这里再按可见宽度淡出，避免半个字 */
+    var lb = q(root, ".clab.l"), rb = q(root, ".clab.r"), cw = root.clientWidth || 1;
+    if (lb) lb.classList.toggle("dim", pos * cw / 100 < (lb.offsetWidth || 0) + 16);
+    if (rb) rb.classList.toggle("dim", (100 - pos) * cw / 100 < (rb.offsetWidth || 0) + 16);
+  }
+
+  /* 两张图都 onload 才算就绪；任一张失败给明确文案 */
+  function load(root, out, ref, onReady){
+    var base = q(root, '[data-role="base"]'), top = q(root, '[data-role="topimg"]');
+    var err = q(root, ".cerr");
+    if (err) err.style.display = "none";
+    var n = 0, bad = 0;
+    function ok(){ n++; if (n >= 2 && !bad && onReady) onReady(); }
+    function no(){
+      bad++;
+      if (err) {
+        err.innerHTML = "<div style='font-weight:700;color:#dc2626'>图片加载失败</div>" +
+                        "<div>可能已过 72 小时清理期</div>";
+        err.style.display = "flex";
+      }
+    }
+    [[base, ref], [top, out]].forEach(function(p){
+      if (!p[0]) return;
+      p[0].onload = ok; p[0].onerror = no;
+      p[0].src = p[1] || "";
+      if (p[0].complete && p[0].naturalWidth) ok();
+    });
+  }
+
+  function bind(root){
+    if (!root || root._cmpBound) return;
+    root._cmpBound = true;
+    var dragging = false;
+    function put(p){
+      FS.pos = Math.max(0, Math.min(100, p));
+      S.cmpPos[FS.idx] = FS.pos;
+      paint(root, FS.pos);
+    }
+    function fromEvent(e){
+      var r = root.getBoundingClientRect();
+      if (!r.width) return;
+      put((e.clientX - r.left) / r.width * 100);
+    }
+    root.addEventListener("pointerdown", function(e){
+      if (e.button !== undefined && e.button !== 0) return;
+      try { root.setPointerCapture(e.pointerId); } catch (err) {}
+      dragging = true;
+      try { root.focus({preventScroll: true}); } catch (err) {}
+      fromEvent(e); e.preventDefault();
+    });
+    root.addEventListener("pointermove", function(e){ if (dragging) fromEvent(e); });
+    function end(e){
+      if (!dragging) return;
+      dragging = false;
+      try { if (root.hasPointerCapture && root.hasPointerCapture(e.pointerId)) root.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
+    root.addEventListener("pointerup", end);
+    root.addEventListener("pointercancel", end);
+    root.addEventListener("dblclick", function(){ put(50); });
+    root.addEventListener("keydown", function(e){
+      var st = e.shiftKey ? 5 : 1, nv = null;
+      if (e.key === "ArrowLeft") nv = FS.pos - st;
+      else if (e.key === "ArrowRight") nv = FS.pos + st;
+      else if (e.key === "Home") nv = 0;
+      else if (e.key === "End") nv = 100;
+      if (nv === null) return;
+      e.preventDefault(); put(nv);
+    });
+  }
+
+  function meta(){
+    var m = document.getElementById("fsMeta");
+    var it = itemOf(FS.idx) || {};
+    var ow = it.w || 0, oh = it.h || 0;
+    m.className = "fmeta";
+    var refName = S.cmpObj === "item" ? "图2 物品" : "图1 场景";
+    var rw = (S.src && S.cmpObj === "scene") ? S.src.w : (S.item && S.cmpObj === "item" ? S.item.w : 0);
+    m.textContent = "成品 " + (ow || "?") + "×" + (oh || "?") + "（" +
+      (ow && oh ? (ow / oh).toFixed(3) : "?") + "）｜" + refName +
+      (rw ? " " + rw + "px 宽" : "");
+  }
+
+  function chips(){
+    document.querySelectorAll("#cmpFs [data-fobj]").forEach(function(c){
+      c.classList.toggle("on", c.getAttribute("data-fobj") === S.cmpObj);
+    });
+  }
+
+  function setObj(obj){
+    S.cmpObj = obj;
+    chips(); meta();
+    if (S.fsOpen) reload();
+  }
+
+  function reload(){
+    var root = document.getElementById("fsCmp");
+    var idx = FS.idx;
+    var it = itemOf(idx);
+    if (!it) return;
+    var w = it.w || 1, h = it.h || 1;
+    /* 🔴 高度同时受视口宽高约束：只写 height:100% 会在窄屏撑出横向溢出 */
+    root.style.aspectRatio = w + " / " + h;
+    root.style.height = "min(100%, calc((100vw - 34px) * " + (h / w).toFixed(4) + "))";
+    setFitClass(root, S.cmpFit);
+    load(root, outUrl(idx), refUrl(), function(){ paint(root, FS.pos); });
+    paint(root, FS.pos);
+  }
+
+  function openFs(idx){
+    var it = itemOf(idx);
+    if (!it || it.status !== "done" || !it.url) { toast("这一张还没出图"); return; }
+    FS.idx = idx;
+    FS.pos = (S.cmpPos[idx] == null) ? 50 : S.cmpPos[idx];
+    S.fsOpen = true;
+    S.fsIdx = idx;
+    document.getElementById("fsName").textContent = "第 " + idx + " 张 · 原图对比";
+    document.getElementById("cmpFs").classList.add("on");
+    document.body.style.overflow = "hidden";
+    bind(document.getElementById("fsCmp"));
+    chips();
+    reload();
+    meta();
+    try { document.getElementById("fsCmp").focus({preventScroll: true}); } catch (e) {}
+  }
+
+  function closeFs(){
+    S.fsOpen = false;
+    document.getElementById("cmpFs").classList.remove("on");
+    document.body.style.overflow = "";
+  }
+
+  function step(d){
+    var items = task().items || [];
+    var n = items.length;
+    if (!n) return;
+    var i = FS.idx;
+    for (var k = 0; k < n; k++) {
+      i = ((i - 1 + d + n) % n) + 1;          /* 跳过没出图的张 */
+      var it = items[i - 1];
+      if (it && it.status === "done" && it.url) { openFs(i); return; }
+    }
+  }
+
+  return { openFs: openFs, closeFs: closeFs, setObj: setObj, step: step };
+})();
+
+document.querySelectorAll("#cmpFs [data-fobj]").forEach(function(c){
+  c.onclick = function(){ CMP.setObj(c.getAttribute("data-fobj")); };
+});
+document.getElementById("fsClose").onclick = function(){ CMP.closeFs(); };
+document.getElementById("fsPrev").onclick = function(e){ e.stopPropagation(); CMP.step(-1); };
+document.getElementById("fsNext").onclick = function(e){ e.stopPropagation(); CMP.step(1); };
+document.getElementById("cmpFs").addEventListener("click", function(e){
+  if (e.target === this || (e.target.className || "").indexOf("fsstage") >= 0) CMP.closeFs();
+});
+document.addEventListener("keydown", function(e){
+  if (!S.fsOpen) return;
+  if (e.key === "Escape") { CMP.closeFs(); return; }
+  var t = e.target;
+  if (t && t.closest && t.closest("#fsCmp")) return;   /* 滑块自己处理 ←→ */
+  if (e.altKey) return;
+  if (e.key === "ArrowLeft") { e.preventDefault(); CMP.step(-1); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); CMP.step(1); }
+});
+
+/* ---------------- tab ---------------- */
+function showTab(t){
+  S.tab = t;
+  Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(e){
+    e.classList.toggle("on", e.getAttribute("data-tab") === t);
+  });
+  $("paneRes").classList.toggle("hide", t !== "res");
+  $("paneHist").classList.toggle("hide", t !== "hist");
+  if (t === "hist") loadHist();
+}
+Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(e){
+  e.onclick = function(){ showTab(e.getAttribute("data-tab")); };
+});
+
+function loadHist(){
+  $("histBox").innerHTML = '<div class="n0" style="grid-column:1/-1;height:auto;padding:26px 0">加载中…</div>';
+  api("api/tasks?limit=24").then(function(d){
+    var ts = d.tasks || [];
+    if (!ts.length) {
+      $("histBox").innerHTML = '<div class="n0" style="grid-column:1/-1;height:auto;padding:26px 0">还没有作品</div>';
+      return;
+    }
+    var h = "";
+    ts.forEach(function(t){
+      var dt = new Date((t.ts || 0) * 1000);
+      var when = (dt.getMonth() + 1) + "/" + dt.getDate() + " " +
+        ("0" + dt.getHours()).slice(-2) + ":" + ("0" + dt.getMinutes()).slice(-2);
+      h += '<div class="ht" data-tid="' + t.tid + '">' +
+        (t.thumb ? '<img src="' + BASE + "/" + t.thumb + '" alt="">'
+                 : '<div class="n0">无图</div>') +
+        '<div class="m">' + when + ' · ' + t.n_done + '/' + t.n + '</div></div>';
+    });
+    $("histBox").innerHTML = h;
+    Array.prototype.forEach.call($("histBox").querySelectorAll("[data-tid]"), function(el){
+      el.onclick = function(){
+        S.tid = el.getAttribute("data-tid");
+        showTab("res");
+        $("resEmpty").classList.add("hide");
+        $("resBody").classList.remove("hide");
+        $("items").innerHTML = "";
+        poll();
+      };
+    });
+  }).catch(function(e){
+    $("histBox").innerHTML = '<div class="n0" style="grid-column:1/-1;height:auto;padding:26px 0">' + esc(e.message) + '</div>';
+  });
+}
+
+/* 从父页面带 ?tid= 进来时直接看那一单 */
+(function(){
+  var m = /[?&]tid=([^&]+)/.exec(location.search);
+  if (m) {
+    S.tid = decodeURIComponent(m[1]);
+    $("resEmpty").classList.add("hide");
+    $("resBody").classList.remove("hide");
+    poll();
+  }
+})();
+renderDrop("src"); renderDrop("item");
+</script>
+</body>
+</html>

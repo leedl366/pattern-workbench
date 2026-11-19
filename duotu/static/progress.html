@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>多图生图工作台 · 摄像头框一致性修复</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --a:#4a6cf7;--a2:#3752c4;--ink:#16181d;--ink2:#4b4f57;--ink3:#8a8f98;
+  --bg:#f4f6f9;--card:#fff;--line:#e4e8ef;--line2:#f1f4f8;
+  --done:#2f9e63;--donebg:#e9f7ef;--doing:#e08a1e;--doingbg:#fdf4e4;
+  --todo:#8a8f98;--todobg:#f2f4f7;--pause:#8b5cf6;--pausebg:#f2eeff;
+  --risk:#c0443a;--riskbg:#fdeeec;
+}
+body{background:var(--bg);color:var(--ink);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;padding-bottom:80px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 22px}
+a{color:var(--a2)}
+/* ---------- 顶栏 ---------- */
+.top{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.top .wrap{display:flex;align-items:center;gap:14px;padding:13px 22px;flex-wrap:wrap}
+.logo{font-weight:750;font-size:15.5px;letter-spacing:-.2px}
+.logo b{color:var(--a2)}
+.crumb{color:var(--ink3);font-size:12.5px}
+.sp{flex:1}
+.nav{display:flex;gap:6px;flex-wrap:wrap}
+.nav a{font-size:12.5px;text-decoration:none;color:var(--ink2);padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.nav a:hover{border-color:var(--a);color:var(--a2)}
+.nav a.on{background:var(--a);color:#fff;border-color:var(--a)}
+/* ---------- 概览 ---------- */
+.hero{background:#fff;border-bottom:1px solid var(--line);padding:26px 0 24px}
+.hero h1{font-size:23px;font-weight:750;letter-spacing:-.4px}
+.hero .sub{color:var(--ink2);font-size:13px;margin-top:7px}
+.kpis{display:grid;grid-template-columns:auto repeat(auto-fit,minmax(118px,1fr));gap:14px;margin-top:22px;align-items:center}
+.ring{position:relative;width:118px;height:118px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .val b{font-size:26px;font-weight:750;color:var(--a2);line-height:1}
+.ring .val i{font-style:normal;font-size:11px;color:var(--ink3);margin-top:3px}
+.kpi{background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:12px 15px}
+.kpi b{display:block;font-size:21px;font-weight:750;line-height:1.25}
+.kpi i{font-style:normal;font-size:11.5px;color:var(--ink3)}
+.kpi.d b{color:var(--done)}.kpi.o b{color:var(--doing)}.kpi.t b{color:var(--todo)}.kpi.r b{color:var(--risk)}
+/* ---------- 通用 ---------- */
+h2{font-size:16.5px;margin:34px 0 6px;padding-left:11px;border-left:3px solid var(--a);font-weight:750}
+h2 em{font-style:normal;font-size:12.5px;color:var(--ink3);font-weight:400;margin-left:8px}
+h3{font-size:13.8px;font-weight:700;margin:20px 0 9px}
+.hint{color:var(--ink3);font-size:12.5px;margin:6px 0 14px;padding-left:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px}
+.pad{padding:18px 20px}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:11px;background:var(--card);margin-bottom:4px}
+.tw table{border:none}
+.num{width:34px;text-align:center;font-weight:700;color:var(--a2);font-size:12.5px}
+.arrow{color:var(--ink3);font-size:12px}
+.ok{color:var(--done);font-weight:650}
+/* ---------- 阶段进度条 ---------- */
+.phases{display:grid;gap:9px;margin-top:14px}
+.ph{background:#fff;border:1px solid var(--line);border-radius:11px;padding:13px 16px}
+.ph .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ph .nm{font-weight:650;font-size:13.5px;min-width:190px}
+.ph .tagx{font-size:11.5px;color:var(--ink3)}
+.ph .bar{flex:1;min-width:150px;height:7px;background:var(--line2);border-radius:99px;overflow:hidden}
+.ph .bar i{display:block;height:100%;border-radius:99px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.ph .pc{font-size:12.5px;font-weight:700;color:var(--ink2);min-width:42px;text-align:right}
+/* ---------- 看板 ---------- */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0 12px}
+.fbtn{font-size:12.5px;padding:6px 13px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink2);cursor:pointer;font-family:inherit}
+.fbtn:hover{border-color:var(--a)}
+.fbtn.on{background:var(--a);color:#fff;border-color:var(--a)}
+.abtn{font-size:12.5px;padding:6px 13px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink2);cursor:pointer;font-family:inherit}
+.abtn:hover{border-color:var(--a);color:var(--a2)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#fafbfc;text-align:left;padding:10px 13px;font-weight:650;color:var(--ink2);border-bottom:1px solid var(--line);font-size:12.2px;white-space:nowrap}
+td{padding:10px 13px;border-bottom:1px solid var(--line2);vertical-align:top;color:var(--ink2)}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#fafbfd}
+.mono{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px}
+.pth{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:11.5px;word-break:break-all;color:var(--ink2)}
+.st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:20px;cursor:pointer;border:1px solid transparent;user-select:none;white-space:nowrap}
+.st:hover{opacity:.82}
+.s-done{background:var(--donebg);color:var(--done)}
+.s-doing{background:var(--doingbg);color:var(--doing)}
+.s-todo{background:var(--todobg);color:var(--todo)}
+.s-pause{background:var(--pausebg);color:var(--pause)}
+.dot{width:6px;height:6px;border-radius:99px;background:currentColor;flex:none}
+/* ---------- 链接块 ---------- */
+.lnk{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:11.8px;color:var(--a2);text-decoration:none;border-bottom:1px dashed rgba(74,108,247,.45);word-break:break-all}
+.lnk:hover{border-bottom-style:solid}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.b-use{background:var(--donebg);color:var(--done)}
+.b-drop{background:var(--riskbg);color:var(--risk)}
+.b-idle{background:var(--doingbg);color:var(--doing)}
+.b-built{background:#eaefff;color:var(--a2)}
+.b-stop{background:var(--pausebg);color:var(--pause)}
+.b-now{background:#e6f7f7;color:#0e7c7c}
+/* ---------- 环境 ---------- */
+.envs{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:14px}
+.env{border:1px solid var(--line);border-radius:11px;padding:14px 16px;background:#fff}
+.env .t{display:flex;align-items:center;gap:8px;font-weight:650;font-size:13.5px}
+.led{width:9px;height:9px;border-radius:99px;background:var(--todo);flex:none;box-shadow:0 0 0 3px var(--todobg)}
+.led.up{background:var(--done);box-shadow:0 0 0 3px var(--donebg)}
+.led.down{background:var(--risk);box-shadow:0 0 0 3px var(--riskbg)}
+.env .d{font-size:12.3px;color:var(--ink3);margin-top:6px}
+/* ---------- 提示块 ---------- */
+.note{border-radius:10px;padding:13px 16px;font-size:12.8px;margin-top:12px}
+.note.w{background:#fffdf5;border:1px solid #f0e6cc;color:#6b5a2c}
+.note.r{background:var(--riskbg);border:1px solid #f0d2ce;color:#8a3a31}
+.note.i{background:#f5f8ff;border:1px solid #dde6fd;color:#3a4a7a}
+.note.g{background:#f0faf4;border:1px solid #cfe9da;color:#2b6a4a}
+ul{padding-left:19px;color:var(--ink2);font-size:13.2px}
+li{margin:5px 0}
+code{background:#f2f4f8;padding:1px 6px;border-radius:4px;font-size:12px;font-family:ui-monospace,Consolas,Menlo,monospace;color:var(--a2)}
+footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--ink3);font-size:12.3px}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#16181d;color:#fff;font-size:13px;padding:10px 20px;border-radius:9px;opacity:0;transition:.25s;pointer-events:none;z-index:99}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- ================= 顶栏 ================= -->
+<div class="top"><div class="wrap">
+  <div class="logo">工程进度<b>表</b></div>
+  <div class="crumb" id="pgCrumb">多图工作台</div>
+  <div class="sp"></div>
+  <div class="nav">
+    <!--NAV_START-->
+    <a href="https://chule.top:8443/duotu/" target="_blank">工作台（线上）</a>
+    <a href="https://chule.top:8443/duotu/progress.html" target="_blank" class="on">本次体检报告</a>
+  <!--NAV_END-->
+  </div>
+</div></div>
+
+<!-- ================= 概览 ================= -->
+<div class="hero"><div class="wrap">
+  <h1 id="pgTitle">多图生图工作台 · 摄像头框一致性修复</h1>
+  <p class="sub" id="pgSub">同一产品 2 张图批量换材质 → 换出两种摄像头边框颜色：全流程体检 · 根因定位 · 修复上线</p>
+  <div class="kpis">
+    <div class="ring">
+      <svg width="118" height="118" viewBox="0 0 118 118">
+        <circle cx="59" cy="59" r="50" fill="none" stroke="#eef1f6" stroke-width="11"/>
+        <circle id="ringBar" cx="59" cy="59" r="50" fill="none" stroke="#4a6cf7" stroke-width="11"
+                stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="314.16"/>
+      </svg>
+      <div class="val"><b id="ringPct">0%</b><i>总进度</i></div>
+    </div>
+    <div class="kpi d"><b id="kDone">0</b><i>已完成</i></div>
+    <div class="kpi o"><b id="kDoing">0</b><i>进行中</i></div>
+    <div class="kpi t"><b id="kTodo">0</b><i>待开始</i></div>
+    <div class="kpi r"><b id="kPause">0</b><i>已暂停</i></div>
+    <div class="kpi"><b id="kPhase">0</b><i>项目阶段</i></div>
+    <div class="kpi"><b id="kAsset">0</b><i>交付资产</i></div>
+  </div>
+  <div class="note i" style="margin-top:18px">
+    <b>本页为标准格式（合一版）</b>：可交互进度（进度环 + 阶段条 + 任务看板 + 环境探测）与静态明细（运行全过程 · 工具清单 · SKILL 清单 · 部署位置）合为一页。
+    <b>以后每次工程汇报都用这一版</b>，不再分开发。
+  </div>
+</div></div>
+
+<div class="wrap">
+
+  <!-- ================= 一、阶段进度 ================= -->
+  <h2>一、阶段进度 <em id="phEm">3 个阶段，进度由下方看板任务状态自动计算</em></h2>
+  <div class="phases" id="phaseBox"></div>
+
+  <!-- ================= 二、任务看板 ================= -->
+  <h2>二、任务看板 <em>点状态徽章可切换：已完成 → 进行中 → 待开始 → 已暂停</em></h2>
+  <p class="hint">改动会存在浏览器本地（localStorage），刷新不丢。右侧可导出 JSON 交给别人接手。</p>
+  <div class="toolbar">
+    <button class="fbtn on" data-f="all">全部 <span id="cAll"></span></button>
+    <button class="fbtn" data-f="done">已完成 <span id="cDone"></span></button>
+    <button class="fbtn" data-f="doing">进行中 <span id="cDoing"></span></button>
+    <button class="fbtn" data-f="todo">待开始 <span id="cTodo"></span></button>
+    <button class="fbtn" data-f="pause">已暂停 <span id="cPause"></span></button>
+    <div class="sp" style="flex:1"></div>
+    <button class="abtn" id="btnExport">导出 JSON</button>
+    <button class="abtn" id="btnReset">重置为初始状态</button>
+  </div>
+  <div class="card"><table>
+    <thead><tr>
+      <th style="width:96px">阶段</th>
+      <th style="min-width:250px">任务</th>
+      <th style="width:118px">状态</th>
+      <th style="min-width:190px">动用工具 / SKILL</th>
+      <th style="min-width:200px">产出 / 位置</th>
+    </tr></thead>
+    <tbody id="taskBody"></tbody>
+  </table></div>
+
+  <!-- ================= 三、功能运行全过程 ================= -->
+  <h2>三、功能运行全过程 <em>本次实战逐阶段记录，共 16 步</em></h2>
+  <p class="hint">下表是这个功能<b>从上手到交付</b>的完整执行轨迹。每一步都标明：做了什么、动用了哪个工具或 SKILL、关键命令 / 接口、以及落到哪个位置。</p>
+  <div class="tw">
+  <table>
+    <thead><tr>
+      <th class="num">#</th>
+      <th style="min-width:150px">做了什么</th>
+      <th style="min-width:190px">动用的工具 / SKILL</th>
+      <th style="min-width:260px">关键命令 / 接口</th>
+      <th style="min-width:210px">落地位置</th>
+    </tr></thead>
+    <tbody>
+    <!--PROCESS_START-->
+    <tr>
+      <td class="num">1</td>
+      <td>导出线上真实任务：定位到雪碧刚跑的 <code>20261012_152845_972cc9</code>（kind=group_run / mode=fusion / 2 张全 <code>material_pick</code>）</td>
+      <td>Bash ssh · Python json</td>
+      <td class="mono">ssh &lt;your-host&gt; → <code>/opt/duotu/data/parts_jobs/*.json</code> 打印 spec / features / 每张的 steps</td>
+      <td class="pth">线上任务 JSON</td>
+    </tr>
+    <tr>
+      <td class="num">2</td>
+      <td><b>关键取证</b>：规格卡 <code>DETAILS</code> 行写着 <code>oversized rounded camera cutouts with white rim</code>——旧白框不在 MATERIAL 行，而在 DETAILS 行里</td>
+      <td>Read · Grep</td>
+      <td class="mono">spec 四行全文导出 → 定位 <code>white rim</code> 在 DETAILS</td>
+      <td class="pth">SPEC 原文</td>
+    </tr>
+    <tr>
+      <td class="num">3</td>
+      <td>视觉模型客观比对两张成品（不看截图、靠模型描述取数）</td>
+      <td>gpt-5.4 <code>describe()</code></td>
+      <td class="mono">图1 <code>frame=black, glossy; body=white</code>；图2 <code>frame=white, glossy; body=off-white/matte</code></td>
+      <td class="pth">152845_FUSION.png / 152944_FUSION.png</td>
+    </tr>
+    <tr>
+      <td class="num">4</td>
+      <td>代码走查：确认 4 条叠加根因（无框色规则 / 旧材质干扰 / DETAILS 的 rim / 系列尾句没点名框）</td>
+      <td>Read · Grep</td>
+      <td class="mono">grep <code>SERIES_TAIL</code> <code>SIBLING_REF</code> <code>_swap</code> <code>merge_features</code></td>
+      <td class="pth">engine/parts.py · server.py</td>
+    </tr>
+    <tr>
+      <td class="num">5</td>
+      <td>新增 <code>CAM_FRAME_DEFAULT</code>（条件式默认跟壳身同色）+ <code>CAM_FRAME_LOCK</code>（每步硬约束 + 不许照抄旧 rim 色）</td>
+      <td>Edit</td>
+      <td class="mono"><code>unless a camera-frame color is explicitly stated above</code>；<code>do NOT copy the old rim/frame color</code></td>
+      <td class="pth">engine/parts.py</td>
+    </tr>
+    <tr>
+      <td class="num">6</td>
+      <td>新增 <code>supersede_old_material()</code>：MATERIAL 行标 SUPERSEDED，末尾声明点名 FORM/DETAILS 里的 rim 色同样作废</td>
+      <td>Edit</td>
+      <td class="mono"><code>including 'white rim' or 'black rim' in FORM/DETAILS</code></td>
+      <td class="pth">engine/parts.py</td>
+    </tr>
+    <tr>
+      <td class="num">7</td>
+      <td><code>merge_features()</code> 加第三参 <code>cam_lock</code>，按实际步骤判定是否注入框默认</td>
+      <td>Edit</td>
+      <td class="mono"><code>cam_lock and "CAMERA FRAME COLOR" not in f.upper()</code></td>
+      <td class="pth">engine/parts.py</td>
+    </tr>
+    <tr>
+      <td class="num">8</td>
+      <td>server.py：<code>_swap</code> 动作表补 <code>pattern_material</code>（原来漏了 → 组合动作换材质会复发同样 bug）</td>
+      <td>Edit</td>
+      <td class="mono">("material", "material_pick", <b>"pattern_material"</b>, "pattern_restore")</td>
+      <td class="pth">server.py:1045</td>
+    </tr>
+    <tr>
+      <td class="num">9</td>
+      <td>server.py：融合 + 分层两条分支的每个手机壳/摄像头步追加框锁</td>
+      <td>Edit</td>
+      <td class="mono"><code>if s["part"] in ("phone_case","camera_area"): pr += CAM_FRAME_LOCK</code></td>
+      <td class="pth">server.py:1103 / 1087 / 分层分支</td>
+    </tr>
+    <tr>
+      <td class="num">10</td>
+      <td>server.py：融合普通步加空 prompt 模板兜底（原来只有 pattern 类有，缺 prompt 时指令体会空）</td>
+      <td>Edit</td>
+      <td class="mono"><code>pr = (s.get("prompt") or "").strip() or P.render_prompt(...)</code></td>
+      <td class="pth">server.py:1096</td>
+    </tr>
+    <tr>
+      <td class="num">11</td>
+      <td>server.py：组执行图级 merge 改为按图1 实际步骤判 cam_lock（非手机壳组不再被误注入框锁）</td>
+      <td>Edit</td>
+      <td class="mono"><code>_g0_cam = any(s.get("part") in ("phone_case","camera_area") ...)</code></td>
+      <td class="pth">server.py:1436</td>
+    </tr>
+    <tr>
+      <td class="num">12</td>
+      <td>parts.html：新增锚定项「镜头框 · 颜色（全组一致关键🔒）」</td>
+      <td>Edit</td>
+      <td class="mono">FEATURE_GROUPS 增 <code>lenscolor</code>（跟壳身同色 / 黑 / 白 / 透明 / 金属银 / 自定义）</td>
+      <td class="pth">static/parts.html:922</td>
+    </tr>
+    <tr>
+      <td class="num">13</td>
+      <td>parts.html：换壳卡底部未锚定框色时橙字告警 + 跑之前 <code>camFrameWarn()</code> 提醒一次</td>
+      <td>Edit</td>
+      <td class="mono">抽 <code>matCamHintHtml(p)</code> 共用；<code>S._camWarned</code> 只提醒一次不打断</td>
+      <td class="pth">static/parts.html</td>
+    </tr>
+    <tr>
+      <td class="num">14</td>
+      <td>server.py：启动任务恢复的静默 except 改 <code>traceback.print_exc()</code>（失败留痕，否则用户只看到任务消失）</td>
+      <td>Edit · Python</td>
+      <td class="mono">全文件扫出 19 处静默 pass，改主流程这一处</td>
+      <td class="pth">server.py:1562</td>
+    </tr>
+    <tr>
+      <td class="num">15</td>
+      <td>mock 全量回归：新增 24a–24f + 25a–25g 共 26 条断言</td>
+      <td>Python · Bash</td>
+      <td class="mono"><code>python _test_pattern_block.py</code> → <b>157/157 全绿</b></td>
+      <td class="pth">工作台/_test_pattern_block.py</td>
+    </tr>
+    <tr>
+      <td class="num">16</td>
+      <td>离线复现：用线上真实 spec + features 跑一次组任务，比对两张提示词</td>
+      <td>Python · 临时脚本</td>
+      <td class="mono">框相关约束 <b>图1=4 条 / 图2=4 条完全一致</b>（唯一差异是图2 多一条 SIBLING 锚点说明，设计如此）</td>
+      <td class="pth">_verify_frame.py（已删）</td>
+    </tr>
+    <tr>
+      <td class="num">17</td>
+      <td>语法门禁：py_compile 三份 + 抽内联 script 走 <code>node --check</code></td>
+      <td>Bash · Node</td>
+      <td class="mono">PY_OK / JS_OK</td>
+      <td class="pth">工作台/</td>
+    </tr>
+    <tr>
+      <td class="num">18</td>
+      <td>deploy.sh 上线 + 线上 grep 新关键词 + curl 自检</td>
+      <td>Bash · ssh · curl</td>
+      <td class="mono">首页 200 · 接口 200 · parts.html 含 camFrameWarn / lenscolor</td>
+      <td class="pth">/opt/duotu/</td>
+    </tr>
+  <!--PROCESS_END-->
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    <b>链路的一句话概括</b>：<span class="mono">JS chunk 挖配置 <span class="arrow">→</span> Chrome 存储取 refreshToken <span class="arrow">→</span> 换 idToken <span class="arrow">→</span> 自建 Chrome + CDP 注入 <span class="arrow">→</span> 渲染抽取 <span class="arrow">→</span> 合并出表</span>。
+    第 7 步是最关键的一环——<b>整个方案成立的前提就是它</b>：用本机浏览器的既有登录态替代账号密码。
+  </div>
+
+  <!-- ================= 四、交付物与部署位置 ================= -->
+  <h2>四、交付物与部署位置 <em id="dlEm">线上：https://chule.top:8443/duotu/ · 本机：工作台/</em></h2>
+  <div class="card"><table>
+    <thead><tr><th style="width:130px">类别</th><th style="min-width:330px">位置</th><th style="min-width:190px">访问地址</th><th>说明</th></tr></thead>
+    <!--DELIVERABLES_START-->
+    <tbody>
+      <tr>
+        <td><b>工作台（分部位编辑）</b><br><span class="badge b-built">线上主页</span></td>
+        <td class="pth">https://chule.top:8443/duotu/<br>服务器 /opt/duotu/static/parts.html</td>
+        <td><a class="lnk" href="https://chule.top:8443/duotu/" target="_blank">https://chule.top:8443/duotu/</a></td>
+        <td>唯一主页（旧 index.html 已下线）。手机可直接打开</td>
+      </tr>
+      <tr>
+        <td><b>本次体检报告</b><br><span class="badge b-now">本页</span></td>
+        <td class="pth">https://chule.top:8443/duotu/progress.html<br>服务器 /opt/duotu/static/progress.html</td>
+        <td><a class="lnk" href="https://chule.top:8443/duotu/progress.html" target="_blank">https://chule.top:8443/duotu/progress.html</a></td>
+        <td>合一版：进度环 / 任务看板 / 运行全过程 / 交付位置 / 环境 / 工具与 SKILL 台账 / 风险待办</td>
+      </tr>
+      <tr>
+        <td><b>一致性引擎</b><br><span class="badge b-built">本次改动</span></td>
+        <td class="pth">工作台/engine/parts.py<br>（CAM_FRAME_DEFAULT / CAM_FRAME_LOCK / supersede_old_material / merge_features）</td>
+        <td><span class="mono">Python 模块</span></td>
+        <td>摄像头框一致性双锁：默认值 + 每步硬约束 + 旧状态作废</td>
+      </tr>
+      <tr>
+        <td><b>管线注入层</b><br><span class="badge b-built">本次改动</span></td>
+        <td class="pth">工作台/server.py<br>（_parts_pipeline 融合 / 分层 · _group_run_job）</td>
+        <td><span class="mono">Flask 路由</span></td>
+        <td>换材质任务作废旧规格卡；每步追加框锁；空 prompt 兜底；组级 cam_lock 按图1 步骤判定</td>
+      </tr>
+      <tr>
+        <td><b>前端锚定项</b><br><span class="badge b-now">本次新增</span></td>
+        <td class="pth">工作台/static/parts.html<br>（FEATURE_GROUPS.lenscolor · matCamHintHtml · camFrameWarn）</td>
+        <td><span class="mono">内联 JS</span></td>
+        <td>「镜头框·颜色」chips + 未锚定告警 + 跑前提醒一次</td>
+      </tr>
+      <tr>
+        <td><b>回归测试</b></td>
+        <td class="pth">工作台/_test_pattern_block.py</td>
+        <td><span class="mono">157/157 全绿</span></td>
+        <td>新增 24a–24f（框锁基础）+ 25a–25g（真实 case 复现）共 26 条</td>
+      </tr>
+    </tbody>
+  <!--DELIVERABLES_END-->
+  </table></div>
+  <div class="note">
+    <b>关于「部署」</b>：本工程是<b>本机工具链</b>，不是线上服务 —— 技能装在用户级技能目录，页面走 <code>127.0.0.1</code> 本地预览，没有公网地址。若需要手机也能打开，可一键发布成在线链接。
+  </div>
+
+  <!-- ================= 五、环境状态 ================= -->
+  <h2>五、环境状态 <em>实时探测，点按钮重新检测</em></h2>
+  <div class="toolbar"><button class="abtn" id="btnProbe">重新检测服务</button><span style="font-size:12.3px;color:var(--ink3)" id="probeTime">—</span></div>
+  <!--ENV_START-->
+  <div class="envs">
+    <div class="env">
+      <div class="t"><span class="led" id="ledDuotu"></span>线上工作台（chule.top）</div>
+      <div class="d">systemd <span class="mono">duotu.service</span> · Flask 监听 127.0.0.1:8770 · Caddy 反代 8443 前缀 <span class="mono">/duotu/</span></div>
+      <div class="d"><a class="lnk" href="https://chule.top:8443/duotu/" target="_blank">https://chule.top:8443/duotu/</a></div>
+    </div>
+    <div class="env">
+      <div class="t"><span class="led up"></span>本机工作台（开发态）</div>
+      <div class="d">Python venv Flask · 端口 8770 · 目录 <span class="mono">工作台\</span> · Startup vbs 登录自启</div>
+      <div class="d"><a class="lnk" href="http://127.0.0.1:8770/parts.html" target="_blank">http://127.0.0.1:8770/parts.html</a></div>
+    </div>
+    <div class="env">
+      <div class="t"><span class="led down"></span>腾讯云 COS（图床）</div>
+      <div class="d">bucket <span class="mono"><your-bucket></span> · 账号欠费 451 · 线上已应急置 <span class="mono">enabled=false</span>，图片走本地慢速通道</div>
+      <div class="d">充值后两步：① enabled 改回 true ② 跑 <span class="mono">cosstore.set_lifecycle(7)</span></div>
+    </div>
+    <div class="env">
+      <div class="t"><span class="led up"></span>回归测试（mock 端到端）</div>
+      <div class="d"><span class="mono">_test_pattern_block.py</span> · 157 条断言全绿 · 含 26 条本次新增的框一致性用例</div>
+      <div class="d">py_compile 三份 Python + <span class="mono">node --check</span> 前端内联脚本，均为上线门禁</div>
+    </div>
+  </div>
+  <!--ENV_END-->
+  <div class="note i"><b>注意</b>：本机 8770 是<b>开发态</b>服务（登录自启，重启后需重新拉起），<b>线上 chule.top 才是生产地址</b>，手机可直接打开。COS 因账号欠费已降级为本地慢速通道，出图不受影响、看图变慢（充值步骤见上方卡片与「风险与待办」）。</div>
+
+  <!-- ================= 六、工具清单 + 七、SKILL 清单 ================= -->
+  <h2>六、动用的工具清单 <em>共 14 类，按角色分组</em></h2>
+  <!--TOOLS_START-->
+  <h3>A. 编排与文件层（WorkBuddy 内置）</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="min-width:170px">工具</th><th style="min-width:110px">类型</th><th>在本功能里干了什么</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">Bash（Git Bash）</td><td>命令执行</td><td>主力通道。跑 py_compile / node --check / 测试脚本 / deploy.sh / ssh 取线上数据</td></tr>
+      <tr><td class="mono">Read / Edit / Write</td><td>文件读写</td><td>改 parts.py、server.py、parts.html；写测试与验证脚本</td></tr>
+      <tr><td class="mono">Grep</td><td>检索</td><td>定位 <code>SERIES_TAIL</code> / <code>SIBLING_REF</code> / <code>_swap</code> / 静默 except 等关键点</td></tr>
+      <tr><td class="mono">ssh / scp（前台执行）</td><td>远程</td><td>读线上任务 JSON、grep 新关键词、curl 自检（后台任务会被沙箱拦 ~/.ssh/config）</td></tr>
+      <tr><td class="mono">present_files</td><td>交付</td><td>把报告页在右侧打开</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>B. 运行时与模型层</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="min-width:170px">工具</th><th style="min-width:130px">版本 / 位置</th><th>在本功能里干了什么</th></tr></thead>
+    <tbody>
+      <tr><td><b>Python</b></td><td class="pth">3.13（受管 venv）<br>C:\Users\Administrator\.workbuddy\binaries\python\envs\default\Scripts\python.exe</td><td>py_compile 语法门禁、跑 mock 测试、抽内联 JS、线上 JSON 解析</td></tr>
+      <tr><td><b>Node.js</b></td><td class="pth">v22.22.2（受管运行时）</td><td><code>node --check</code> 校验 parts.html 内联脚本语法</td></tr>
+      <tr><td><b>gpt-5.4（视觉模型）</b></td><td class="pth">apib.ai 网关 · aigen.DEFAULT_VISION</td><td>对两张成品 <code>describe()</code> 取客观框色/材质描述（截图读不了，用模型取证绕过）</td></tr>
+      <tr><td><b>gpt-image-2（生图）</b></td><td class="pth">apib.ai 网关</td><td>工作台出图引擎（本次未真实出图，用 FakeCl mock，不花钱）</td></tr>
+      <tr><td><b>Flask</b></td><td class="pth">/opt/duotu/venv · systemd duotu.service · 127.0.0.1:8770</td><td>线上服务；Caddy 8443 段反代 <code>handle_path /duotu/*</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>七、动用的 SKILL 清单 <em>2 个，含使用状态</em></h2>
+  <div class="tw"><table>
+    <thead><tr><th style="min-width:180px">SKILL</th><th style="min-width:118px">状态</th><th style="min-width:210px">来源 / 位置</th><th style="min-width:280px">在本功能里的角色与结论</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>工程进度后台</b></td>
+        <td><span class="badge b-now">本次使用</span></td>
+        <td class="pth">C:\Users\Administrator\.workbuddy\skills\工程进度后台\<br>scripts/scaffold.py + templates/progress.template.html</td>
+        <td><b>本页生成器</b>。按雪碧约定的「合一版 8 区块」标准格式产出，spec 里塞 3 阶段 / 10 任务 / 4 个片段</td>
+      </tr>
+      <tr>
+        <td><b>闲鱼工作台部署</b>（部署方法论，非本次执行）</td>
+        <td><span class="badge b-built">沿用经验</span></td>
+        <td class="pth">C:\Users\Administrator\.workbuddy\skills\闲鱼工作台部署\</td>
+        <td>本次走的是 duotu 的 <code>deploy.sh</code>；Caddy 白名单铁律（新增路径不能 301、不能剥 <code>/api</code> 前缀）沿用同一套纪律</td>
+      </tr>
+    </tbody>
+  </table></div>
+  <!--TOOLS_END-->
+
+  <!-- ================= 八、风险与待办 ================= -->
+  <h2>八、风险与待办</h2>
+  <div class="card pad">
+    <!--TODO_START-->
+    <h3 style="font-size:13.8px;margin:0 0 8px;color:var(--risk)">风险提示</h3>
+    <ul>
+      <li><b>图1 没有视觉锚点</b>：组执行是「图1 先跑 → 图1 成品当图2~N 的兄弟锚点」。所以<b>图1 跑偏，全组会一致地偏</b>。多张一起换壳时，务必先把「镜头框·颜色 / 壳体颜色 / 材质工艺」在特征标注里锚死，别依赖 AI 猜</li>
+      <li><b>用户中文注记（EXTRA）混在英文提示词里</b>：这次 <code>EXTRA: 镜头框，要跟材质一样，是黑色凸起的边框</code> 图1 理解了、图2 没理解。已把默认值改成条件式（不覆盖用户注记），但<b>强烈建议改用「镜头框·颜色」chips</b>，英文值进提示词最稳</li>
+      <li><b>规格卡是「原图旧壳」的描述</b>：AI 提取的 MATERIAL / DETAILS 行天然会跟换材质的目标冲突。已作废，但 FORM / PATTERN 仍保留做版式参考——若图案也要换，注意 PATTERN 行同样可能把旧图案拉回来</li>
+      <li><b>server.py 仍有 19 处静默 except</b>：本次只改了主流程（启动任务恢复）那一处。多数是清文件，风险低，但同类「失败不可见」问题还可能复发</li>
+      <li><b>腾讯云 COS 欠费中</b>：线上 <code>cos_config.json</code> 已应急 <code>enabled=false</code>，图片走本地慢速通道（4s+/张）。充值后必做两步：① enabled 改回 true ② 跑 <code>cosstore.set_lifecycle(7)</code> 补设生命周期</li>
+    </ul>
+    <h3 style="font-size:13.8px;margin:18px 0 8px;color:var(--doing)">待办事项</h3>
+    <ul>
+      <li><b>雪碧复跑验证</b>：拿同样那 2 张图重跑一次换材质，确认两张摄像头框同色（建议同时在「镜头框·颜色」点一个具体颜色，比留默认更稳）</li>
+      <li>把「换图案」场景也按同样思路体检一次：PATTERN 行描述旧图案，换图案时可能同样被拉回——目前只有换材质类动作会走 <code>supersede_old_material</code></li>
+      <li>考虑给「按键颜色 / 边框颜色」也加 chips 锚定（本次只做了摄像头框，SERIES_TAIL 已点名这三项，但只有框色有 UI 入口）</li>
+      <li>其余 18 处静默 except 择机加留痕（优先：<code>_job_save</code> 失败、session 保存失败）</li>
+      <li>腾讯云充值后恢复 COS 并补设 7 天生命周期</li>
+    </ul>
+  <!--TODO_END-->
+  </div>
+
+  <footer>
+    <!--FOOTER_START-->
+    多图生图工作台 · 摄像头框一致性修复（全流程体检）· 数据源为线上真实任务 JSON + 本机代码库实际状态 · 任务状态改动仅存于当前浏览器<br>
+    技能位置：<span class="mono">C:\Users\Administrator\.workbuddy\skills\工程进度后台\</span> · 报告地址：<span class="mono">https://chule.top:8443/duotu/progress.html</span>
+  <!--FOOTER_END-->
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 数据：阶段 ================= */
+const PHASES = [
+ {
+  "id": "P1",
+  "name": "取证与根因定位",
+  "color": "#4a6cf7"
+ },
+ {
+  "id": "P2",
+  "name": "三端修复实现",
+  "color": "#e08a1e"
+ },
+ {
+  "id": "P3",
+  "name": "回归验证与上线",
+  "color": "#2f9e63"
+ }
+];
+
+/* ================= 数据：任务清单 ================= */
+const TASKS = [
+ {
+  "id": "t1",
+  "p": "P1",
+  "n": "导出线上真实任务数据（spec / features / steps）",
+  "s": "done",
+  "tool": "Bash ssh · Python json",
+  "out": "20261012_152845_972cc9.json"
+ },
+ {
+  "id": "t2",
+  "p": "P1",
+  "n": "视觉模型客观比对两张成品的框色与壳材质",
+  "s": "done",
+  "tool": "gpt-5.4 describe()",
+  "out": "frame=black vs frame=white"
+ },
+ {
+  "id": "t3",
+  "p": "P1",
+  "n": "代码走查：确认 4 条叠加根因",
+  "s": "done",
+  "tool": "Read · Grep",
+  "out": "根因清单（见区块三）"
+ },
+ {
+  "id": "t4",
+  "p": "P2",
+  "n": "parts.py：框色双锁常量 + 旧 PART 作废（含 DETAILS 的 rim）",
+  "s": "done",
+  "tool": "Edit",
+  "out": "engine/parts.py"
+ },
+ {
+  "id": "t5",
+  "p": "P2",
+  "n": "server.py：_swap 补漏 / 每步框锁 / 空 prompt 兜底 / 组级 cam_lock",
+  "s": "done",
+  "tool": "Edit · Python",
+  "out": "server.py"
+ },
+ {
+  "id": "t6",
+  "p": "P2",
+  "n": "parts.html：镜头框颜色锚定项 + 未锚定告警 + 跑前提醒",
+  "s": "done",
+  "tool": "Edit · Node --check",
+  "out": "static/parts.html"
+ },
+ {
+  "id": "t7",
+  "p": "P2",
+  "n": "静默异常留痕（启动任务恢复失败要能查）",
+  "s": "done",
+  "tool": "Edit",
+  "out": "server.py"
+ },
+ {
+  "id": "t8",
+  "p": "P3",
+  "n": "mock 全量回归测试",
+  "s": "done",
+  "tool": "Python · _test_pattern_block.py",
+  "out": "157/157 全绿"
+ },
+ {
+  "id": "t9",
+  "p": "P3",
+  "n": "用真实 spec + features 离线复现两张提示词一致性",
+  "s": "done",
+  "tool": "Python · 临时验证脚本",
+  "out": "图1=4 条 / 图2=4 条一致"
+ },
+ {
+  "id": "t10",
+  "p": "P3",
+  "n": "deploy.sh 上线 + 线上 curl 自检",
+  "s": "done",
+  "tool": "Bash deploy.sh · curl",
+  "out": "首页 200 / 接口 200"
+ }
+];
+
+/* ================= 状态机 ================= */
+const CYCLE = ['done','doing','todo','pause'];
+const LABEL = { done:'已完成', doing:'进行中', todo:'待开始', pause:'已暂停' };
+const KEY = 'wb_progress_duotu_camframe_v1';
+const EXPORT_NAME = '多图工作台-摄像头框一致性修复.json';
+/* 交付资产数：0 表示按任务自动统计（out 不以「待」开头的任务） */
+const ASSET_COUNT = 6;
+
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch(e) { state = {}; }
+const cur = t => state[t.id] || t.s;
+
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('on'), 1600);
+}
+
+/* ================= 渲染 ================= */
+let filter = 'all';
+
+function render(){
+  const c = { done:0, doing:0, todo:0, pause:0 };
+  TASKS.forEach(t => c[cur(t)]++);
+  const total = TASKS.length;
+  const pct = Math.round(c.done / total * 100);
+
+  document.getElementById('kDone').textContent  = c.done;
+  document.getElementById('kDoing').textContent = c.doing;
+  document.getElementById('kTodo').textContent  = c.todo;
+  document.getElementById('kPause').textContent = c.pause;
+  document.getElementById('ringPct').textContent = pct + '%';
+  const L = 2 * Math.PI * 50;
+  document.getElementById('ringBar').setAttribute('stroke-dashoffset', String(L * (1 - c.done / total)));
+
+  const kp = document.getElementById('kPhase');
+  if (kp) kp.textContent = PHASES.length;
+  const ka = document.getElementById('kAsset');
+  if (ka) {
+    ka.textContent = ASSET_COUNT || TASKS.filter(t => t.out && t.out.indexOf('待') !== 0).length;
+  }
+
+  document.getElementById('cAll').textContent   = '(' + total + ')';
+  document.getElementById('cDone').textContent  = '(' + c.done + ')';
+  document.getElementById('cDoing').textContent = '(' + c.doing + ')';
+  document.getElementById('cTodo').textContent  = '(' + c.todo + ')';
+  document.getElementById('cPause').textContent = '(' + c.pause + ')';
+
+  // 阶段卡
+  const pb = document.getElementById('phaseBox');
+  pb.innerHTML = PHASES.map(p => {
+    const ts = TASKS.filter(t => t.p === p.id);
+    const d = ts.filter(t => cur(t) === 'done').length;
+    const w = Math.round(d / ts.length * 100);
+    return '<div class="ph"><div class="row">'
+      + '<span class="nm">' + p.id + ' · ' + p.name + '</span>'
+      + '<span class="tagx">' + d + ' / ' + ts.length + ' 项</span>'
+      + '<span class="bar"><i style="width:' + w + '%;background:' + (w === 100 ? 'var(--done)' : p.color) + '"></i></span>'
+      + '<span class="pc">' + w + '%</span>'
+      + '</div></div>';
+  }).join('');
+
+  // 看板
+  const tb = document.getElementById('taskBody');
+  const rows = TASKS.filter(t => filter === 'all' || cur(t) === filter);
+  tb.innerHTML = rows.map(t => {
+    const s = cur(t);
+    return '<tr>'
+      + '<td><b>' + t.p + '</b></td>'
+      + '<td>' + t.n + '</td>'
+      + '<td><span class="st s-' + s + '" data-id="' + t.id + '" title="点击切换状态"><span class="dot"></span>' + LABEL[s] + '</span></td>'
+      + '<td class="mono" style="color:var(--ink2)">' + t.tool + '</td>'
+      + '<td class="pth">' + t.out + '</td>'
+      + '</tr>';
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:26px">该状态下暂无任务</td></tr>';
+
+  tb.querySelectorAll('.st').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.id;
+      const t = TASKS.find(x => x.id === id);
+      const nx = CYCLE[(CYCLE.indexOf(cur(t)) + 1) % CYCLE.length];
+      state[id] = nx;
+      save(); render();
+      toast('「' + t.p + '」已标记为 ' + LABEL[nx]);
+    });
+  });
+}
+
+/* ================= 环境探测 ================= */
+/* 探测目标：由生成器按 spec.probe 注入（换项目时改这里即可） */
+const PROBE = [
+ {
+  "led": "ledDuotu",
+  "url": "https://chule.top:8443/duotu/api/healthz"
+ }
+];
+
+function probe(){
+  const targets = PROBE;
+  targets.forEach(t => {
+    const el = document.getElementById(t.led);
+    if (!el) return;
+    el.className = 'led';
+    fetch(t.url, { mode:'no-cors', cache:'no-store' })
+      .then(() => { el.className = 'led up'; })
+      .catch(() => { el.className = 'led down'; });
+  });
+  const now = new Date();
+  const pt = document.getElementById('probeTime');
+  if (pt) pt.textContent = '上次检测 ' + now.toLocaleTimeString('zh-CN', { hour12:false });
+}
+
+/* ================= 交互绑定 ================= */
+document.querySelectorAll('.fbtn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.fbtn').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    filter = b.dataset.f;
+    render();
+  });
+});
+
+document.getElementById('btnProbe').addEventListener('click', () => { probe(); toast('正在检测…'); });
+
+document.getElementById('btnExport').addEventListener('click', () => {
+  const tEl = document.getElementById('pgTitle');
+  const data = {
+    project: tEl ? tEl.textContent.trim() : '',
+    exportedAt: new Date().toISOString(),
+    summary: {
+      total: TASKS.length,
+      done:  TASKS.filter(t => cur(t) === 'done').length,
+      doing: TASKS.filter(t => cur(t) === 'doing').length,
+      todo:  TASKS.filter(t => cur(t) === 'todo').length,
+      pause: TASKS.filter(t => cur(t) === 'pause').length
+    },
+    tasks: TASKS.map(t => ({ id:t.id, phase:t.p, name:t.n, status:cur(t), tool:t.tool, output:t.out }))
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = EXPORT_NAME;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('已导出 ' + EXPORT_NAME);
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  state = {}; save(); render(); toast('已重置为初始状态');
+});
+
+/* 启动 */
+render();
+probe();
+</script>
+</body>
+</html>

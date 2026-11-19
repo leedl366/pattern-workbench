@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>充值中心 · 速图AIGC</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../accounts/static/ui.css">
+<style>
+/* 令牌来自 ui.css，本页只留布局 */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);padding:26px 30px}
+h1{font-size:20px;margin-bottom:4px}
+.sub{color:var(--sub);font-size:13px;margin-bottom:20px}
+.balance{display:inline-block;background:var(--pri-050);border:1px solid var(--pri-200);color:var(--pri-dark);border-radius:var(--r-ctl);padding:8px 16px;font-size:14px;font-weight:700;margin-bottom:22px}
+.sect{font-size:15px;font-weight:700;margin:26px 0 12px;display:flex;align-items:center;gap:8px}
+.sect::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--pri)}
+.packs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.pack{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:18px 14px;text-align:center;position:relative;transition:.15s}
+.pack:hover{border-color:var(--pri2);box-shadow:0 6px 20px rgba(13,148,136,.1)}
+.pack .pts{font-size:24px;font-weight:800;color:var(--pri)}
+.pack .pts small{font-size:13px;font-weight:600;color:var(--sub)}
+.pack .price{margin-top:6px;font-size:15px;font-weight:700}
+.pack .note{margin-top:6px;font-size:12px;color:var(--warn)}
+.pack.hot::after{content:"最划算";position:absolute;top:-9px;right:10px;background:#f59e0b;color:#fff;font-size:11px;padding:2px 8px;border-radius:var(--r-sm)}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--r-card);overflow:hidden;font-size:14px}
+th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--bd)}
+th{background:var(--fill);color:var(--sub);font-size:13px}
+tr:last-child td{border-bottom:none}
+.qrrow{display:flex;gap:18px;flex-wrap:wrap}
+.qr{flex:1;min-width:240px;background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:18px;text-align:center}
+.qr img{width:200px;height:200px;object-fit:contain;border-radius:var(--r-sm);background:var(--fill)}
+.qr .t{margin-top:10px;font-weight:700;font-size:14px}
+.qr .d{margin-top:4px;font-size:12px;color:var(--sub)}
+.redeem{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.redeem input{flex:1;min-width:220px;padding:11px 12px;border:1px solid var(--bd);border-radius:var(--r-ctl);font-size:14px;letter-spacing:.08em;text-transform:uppercase;outline:none}
+.redeem input:focus{border-color:var(--pri2);box-shadow:var(--ring)}
+.btn{padding:11px 24px;border:none;border-radius:var(--r-ctl);background:var(--grad-pri);color:var(--on-pri);font-size:14px;font-weight:700;cursor:pointer}
+.msg{font-size:13px;min-height:18px}
+.msg.err{color:var(--err)}.msg.ok{color:var(--ok)}
+.steps{font-size:13px;color:var(--sub);line-height:1.9;background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:16px 18px}
+.steps b{color:var(--tx)}
+/* 邀请返利引导条 */
+.invite-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:16px;
+  background:linear-gradient(135deg,rgba(74,222,128,.10),rgba(255,255,255,.06));border:1px solid rgba(74,222,128,.30);border-radius:var(--r-card);padding:15px 18px}
+.invite-bar .txt{flex:1;min-width:240px;font-size:13px;color:#e5e7eb;line-height:1.7}
+.invite-bar .txt b{color:#4ade80}
+.invite-bar a{padding:9px 20px;border-radius:var(--r-ctl);background:#fff;color:#111214;
+  font-size:13.5px;font-weight:700;text-decoration:none;white-space:nowrap}
+.invite-bar a:hover{background:#e5e7eb}
+/* 收款码点击放大 */
+.qr img{cursor:zoom-in}
+.zoom{position:fixed;inset:0;background:rgba(17,24,39,.82);display:none;align-items:center;justify-content:center;
+  z-index:99;padding:24px;cursor:zoom-out}
+.zoom.on{display:flex}
+.zoom img{max-width:min(90vw,560px);max-height:88vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);background:#fff}
+.zoom .zt{position:absolute;bottom:26px;left:0;right:0;text-align:center;color:#fff;font-size:13px;opacity:.85}
+/* 积分明细 */
+.led-sum{font-size:12px;font-weight:400;color:var(--sub);margin-left:6px}
+.led-sum b{color:var(--pri-dark)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{padding:6px 14px;border:1px solid var(--bd);border-radius:999px;font-size:13px;color:var(--sub);
+  background:var(--card);cursor:pointer;transition:.15s;user-select:none}
+.chip:hover{border-color:var(--pri2);color:var(--pri-dark)}
+.chip.on{background:var(--pri-050);border-color:var(--pri2);color:var(--pri-dark);font-weight:700}
+.led-list{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);overflow:hidden}
+.led-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--bd);font-size:13.5px}
+.led-row:last-child{border-bottom:none}
+.led-row .t{width:132px;flex:0 0 auto;color:var(--sub);font-size:12.5px;font-variant-numeric:tabular-nums}
+.led-row .r{flex:1;min-width:0;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.led-row .r .tagk{display:inline-block;font-size:11px;padding:1px 7px;border-radius:var(--r-sm);
+  margin-right:8px;vertical-align:1px}
+.led-row .d{width:78px;flex:0 0 auto;text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+.led-row .d.in{color:#dc2626}   /* 中国习惯：加分用红 */
+.led-row .d.out{color:#059669}  /* 减分用绿 */
+.led-row .b{width:86px;flex:0 0 auto;text-align:right;color:var(--sub);font-size:12.5px;font-variant-numeric:tabular-nums}
+.tagk.k-consume{background:rgba(74,222,128,.10);color:#4ade80}
+.tagk.k-recharge{background:rgba(248,113,113,.14);color:#f87171}
+.tagk.k-invite{background:rgba(255,255,255,.06);color:#e5e7eb}
+.tagk.k-refund{background:rgba(96,165,250,.14);color:#93c5fd}
+.tagk.k-gift{background:rgba(251,191,36,.14);color:#fbbf24}
+.tagk.k-adjust{background:rgba(255,255,255,.10);color:var(--tx)}
+.tagk.k-other{background:var(--fill);color:var(--sub)}
+.led-empty{padding:34px 16px;text-align:center;color:var(--faint);font-size:13px}
+.led-more{text-align:center;margin-top:12px}
+.btn.gray{background:var(--fill);color:var(--sub);border:1px solid var(--bd)}
+@media(max-width:640px){
+  .led-row{flex-wrap:wrap;gap:4px 10px}
+  .led-row .t{width:auto}
+  .led-row .r{flex:1 1 100%;order:3;white-space:normal}
+  .led-row .d,.led-row .b{width:auto}
+}
+</style>
+</head>
+<body>
+<h1>充值中心</h1>
+<div class="sub">1 积分 = 0.1 元 · 5 元起充 · 积分永久有效</div>
+<div class="balance" id="bal">当前积分：--</div>
+
+<div class="sect">充值套餐</div>
+<div class="packs" id="packs"></div>
+
+<div class="invite-bar">
+  <div class="txt">🎁 <b>邀请好友一起用</b> —— 好友通过你的链接注册，你得 <b>20 积分</b>；好友之后每次充值，你再拿 <b>充值积分的 30%</b>（即时到账）</div>
+  <a id="goInvite" href="#">去邀请 →</a>
+</div>
+
+<div class="sect">付款方式（二选一）</div>
+<div class="qrrow">
+  <div class="qr">
+    <img id="qrWx" alt="微信收款码">
+    <div class="t">微信扫码付款</div>
+    <div class="d">转账请<b>备注你的用户名</b>，到账后管理员为你加积分<br><span style="color:#e5e7eb">点图可放大 / 手机上长按保存</span></div>
+  </div>
+  <div class="qr">
+    <img id="qrZfb" alt="支付宝收款码">
+    <div class="t">支付宝扫码付款</div>
+    <div class="d">转账请<b>备注你的用户名</b>，到账后管理员为你加积分<br><span style="color:#e5e7eb">点图可放大 / 手机上长按保存</span></div>
+  </div>
+</div>
+<div class="zoom" id="zoom"><img id="zoomImg" alt="收款码"><div class="zt">点任意处关闭</div></div>
+<div class="steps" style="margin-top:14px">
+  <b>充值流程：</b>① 按套餐金额扫码付款，<b>备注用户名</b> → ② 管理员核对后积分到账（一般当天）→ ③ 刷新页面查看余额。<br>
+  <b>淘宝店铺购买充值码</b>（更快）：付款后客服发充值码 → 在下方输入兑换，<b>即时到账</b>。
+</div>
+
+<div class="sect">充值码兑换（即时到账）</div>
+<div class="redeem">
+  <input id="code" placeholder="输入充值码，例如 ST-XXXX-XXXX">
+  <button class="btn" id="redeemBtn">立即兑换</button>
+  <div class="msg" id="redeemMsg"></div>
+</div>
+
+<div class="sect" id="ledger">积分明细<span class="led-sum" id="ledSum"></span></div>
+<div class="chips" id="ledChips">
+  <span class="chip on" data-k="all">全部</span>
+  <span class="chip" data-k="consume">消费</span>
+  <span class="chip" data-k="recharge">充值</span>
+  <span class="chip" data-k="invite">邀请奖励</span>
+  <span class="chip" data-k="refund">失败退回</span>
+  <span class="chip" data-k="gift">注册赠送</span>
+  <span class="chip" data-k="adjust">管理员调整</span>
+</div>
+<div class="led-list" id="ledList"><div class="led-empty">加载中…</div></div>
+<div class="led-more"><button class="btn gray" id="ledMore" style="display:none">加载更多</button></div>
+
+<div class="sect" id="rules">积分消耗说明</div>
+<table>
+  <tr><th>功能</th><th>价格</th></tr>
+  <tbody id="priceRows"></tbody>
+</table>
+<div class="steps" style="margin-top:14px">
+  <b>说明：</b>先扣积分后出图，生成失败自动退回积分；同一任务的分层 PSD 重复下载不重复扣费；产物保留 72 小时，请及时下载。
+</div>
+
+<script>
+var BASE = location.pathname.replace(/\/recharge\/?.*$/, '').replace(/\/+$/, '');
+function $(id){ return document.getElementById(id); }
+
+/* 收款码：优先 COS 直链（服务器出口只有 ~1Mbps，走 COS 快 4~10 倍），
+   失败自动降级本地路由，本地也失败才显示占位提示（三级降级，绝不裂图）。 */
+var QR_CDN = 'https://<your-bucket>.cos.ap-guangzhou.myqcloud.com/pattern/static/';
+['qrWx', 'qrZfb'].forEach(function(id, i){
+  var img = $(id);
+  var fn = (i === 0 ? 'pay_wechat.png' : 'pay_alipay.png');
+  img.src = QR_CDN + fn;
+  img.onerror = function(){
+    var step = img.getAttribute('data-fb') || '0';
+    if (step === '0') {                       /* CDN 失败 → 退本地 */
+      img.setAttribute('data-fb', '1');
+      img.src = BASE + '/accounts/static/' + fn;
+      return;
+    }
+    /* 本地也没有 → 占位 */
+    img.style.display = 'none';
+    var d = document.createElement('div');
+    d.style.cssText = 'width:200px;height:200px;margin:0 auto;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border-radius:8px;color:#9ca3af;font-size:13px;padding:0 20px';
+    d.textContent = '收款码配置中，请先用充值码兑换或联系客服';
+    if (img.parentNode) img.parentNode.insertBefore(d, img);
+  };
+  /* 点击放大：手机上收款码只有 200px 不好扫，放大到 90vw 再扫/长按保存 */
+  img.addEventListener('click', function(){
+    if (!img.naturalWidth) return;
+    $('zoomImg').src = img.src;
+    $('zoom').classList.add('on');
+  });
+});
+$('zoom').addEventListener('click', function(){ this.classList.remove('on'); });
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') $('zoom').classList.remove('on');
+});
+
+/* 「去邀请」：在外壳 iframe 里就切顶层视图（顶栏导航跟着走），单独打开则直接跳 */
+$('goInvite').addEventListener('click', function(e){
+  e.preventDefault();
+  if (window.top !== window.self) {
+    try { window.top.location.hash = '#invite'; return; } catch (err) {}
+  }
+  location.href = BASE + '/invite/';
+});
+
+fetch(BASE + '/accounts/api/me').then(function(r){ return r.json(); }).then(function(d){
+  if (d.ok) $('bal').textContent = '当前积分：' + d.user.points + '（' + d.user.username + '）';
+});
+
+fetch(BASE + '/accounts/api/packages').then(function(r){ return r.json(); }).then(function(d){
+  var html = '';
+  d.packages.forEach(function(p, i){
+    html += '<div class="pack' + (i === d.packages.length - 1 ? ' hot' : '') + '">' +
+      '<div class="pts">' + p.points + '<small> 积分</small></div>' +
+      '<div class="price">¥' + p.price + '</div>' +
+      '<div class="note">' + (p.note || '') + '</div></div>';
+  });
+  $('packs').innerHTML = html;
+  var rows = '';
+  d.prices.forEach(function(p){ rows += '<tr><td>' + p.name + '</td><td>' + p.desc + '</td></tr>'; });
+  $('priceRows').innerHTML = rows;
+});
+
+$('redeemBtn').onclick = function(){
+  var code = $('code').value.trim();
+  var msg = $('redeemMsg');
+  if (!code){ msg.textContent = '请输入充值码'; msg.className = 'msg err'; return; }
+  fetch(BASE + '/accounts/api/redeem', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({code: code})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok){
+      msg.textContent = '兑换成功 +' + d.points + ' 积分，当前余额 ' + d.balance;
+      msg.className = 'msg ok';
+      $('code').value = '';
+      $('bal').textContent = $('bal').textContent.replace(/当前积分：\d+/, '当前积分：' + d.balance);
+      loadLedger();                     /* 兑换后立刻刷新明细，客户能看到这笔充值 */
+    } else {
+      msg.textContent = d.error || '兑换失败';
+      msg.className = 'msg err';
+    }
+  });
+};
+
+/* ---------------- 积分明细（只能看自己的，uid 由服务端会话决定） ---------------- */
+var LED_KIND = 'all', LED_LIMIT = 100;
+var KIND_NAME = {consume: '消费', recharge: '充值', invite: '邀请奖励',
+                 refund: '失败退回', gift: '注册赠送', adjust: '管理员调整', other: '其他'};
+function ledEsc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+  });
+}
+function ledTs(ts){
+  if (!ts) return '--';
+  var d = new Date(ts * 1000);
+  var p = function(n){ return n < 10 ? '0' + n : '' + n; };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+         ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function loadLedger(){
+  var box = $('ledList');
+  fetch(BASE + '/accounts/api/ledger?kind=' + encodeURIComponent(LED_KIND) + '&limit=' + LED_LIMIT)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok){
+        box.innerHTML = '<div class="led-empty">' + ledEsc(d.error || '读取失败') + '，请刷新重试</div>';
+        return;
+      }
+      $('ledSum').innerHTML = '累计获得 <b>' + d.total_in + '</b> · 累计消耗 <b>' +
+        d.total_out + '</b> · 共 ' + d.total + ' 条';
+      if (!d.items.length){
+        box.innerHTML = '<div class="led-empty">' +
+          (LED_KIND === 'all' ? '还没有积分变动记录' : '这个分类下暂无记录') + '</div>';
+      } else {
+        var h = '';
+        d.items.forEach(function(it){
+          var cls = it.delta > 0 ? 'in' : 'out';
+          var sign = it.delta > 0 ? '+' : '';
+          h += '<div class="led-row">' +
+            '<div class="t">' + ledTs(it.ts) + '</div>' +
+            '<div class="r"><span class="tagk k-' + it.kind + '">' +
+              (KIND_NAME[it.kind] || '其他') + '</span>' + ledEsc(it.reason) + '</div>' +
+            '<div class="d ' + cls + '">' + sign + it.delta + '</div>' +
+            '<div class="b">余额 ' + it.balance + '</div>' +
+          '</div>';
+        });
+        box.innerHTML = h;
+      }
+      $('ledMore').style.display = d.has_more ? '' : 'none';
+    })
+    .catch(function(){ box.innerHTML = '<div class="led-empty">网络错误，请刷新重试</div>'; });
+}
+$('ledChips').addEventListener('click', function(e){
+  var c = e.target.closest('.chip');
+  if (!c) return;
+  this.querySelectorAll('.chip').forEach(function(x){ x.classList.remove('on'); });
+  c.classList.add('on');
+  LED_KIND = c.getAttribute('data-k');
+  LED_LIMIT = 100;
+  $('ledList').innerHTML = '<div class="led-empty">加载中…</div>';
+  loadLedger();
+});
+$('ledMore').addEventListener('click', function(){ LED_LIMIT += 100; loadLedger(); });
+loadLedger();
+</script>
+</body>
+</html>

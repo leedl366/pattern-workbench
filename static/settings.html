@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系统设置 · 图案提取工作台</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../accounts/static/ui.css">
+<style>
+/* 令牌来自 ui.css，本页只留布局 */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);color:var(--tx);background:var(--bg);font-size:14px}
+.wrap{max-width:860px;margin:0 auto;padding:26px 20px 80px}
+h1{font-size:19px;margin-bottom:4px}
+.sub{color:var(--sub);font-size:12.5px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:20px 22px;margin-bottom:16px;box-shadow:var(--shadow-card)}
+.card h2{font-size:15px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.card h2 .tag{font-size:11px;font-weight:400;color:var(--pri);background:var(--pri-050);border:1px solid var(--pri-100);border-radius:var(--r-pill);padding:2px 9px}
+.card .desc{font-size:12px;color:var(--sub);margin-bottom:14px}
+label{display:block;font-size:12.5px;color:var(--sub);margin:12px 0 5px}
+input,select{width:100%;font:inherit;font-size:13.5px;border:1px solid var(--bd);border-radius:var(--r-ctl);padding:9px 12px;background:var(--card);color:var(--tx);outline:none}
+input:focus,select:focus{border-color:var(--pri);box-shadow:var(--ring)}
+.hint{font-size:11.5px;color:var(--faint);margin-top:4px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>div{flex:1;min-width:220px}
+.bar{display:flex;gap:10px;align-items:center;margin-top:6px}
+button{font:inherit;cursor:pointer;border-radius:var(--r-ctl);border:1px solid var(--bd);background:var(--card);padding:9px 18px;color:var(--tx)}
+button.primary{background:var(--pri);border-color:var(--pri);color:var(--on-pri);font-weight:600}
+button:disabled{opacity:.55;cursor:not-allowed}
+#status{font-size:12.5px;padding:8px 12px;border-radius:var(--r-ctl);display:none}
+.st{font-size:12.5px;padding:8px 12px;border-radius:var(--r-ctl);display:none}
+.st.ok{display:block;background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+.st.err{display:block;background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
+.st.info{display:block;background:var(--pri-050);color:var(--pri-dark);border:1px solid var(--pri-200)}
+#status.ok{display:block;background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+#status.err{display:block;background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
+#status.info{display:block;background:var(--pri-050);color:var(--pri-dark);border:1px solid var(--pri-200)}
+.models{font-size:11.5px;color:var(--sub);margin-top:8px;max-height:120px;overflow:auto;background:var(--fill);border:1px solid var(--bd);border-radius:var(--r-sm);padding:8px 10px;display:none;white-space:pre-wrap}
+/* 生图站点池 */
+textarea{width:100%;font:inherit;font-size:13px;line-height:1.55;border:1px solid var(--bd);border-radius:var(--r-ctl);padding:9px 12px;background:var(--card);color:var(--tx);outline:none;resize:vertical}
+textarea:focus{border-color:var(--pri);box-shadow:var(--ring)}
+select.sProto{width:100%;font:inherit;font-size:13px;border:1px solid var(--bd);border-radius:var(--r-ctl);padding:9px 12px;background:var(--card);color:var(--tx);outline:none}
+select.sProto:focus{border-color:var(--pri);box-shadow:var(--ring)}
+.sites{display:flex;flex-direction:column;gap:12px}
+.site{border:1px solid var(--bd);border-radius:var(--r-ctl);padding:12px 14px;background:var(--fill)}
+.site.off{opacity:.62}
+.siteHead{display:flex;align-items:center;gap:10px}
+.siteHead .nm{flex:1;min-width:140px}
+.siteHead .chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--sub);margin:0;white-space:nowrap;cursor:pointer}
+.siteHead .chk input{width:auto;margin:0}
+.site .del{padding:5px 12px;font-size:12.5px;color:var(--err);border-color:var(--err-bd);background:transparent}
+.site .two{display:flex;gap:12px;flex-wrap:wrap}
+.site .two>div{flex:1;min-width:210px}
+.site label{margin-top:10px}
+.btnSm{padding:7px 15px;font-size:12.5px}
+.mockey{font-size:11.5px;color:var(--faint);margin-top:4px}
+.tagw{font-size:11px;font-weight:400;color:var(--sub);background:var(--fill);border:1px solid var(--bd);border-radius:var(--r-pill);padding:2px 9px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚙️ 系统设置</h1>
+  <div class="sub">① 生图站点池由图案提取 / 去水印 / 高清修复三个板块共用；②③④ 只作用于多图编辑（duotu）。保存后立即生效，无需重启；密钥脱敏回显，留空表示沿用已保存的值。</div>
+
+  <div class="card">
+    <h2>① 生图站点池 <span class="tag">全站生图共用</span></h2>
+    <div class="desc">多个站点 + 各自的模型清单。<b>规则：同一个模型先在所有已启用站点里轮着试，全部失败才换下一个模型</b>；最近成功的组合会自动排到最前，省掉必然失败的白等。某一站暂时用不了时，会自动轮到其它站点的同一个模型，无需手工切换。</div>
+    <div class="desc" style="background:rgba(96,165,250,.14);border-left:3px solid #93c5fd;padding:9px 12px;border-radius:6px;margin:10px 0">
+      <b>⚠️ 2026-11-15 起按「参考图张数」自动分线</b>：<b>≥2 张原图</b>走多图线（默认 <code>apib → huahuaapi</code>），
+      <b>1 张或纯文生图</b>走单图线（默认 <code>lensapi → huahuaapi → apib</code>）。<br>
+      两条线的站点顺序、模型顺序、超时<b>都可以在下面「分线规则」里改，保存即生效</b>；
+      这里的「模型优先级」相当于单图线的模型顺序（分线规则里留空时会用它）。
+    </div>
+    <label>模型优先级（单图线 · 外层顺序，每行一个）</label>
+    <textarea id="modelOrder" rows="3" placeholder="每行一个模型名，自上而下依次尝试"></textarea>
+    <div class="hint">站点清单里没有的模型会自动跳过；各板块也可以用各自的顺序覆盖这里的默认值。</div>
+    <label>站点清单</label>
+    <div class="sites" id="siteList"></div>
+    <div class="bar">
+      <button class="btnSm" id="btnAddSite">＋ 新增站点</button>
+      <button class="primary btnSm" id="btnSaveSites">保存站点池</button>
+      <span id="statusSites" class="st"></span>
+    </div>
+
+    <div style="margin-top:18px;padding-top:16px;border-top:1px dashed #d7dce3">
+      <h3 style="font-size:14.5px;margin:0 0 6px">分线规则 <span class="tag">按参考图张数自动选</span></h3>
+      <div class="desc" style="margin-bottom:10px">
+        系统会按<b>本次任务提交了几张原图</b>自动选线：<b>≥2 张</b>走多图线，<b>1 张或纯文生图</b>走单图线。
+        两条线的<b>站点顺序 / 模型顺序 / 超时</b>都可以在这里改，<b>保存即生效、无需重启</b>。
+      </div>
+      <div class="two">
+        <div>
+          <label>多图线 · 站点顺序（≥2 张原图，每行一个站点 name）</label>
+          <textarea id="rtMultiSites" rows="3" placeholder="apib&#10;huahuaapi"></textarea>
+          <label>多图线 · 模型顺序（每行一个，自上而下依次尝试）</label>
+          <textarea id="rtMultiModels" rows="4" placeholder="gpt-image-2&#10;gpt-image-2.5-flare"></textarea>
+          <label>多图线 · 单跳超时（秒，60~1800）</label>
+          <input type="text" id="rtMultiTimeout" placeholder="600">
+        </div>
+        <div>
+          <label>单图线 · 站点顺序（1 张 / 纯文生图，每行一个站点 name）</label>
+          <textarea id="rtSingleSites" rows="3" placeholder="lensapi&#10;huahuaapi&#10;apib"></textarea>
+          <label>单图线 · 模型顺序（<b>留空</b> = 沿用上面的「模型优先级」）</label>
+          <textarea id="rtSingleModels" rows="4" placeholder="留空即可"></textarea>
+          <label>单图线 · 单跳超时（秒，60~1800）</label>
+          <input type="text" id="rtSingleTimeout" placeholder="420">
+        </div>
+      </div>
+      <div class="hint">
+        站点顺序里的名字必须和下面站点清单里的 <code>name</code> 一致（apib / lensapi / huahuaapi …），写错或未启用的站点会被自动忽略；
+        模型不在某站自己的清单里也会自动跳过。两条线都保留「熔断」：同一组合连续失败 2 次冷却 5 分钟。
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>② 接口与密钥 <span class="tagw">仅多图编辑</span></h2>
+    <div class="desc">API 网关地址与密钥，两个模型共用这一套凭证。</div>
+    <label>接口地址（base_url）</label>
+    <input id="base" type="text" placeholder="https://你的网关地址/v1">
+    <label>API Key</label>
+    <input id="apiKey" type="text" placeholder="留空 = 沿用已保存的密钥" autocomplete="off">
+    <div class="hint" id="keyHint"></div>
+  </div>
+
+  <div class="card">
+    <h2>③ 推理模型 <span class="tagw">多图编辑 · 看图 / 对话</span></h2>
+    <div class="desc">用于识别图片内容、对话微调、方案规划等文本+视觉推理（对应 duotu 配置项 vision）。</div>
+    <label>模型名</label>
+    <input id="vision" type="text" list="visionList" placeholder="留空 = 沿用已保存的模型">
+    <datalist id="visionList"></datalist>
+    <label>接口地址（可选，留空 = 沿用上方 ②）</label>
+    <input id="visionBase" type="text" placeholder="https://你的文本模型站点/v1">
+    <label>API Key（可选）</label>
+    <input id="visionKey" type="text" placeholder="留空 = 自动沿用已保存的密钥" autocomplete="off">
+    <div class="hint" id="visionKeyHint"></div>
+  </div>
+
+  <div class="card">
+    <h2>④ 图文模型 <span class="tagw">多图编辑 · 出图</span></h2>
+    <div class="desc">用于 AI 重绘 / 融合出图（对应 duotu 配置项 model 与 size）。模型名可从网关模型列表选择，也可手填。</div>
+    <div class="row">
+      <div>
+        <label>模型名</label>
+        <input id="model" type="text" list="modelList" placeholder="从下方列表选择，或手填模型名">
+        <datalist id="modelList"></datalist>
+      </div>
+      <div>
+        <label>默认出图尺寸</label>
+        <select id="size">
+          <option value="1024x1024">1024×1024（1:1 方形）</option>
+          <option value="1536x1024">1536×1024（3:2 横图）</option>
+          <option value="1024x1536">1024×1536（2:3 竖图）</option>
+          <option value="auto">auto（自动）</option>
+        </select>
+      </div>
+    </div>
+    <div class="models" id="modelBox"></div>
+  </div>
+
+  <div class="bar">
+    <button class="primary" id="btnSave">保存设置</button>
+    <button id="btnTest">保存并测试连接</button>
+    <span id="status" class="st"></span>
+  </div>
+</div>
+
+<script>
+/* 系统设置页：
+   ① 生图站点池 —— 同源读写主站 /api/ai_sites（唯一真源 app/ai_sites.py，仅主账号可读写）；
+   ②③④ duotu 推理/图文模型 —— 读写 /duotu/api/ai_config。
+   页面在 /pattern/settings/，ROOT 自动适配线上 /pattern 前缀与本地根路径。 */
+var ROOT = location.pathname.replace(/\/settings\/?.*$/, '');
+var API = ROOT + '/duotu/api';
+var SITE_API = ROOT + '/api/ai_sites';
+
+function setSt(id, kind, msg){
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'st ' + kind; el.textContent = msg;
+}
+function show(kind, msg){ setSt('status', kind, msg); }
+async function req(url, opt){
+  var r = await fetch(url, opt);
+  var t = await r.text();
+  var j; try { j = JSON.parse(t); } catch(e){ throw new Error('HTTP ' + r.status + ': ' + t.slice(0, 200)); }
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+/* ---------------- ① 生图站点池 ---------------- */
+var _sites = [];
+var _sitesLoaded = false;
+
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c];
+  });
+}
+
+function renderSites(){
+  var box = document.getElementById('siteList');
+  if (!_sites.length){
+    box.innerHTML = '<div class="hint">还没有站点，点下面「＋ 新增站点」加一个。</div>';
+    return;
+  }
+  box.innerHTML = _sites.map(function(s){
+    return '<div class="site' + (s.enabled ? '' : ' off') + '">'
+      + '<div class="siteHead">'
+      +   '<input class="sLabel nm" type="text" value="' + esc(s.label) + '" placeholder="站点名称（仅后台显示）">'
+      +   '<label class="chk"><input type="checkbox" class="sEnable"' + (s.enabled ? ' checked' : '') + '>启用</label>'
+      +   '<button class="del">删除</button>'
+      + '</div>'
+      + '<div class="two">'
+      +   '<div><label>接口地址</label>'
+      +     '<input class="sBase" type="text" value="' + esc(s.base) + '" placeholder="https://..."></div>'
+      +   '<div><label>API Key</label>'
+      +     '<input class="sKey" type="text" value="' + esc(s.key) + '" placeholder="留空 = 沿用已保存的密钥" autocomplete="off">'
+      +     '<div class="mockey">' + (s.has_key ? '已保存密钥（直接覆盖粘贴新密钥即可）' : '尚未保存密钥') + '</div></div>'
+      + '</div>'
+      + '<label>该站点支持的模型（每行一个，逗号也可）</label>'
+      + '<textarea class="sModels" rows="4" placeholder="每行一个模型名">' + esc((s.models || []).join('\n')) + '</textarea>'
+      + '<label>接口协议</label>'
+      + '<select class="sProto">'
+      +   '<option value="openai"' + (s.protocol === 'apib' ? '' : ' selected') + '>openai — 标准同步（lensapi / grsai 等）</option>'
+      +   '<option value="apib"' + (s.protocol === 'apib' ? ' selected' : '') + '>apib — 私有异步（api.apib.ai，gpt-image 官方版）</option>'
+      + '</select>'
+      + '</div>';
+  }).join('');
+}
+
+function collectSites(){
+  var nodes = document.getElementById('siteList').querySelectorAll('.site');
+  var out = [];
+  for (var i = 0; i < nodes.length; i++){
+    var n = nodes[i], old = _sites[i] || {};
+    out.push({
+      /* name 是掩码密钥回写的匹配键：老站点原样保留；新站点随机生成，避免同名互相覆盖 */
+      name: old.name || ('s' + Math.random().toString(36).slice(2, 8)),
+      label: (n.querySelector('.sLabel').value || '').trim(),
+      base: (n.querySelector('.sBase').value || '').trim(),
+      key: (n.querySelector('.sKey').value || '').trim(),
+      models: (n.querySelector('.sModels').value || '').split(/[\n,，]/)
+                 .map(function(x){ return x.trim(); }).filter(Boolean),
+      enabled: n.querySelector('.sEnable').checked,
+      /* 协议：openai（标准同步）/ apib（私有异步）。必须回传，
+         否则后端会把 apib 站点落回 openai → 生图 400（后端另有「缺省沿用旧值」兜底）。*/
+      protocol: (n.querySelector('.sProto') ? n.querySelector('.sProto').value
+                                             : (old.protocol || 'openai'))
+    });
+  }
+  return out;
+}
+
+function splitList(v){
+  return (v || '').split(/[\n,，]/).map(function(x){ return x.trim(); }).filter(Boolean);
+}
+
+/* ---------------- 分线规则（2026-11-15：后台可改，不定死） ---------------- */
+function fillRouting(rt){
+  rt = rt || {};
+  var m = rt.multi || {}, s = rt.single || {};
+  var set = function(id, v){ var el = document.getElementById(id); if (el) el.value = v; };
+  set('rtMultiSites', (m.sites || []).join('\n'));
+  set('rtMultiModels', (m.models || []).join('\n'));
+  set('rtMultiTimeout', m.timeout || 600);
+  set('rtSingleSites', (s.sites || []).join('\n'));
+  set('rtSingleModels', (s.models || []).join('\n'));
+  set('rtSingleTimeout', s.timeout || 420);
+}
+function collectRouting(){
+  var num = function(id, dft){
+    var v = parseInt((document.getElementById(id).value || '').trim(), 10);
+    return (isNaN(v) ? dft : Math.max(60, Math.min(1800, v)));
+  };
+  return {
+    multi:  { sites: splitList(document.getElementById('rtMultiSites').value),
+              models: splitList(document.getElementById('rtMultiModels').value),
+              timeout: num('rtMultiTimeout', 600) },
+    single: { sites: splitList(document.getElementById('rtSingleSites').value),
+              models: splitList(document.getElementById('rtSingleModels').value),
+              timeout: num('rtSingleTimeout', 420) }
+  };
+}
+
+async function loadSites(){
+  try {
+    var j = await req(SITE_API);
+    var c = j.conf || {};
+    _sites = (c.sites || []).map(function(s){ return Object.assign({}, s); });
+    document.getElementById('modelOrder').value = (c.model_order || []).join('\n');
+    fillRouting(c.routing);
+    renderSites();
+    _sitesLoaded = true;
+  } catch(e){
+    setSt('statusSites', 'err', '读取站点池失败：' + e.message);
+  }
+}
+
+async function saveSites(){
+  var body = { model_order: splitList(document.getElementById('modelOrder').value),
+               routing: collectRouting(),
+               sites: collectSites() };
+  var j = await req(SITE_API, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  var c = j.conf || {};
+  _sites = (c.sites || []).map(function(s){ return Object.assign({}, s); });
+  document.getElementById('modelOrder').value = (c.model_order || []).join('\n');
+  fillRouting(c.routing);
+  renderSites();
+  return j;
+}
+
+document.getElementById('siteList').addEventListener('click', function(ev){
+  var b = ev.target.closest ? ev.target.closest('.del') : null;
+  var host = ev.target.closest ? ev.target.closest('.site') : null;
+  var nodes = this.querySelectorAll('.site');
+  var idx = -1;
+  for (var i = 0; i < nodes.length; i++){ if (nodes[i] === host){ idx = i; break; } }
+  if (b && idx > -1){
+    _sites = collectSites();
+    _sites.splice(idx, 1);
+    renderSites();
+  }
+});
+document.getElementById('siteList').addEventListener('change', function(ev){
+  if (ev.target.classList && ev.target.classList.contains('sEnable')){
+    var host = ev.target.closest('.site');
+    if (host) host.classList.toggle('off', !ev.target.checked);
+  }
+});
+
+document.getElementById('btnAddSite').onclick = function(){
+  if (_sitesLoaded) _sites = collectSites();
+  _sites.push({ name: '', label: '', base: '', key: '', models: [], enabled: true, has_key: false });
+  renderSites();
+};
+
+document.getElementById('btnSaveSites').onclick = async function(){
+  this.disabled = true;
+  setSt('statusSites', 'info', '保存中…');
+  try {
+    await saveSites();
+    setSt('statusSites', 'ok', '已保存，全站生图立即生效（无需重启）。');
+  } catch(e){ setSt('statusSites', 'err', '保存失败：' + e.message); }
+  this.disabled = false;
+};
+
+async function load(){
+  try {
+    var j = await req(API + '/ai_config');
+    var c = j.conf || {};
+    document.getElementById('base').value = c.base || '';
+    document.getElementById('vision').value = c.vision || '';
+    document.getElementById('visionBase').value = c.vision_base || '';
+    document.getElementById('model').value = c.model || '';
+    document.getElementById('size').value = c.size || '1024x1024';
+    document.getElementById('keyHint').textContent = c.api_key ? ('当前已保存密钥：' + c.api_key + '（修改请直接粘贴新密钥）') : '当前未保存密钥';
+    var vkHint = c.vision_key ? ('当前已保存密钥：' + c.vision_key)
+               : (c.vision_base ? '留空 = 自动匹配站点池里同地址站点的密钥' : '');
+    document.getElementById('visionKeyHint').textContent = vkHint;
+  } catch(e){
+    show('err', '读取配置失败：' + e.message);
+  }
+}
+
+async function save(){
+  var body = {
+    base: document.getElementById('base').value.trim(),
+    vision: document.getElementById('vision').value.trim(),
+    vision_base: document.getElementById('visionBase').value.trim(),
+    model: document.getElementById('model').value.trim(),
+    size: document.getElementById('size').value
+  };
+  var k = document.getElementById('apiKey').value.trim();
+  if (k) body.api_key = k;
+  var vk = document.getElementById('visionKey').value.trim();
+  if (vk) body.vision_key = vk;
+  var j = await req(API + '/ai_config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  return j;
+}
+
+document.getElementById('btnSave').onclick = async function(){
+  this.disabled = true;
+  try {
+    await save();
+    document.getElementById('apiKey').value = '';
+    show('ok', '已保存，立即生效。');
+    load();
+  } catch(e){ show('err', '保存失败：' + e.message); }
+  this.disabled = false;
+};
+
+document.getElementById('btnTest').onclick = async function(){
+  this.disabled = true;
+  show('info', '保存中，随后向网关拉取模型列表验证…');
+  try {
+    await save();
+    document.getElementById('apiKey').value = '';
+    var t0 = Date.now();
+    var j = await req(API + '/ai_models');
+    var dt = ((Date.now() - t0) / 1000).toFixed(1);
+    if (j.error) { show('err', '网关返回错误：' + j.error); }
+    else {
+      var items = j.items || [];
+      show('ok', '连接成功：网关返回 ' + items.length + ' 个图像模型，耗时 ' + dt + 's。');
+      var box = document.getElementById('modelBox');
+      if (items.length){
+        box.style.display = 'block';
+        box.textContent = '可用图像模型：\n' + items.join('、');
+        var dl = document.getElementById('modelList');
+        dl.innerHTML = items.map(function(m){ return '<option value="' + m + '"></option>'; }).join('');
+      }
+    }
+    load();
+  } catch(e){ show('err', '测试失败：' + e.message); }
+  this.disabled = false;
+};
+
+load();
+loadSites();
+</script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>速图AIGC-专业3C数码配件生图</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<!-- 🔴 2026-11-19：原来优先拉 COS 直链，但 COS 上是旧版 teal 令牌，改主题后会与 iframe 内页面配色割裂。
+     统一走站内白名单路由（4KB 文件，走服务器无感），版本只有一份，不再漂移。 -->
+<link rel="stylesheet" href="accounts/static/ui.css">
+<style>
+/* 令牌来自 ui.css（--shell/--bg/--card/--bd/--r-ctl 等），本页只留布局
+   2026-11-19 按「能影」外壳改版：侧栏 250 亮一档 + 主区更深 + 圆形 logo + 图标菜单 */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);color:var(--tx);background:var(--shell);font-variant-numeric:tabular-nums}
+
+.wrap{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--shell)}
+
+/* 顶栏：站名 + 积分/充值/套餐/账户 */
+.topbar{flex:none;height:60px;background:var(--shell);border-bottom:1px solid var(--hair);
+  display:flex;align-items:center;gap:14px;padding:0 20px}
+
+.tb-brand{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;letter-spacing:-.01em;color:#fff}
+.tb-brand .logo{width:38px;height:38px;border-radius:50%;flex:none;
+  background:linear-gradient(145deg,#3b4cf0 0%,#5b3df0 55%,#7b3af5 100%);
+  box-shadow:0 2px 10px rgba(59,76,240,.35);
+  color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:17px;font-weight:700}
+.tb-brand small{font-size:12px;font-weight:400;color:var(--faint);margin-left:2px}
+
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:7px}
+
+/* 积分：金色数字（能影 #f5af38） */
+.pts{display:inline-flex;align-items:center;gap:6px;background:transparent;border:none;
+  color:var(--gold);font-size:15px;font-weight:500;text-decoration:none;cursor:pointer;
+  padding:6px 10px;border-radius:var(--r-ctl);transition:.15s}
+a.pts:hover{background:rgba(245,175,56,.1)}
+
+.tbtn{padding:7px 14px;border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--tx);
+  text-decoration:none;cursor:pointer;border:1px solid transparent;transition:.15s;white-space:nowrap}
+.tbtn:hover{background:rgba(255,255,255,.06)}
+.tbtn.pri{background:#fff;color:#111214;
+  border-color:transparent;box-shadow:0 2px 10px rgba(0,0,0,.32)}
+.tbtn.pri:hover{background:#e4e5e8}
+.uname{font-size:13px;color:var(--sub);font-weight:500;padding:0 4px}
+
+/* 主体：侧栏亮一档（#121212）+ 主区更深（#090a0e） */
+.shell{display:flex;flex:1;min-height:0}
+
+.nav{width:250px;flex:none;background:var(--shell);border-right:1px solid var(--hair);
+  display:flex;flex-direction:column;transition:width .18s ease}
+.menu{display:flex;flex-direction:column;gap:3px;padding:16px 14px;flex:1;overflow-y:auto}
+.menu::-webkit-scrollbar{width:0}
+
+.item{position:relative;display:flex;align-items:center;gap:12px;height:44px;padding:0 13px;
+  border-radius:var(--r-ctl);color:var(--tx);text-decoration:none;font-size:14.5px;font-weight:500;
+  transition:background .15s,color .15s;cursor:pointer;user-select:none;white-space:nowrap}
+.item .ic{width:19px;height:19px;flex:none;display:grid;place-items:center;color:var(--sub)}
+.item .lb{flex:1;overflow:hidden;text-overflow:ellipsis}
+.item:hover{background:rgba(255,255,255,.045)}
+.item:hover .ic{color:var(--tx)}
+.item.on{background:#262626}
+.item.on .ic{color:#fff}
+.item.on::before{display:none}
+
+.foot{padding:14px 20px 18px;font-size:11.5px;line-height:1.6;color:var(--faint);border-top:1px solid var(--hair)}
+
+/* 主区：与 iframe 内页面同色，切换不闪 */
+.stage{flex:1;min-width:0;background:var(--bg);position:relative}
+.stage iframe{position:absolute;inset:0;width:100%;height:100%;border:none;display:block}
+
+@media(max-width:1080px){
+  .nav{width:76px}
+  .item{justify-content:center;padding:0}
+  .item .lb{display:none}
+  .foot{display:none}
+  .tb-brand small{display:none}
+}
+@media(max-width:760px){
+  .topbar{height:54px;padding:0 12px;gap:8px}
+  .tb-brand{font-size:14px}
+  .tb-brand .logo{width:32px;height:32px;font-size:14px}
+  .tbtn{padding:6px 10px;font-size:12.5px}
+  .uname{display:none}
+  .shell{flex-direction:column}
+  .nav{width:100%;height:auto;flex-direction:row;border-right:none;border-bottom:1px solid var(--hair)}
+  .menu{flex-direction:row;padding:8px 10px;gap:4px;overflow-x:auto}
+  .menu::-webkit-scrollbar{height:0}
+  .item{height:36px;padding:0 12px;font-size:13px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="tb-brand"><span class="logo">S</span>速图 AIGC<small>专业 3C 数码配件生图</small></div>
+    <div class="tb-right">
+      <a class="pts" id="ptsBadge" data-view="ledger" href="#ledger" title="查看积分明细"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 6.9L21 9.3l-5.2 4.5L17.6 21 12 17.2 6.4 21l1.8-7.2L3 9.3l6.6-.4z"/></svg><span id="ptsNum">--</span></a>
+      <a class="tbtn pri" data-view="recharge" href="#recharge">充值</a>
+      <a class="tbtn" data-view="invite" href="#invite">邀请返利</a>
+      <a class="tbtn" data-view="rules" href="#rules">套餐说明</a>
+      <a class="tbtn" data-view="admin" href="#admin" id="adminBtn" style="display:none">管理后台</a>
+      <span class="uname" id="uname"></span>
+      <a class="tbtn" id="logoutBtn">退出</a>
+    </div>
+  </header>
+  <div class="shell">
+    <aside class="nav">
+      <nav class="menu" id="menu">
+        <a class="item" data-view="pt" href="#pt"><i class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m4 17 5-5 4 4 3-3 4 4"/></svg></i><span class="lb">图案提取</span></a>
+        <a class="item" data-view="wm" href="#wm"><i class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s5 5.2 5 9a5 5 0 0 1-10 0c0-3.8 5-9 5-9z"/><path d="M9.5 13.5a2.5 2.5 0 0 0 2.5 2.5"/></svg></i><span class="lb">批量去水印</span></a>
+        <a class="item" data-view="duotu" href="#duotu"><i class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 7.5 12 12l9-4.5z"/><path d="m3 12 9 4.5L21 12"/><path d="m3 16.5 9 4.5 9-4.5"/></svg></i><span class="lb">多图编辑</span></a>
+        <a class="item" data-view="hd" href="#hd"><i class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M4.2 7.2l2.1 2.1M17.7 14.7l2.1 2.1M3 12h3M18 12h3M4.2 16.8l2.1-2.1M17.7 9.3l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg></i><span class="lb">高清修复</span></a>
+        <a class="item" data-view="dtl" href="#dtl"><i class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg></i><span class="lb">详情页生成</span></a>
+        <a class="item" data-view="fk" href="#fk"><i class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="12" height="15" rx="2"/><path d="M16 21H6a2 2 0 0 1-2-2V8"/></svg></i><span class="lb">详情页复刻</span></a>
+        <a class="item" data-view="swap" href="#swap"><i class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3"/><path d="M20 16H7l3 3"/></svg></i><span class="lb">商品替换</span></a>
+        <a class="item" data-view="aigc" href="#aigc"><i class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18 15.5 19 18l2.5 1-2.5 1-1 2.5-1-2.5L14.5 19l2.5-1z"/></svg></i><span class="lb">AI 生图</span></a>
+        <a class="item" data-view="library" href="#library"><i class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg></i><span class="lb">素材库</span></a>
+        <a class="item" data-view="settings" href="#settings" id="settingsBtn" style="display:none"><i class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4z"/></svg></i><span class="lb">系统设置</span></a>
+      </nav>
+      <div class="foot">图案提取 · 批量去水印 · 多图编辑 · 高清修复 · 详情页生成 · 详情页复刻 · 商品替换 · AI 生图 · 素材库</div>
+    </aside>
+    <main class="stage" id="stage"></main>
+  </div>
+</div>
+<script>
+/* 顶栏（站名 + 充值/套餐说明/积分/账户）+ 左侧总导航 + 右侧 iframe 内容切换：
+   线上 BASE=/pattern → 内容页 /pattern/pt/ 、/pattern/wm/ 、/pattern/duotu/ 、/pattern/settings/ 等；
+   点菜单只改 iframe 地址（导航栏不刷新），用 location.hash 记忆当前板块。 */
+var BASE = location.pathname.replace(/\/index\.html$/i, '').replace(/\/+$/, '');
+/* ---------- 板块容器：常驻 iframe（2026-11-15 提速） ----------
+   老做法每次切菜单都 setAttribute('src') → iframe 销毁重建：重传 HTML + 重拉 ui.css/cmp.js
+   + 页面 JS 全跑一遍 + 重新拉任务列表。服务器出口只有 ~1Mbps，体感就是「切一下等半天」。
+   现在每个板块一个 iframe 常驻，切换只改 display → 第二次起 **0 毫秒**，而且任务状态、
+   表单内容、滚动位置全都还在。首次进入后空闲时预热其余板块，点之前就已就绪。
+   兜底：URL 加 ?legacy=1 可回到老的单 iframe 重载行为。 */
+var LEGACY = /[?&]legacy=1/.test(location.search);
+var stage = document.getElementById('stage');
+var frames = {};          /* view → iframe 元素 */
+var views = {
+  pt: BASE + '/pt/',
+  wm: BASE + '/wm/',
+  duotu: BASE + '/duotu/parts.html',
+  hd: BASE + '/hd/',
+  dtl: BASE + '/dtl/',
+  fk: BASE + '/fk/',
+  swap: BASE + '/swap/',
+  aigc: BASE + '/aigc/',
+  library: BASE + '/library/',
+  settings: BASE + '/settings/',
+  recharge: BASE + '/recharge/',
+  invite: BASE + '/invite/',
+  admin: BASE + '/admin/'
+};
+/* 落在「充值」页内部的锚点（#ledger 积分明细 / #rules 消耗说明）：
+   复用同一个常驻 iframe 只滚到对应位置，绝不另开一份充值页（否则常驻 iframe 会有两份）。 */
+var ANCHOR = { ledger: 'ledger', rules: 'rules' };
+function cur(){
+  var h = (location.hash || '').replace(/^#/, '');
+  if (ANCHOR[h]) return 'recharge';
+  return views[h] ? h : 'pt';
+}
+function ensureFrame(v){
+  if (frames[v]) return frames[v];
+  var f = document.createElement('iframe');
+  f.title = v;
+  f.setAttribute('data-view', v);
+  f.style.display = 'none';       /* 先藏起来，等 show() 决定谁可见 */
+  f.src = views[v];
+  stage.appendChild(f);
+  frames[v] = f;
+  return f;
+}
+function markNav(v){
+  var items = document.querySelectorAll('.item');
+  for (var i = 0; i < items.length; i++){
+    items[i].classList.toggle('on', items[i].getAttribute('data-view') === v);
+  }
+}
+/* 在 iframe 内部滚到锚点：明细/说明是静态 HTML 里的元素，不必等接口回来。
+   新 iframe 首次可能还没解析完，故重试 20 次（每次 150ms）。 */
+function scrollInFrame(f, id){
+  if (!f) return;
+  var tries = 0;
+  (function go(){
+    var el = null;
+    try { el = f.contentDocument && f.contentDocument.getElementById(id); } catch (e) { return; }
+    if (el){
+      try { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e2) { el.scrollIntoView(); }
+      return;
+    }
+    if (tries++ < 20) setTimeout(go, 150);
+  })();
+}
+function show(v){
+  if (!views[v]) v = 'pt';
+  var hash = (location.hash || '').replace(/^#/, '');
+  var anchor = ANCHOR[hash] || '';
+  if (LEGACY){
+    var lf = ensureFrame('__legacy');
+    if (lf.getAttribute('src') !== views[v]) lf.setAttribute('src', views[v]);
+    for (var k in frames) frames[k].style.display = (k === '__legacy') ? '' : 'none';
+    if (anchor) scrollInFrame(lf, anchor);
+  } else {
+    ensureFrame(v);
+    for (var k in frames) frames[k].style.display = (k === v) ? '' : 'none';
+    if (anchor) scrollInFrame(frames[v], anchor);
+  }
+  markNav(v);
+}
+show(cur());
+window.addEventListener('hashchange', function(){ show(cur()); });
+
+/* 空闲预热：首屏稳定后逐个加载其余板块（间隔 1.2s，避免同时打满本来就不宽的带宽）。
+   用户点菜单时页面已经在内存里，直接显示。 */
+(function warmup(){
+  if (LEGACY) return;
+  var order = ['pt', 'wm', 'duotu', 'hd', 'dtl', 'fk', 'aigc', 'library'];
+  var i = 0;
+  function next(){
+    if (i >= order.length) return;
+    var v = order[i++];
+    if (!frames[v]) { try { ensureFrame(v); } catch (e) {} }
+    setTimeout(next, 1200);
+  }
+  var idle = window.requestIdleCallback || function(fn){ return setTimeout(fn, 1); };
+  idle(function(){ setTimeout(next, 900); });
+})();
+
+/* 素材库（iframe 内）调这里跳回某板块继续任务：切菜单 + 给 iframe 地址带上定位参数 */
+window.openBoard = function(v, query){
+  if (!views[v]) return;
+  location.hash = v;
+  var f = ensureFrame(v);
+  if (query) f.setAttribute('src', views[v] + query);   /* 带参数 → 该板块重载一次 */
+  show(v);
+};
+
+/* 登录态与积分余额：未登录跳 /login（服务端也有登录门，这里是前置体验优化） */
+function refreshMe(){
+  fetch(BASE + '/accounts/api/me').then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok){
+      document.getElementById('uname').textContent = d.user.username;
+      var _p=document.getElementById('ptsNum'); if(_p) _p.textContent = d.user.points;
+      if (d.user.grp === 'admin'){
+        document.getElementById('adminBtn').style.display = '';
+        document.getElementById('settingsBtn').style.display = '';
+      }
+    } else {
+      location.replace(BASE + '/login');
+    }
+  }).catch(function(){});
+}
+refreshMe();
+/* iframe 内页面扣费后可调用 parent.refreshPoints() 刷新余额 */
+window.refreshPoints = refreshMe;
+
+document.getElementById('logoutBtn').onclick = function(){
+  fetch(BASE + '/accounts/api/logout', {method: 'POST'}).finally(function(){
+    location.replace(BASE + '/login');
+  });
+};
+</script>
+</body>
+</html>

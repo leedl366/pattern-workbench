@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的邀请 · 速图AIGC</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../accounts/static/ui.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);padding:26px 30px 60px}
+h1{font-size:20px;margin-bottom:4px}
+.sub{color:var(--sub);font-size:13px;margin-bottom:20px}
+.sect{font-size:15px;font-weight:700;margin:26px 0 12px;display:flex;align-items:center;gap:8px}
+.sect::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--pri)}
+
+/* 邀请码主卡 */
+.hero{background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border-radius:var(--r-card);padding:26px 28px;color:#fff;
+  box-shadow:0 10px 30px rgba(13,148,136,.22);position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:200px;height:200px;border-radius:50%;
+  background:rgba(255,255,255,.07)}
+.hero .lbl{font-size:13px;opacity:.85;letter-spacing:.05em}
+.hero .code{font-size:38px;font-weight:800;letter-spacing:.22em;margin:8px 0 4px;font-family:ui-monospace,Consolas,monospace}
+.hero .hint{font-size:12.5px;opacity:.85}
+.hero .acts{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.hero .acts button{padding:10px 18px;border:none;border-radius:var(--r-ctl);font-size:13.5px;font-weight:700;
+  cursor:pointer;background:rgba(255,255,255,.16);color:#fff;backdrop-filter:blur(4px);transition:.15s}
+.hero .acts button:hover{background:rgba(255,255,255,.28)}
+.hero .acts button.pri{background:#fff;color:#111214}
+.hero .acts button.pri:hover{background:#e4e5e8}
+
+/* 统计卡 */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:14px}
+.stat{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:16px 18px}
+.stat .n{font-size:26px;font-weight:800;color:var(--pri)}
+.stat .n small{font-size:13px;font-weight:600;color:var(--sub);margin-left:3px}
+.stat .k{font-size:12.5px;color:var(--sub);margin-top:2px}
+
+/* 链接框 */
+.linkbox{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:16px 18px}
+.linkbox .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.linkbox input{flex:1;min-width:260px;padding:11px 12px;border:1px solid var(--bd);border-radius:var(--r-ctl);
+  font-size:13px;outline:none;background:var(--fill);color:var(--tx)}
+.linkbox input:focus{border-color:var(--pri2);box-shadow:var(--ring)}
+.btn{padding:11px 22px;border:none;border-radius:var(--r-ctl);background:var(--grad-pri);color:var(--on-pri);
+  font-size:14px;font-weight:700;cursor:pointer}
+.btn.gray{background:var(--fill);color:var(--tx);border:1px solid var(--bd)}
+
+/* 规则 */
+.rules{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:16px 18px;
+  font-size:13px;color:var(--sub);line-height:2}
+.rules b{color:var(--tx)}
+.rules .em{color:var(--warn);font-weight:700}
+
+/* 明细表 */
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--r-card);overflow:hidden;font-size:13.5px}
+th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--bd)}
+th{background:var(--fill);color:var(--sub);font-size:12.5px;font-weight:600}
+tr:last-child td{border-bottom:none}
+td.plus{color:var(--ok);font-weight:700}
+.empty{padding:30px;text-align:center;color:var(--faint);font-size:13px;background:var(--card);
+  border:1px dashed var(--bd);border-radius:var(--r-card)}
+.badge{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11.5px;font-weight:600}
+.badge.reg{background:rgba(74,222,128,.14);color:#4ade80}
+.badge.rech{background:rgba(251,191,36,.14);color:#fbbf24}
+
+/* 提示气泡 */
+.toast{position:fixed;left:50%;bottom:38px;transform:translate(-50%,20px);background:#1f2937;color:#fff;
+  padding:11px 22px;border-radius:10px;font-size:13.5px;opacity:0;pointer-events:none;transition:.25s;z-index:99}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<h1>我的邀请</h1>
+<div class="sub">分享链接给朋友，TA 注册你得 20 积分；TA 之后每次充值，你再拿充值积分的 30%</div>
+
+<div class="hero">
+  <div class="lbl">我的专属邀请码</div>
+  <div class="code" id="myCode">------</div>
+  <div class="hint" id="myHint">加载中…</div>
+  <div class="acts">
+    <button class="pri" id="btnLink">📋 复制邀请链接</button>
+    <button id="btnCode">复制邀请码</button>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="n" id="stInvited">--</div><div class="k">已成功邀请（人）</div></div>
+  <div class="stat"><div class="n" id="stTotal">--</div><div class="k">累计返利（积分）</div></div>
+  <div class="stat"><div class="n" id="stMonth">--</div><div class="k">近 30 天返利（积分）</div></div>
+</div>
+
+<div class="sect">邀请链接</div>
+<div class="linkbox">
+  <div class="row">
+    <input id="linkInput" readonly value="加载中…">
+    <button class="btn" id="btnCopy2">复制链接</button>
+  </div>
+  <div style="font-size:12.5px;color:var(--sub);margin-top:10px">
+    朋友打开这个链接注册，系统会自动绑定你们的邀请关系 —— <b>绑定后不可更改</b>。
+  </div>
+</div>
+
+<div class="sect">奖励规则</div>
+<div class="rules">
+  · 朋友通过你的链接注册成功 → 你立即得 <b>20 积分</b>（对方也照常得新用户 10 积分）<br>
+  · 朋友之后<b>每次真实充值</b> → 你得<b>本次充值积分的 30%</b>（向下取整，例：充 340 分 → 你拿 102 分）<br>
+  · 只有<b>真实充值</b>才算：充值码兑换、扫码付款后由管理员记入的积分<br>
+  · 返利<b>即时到账</b>，自动进你的积分余额，可在「<a href="#" id="goLedger" style="color:#e5e7eb;font-weight:700;text-decoration:underline">充值 → 积分明细</a>」里查到每一笔<br>
+  · 邀请关系<b>绑定后不可更改</b>，返利只算一层（朋友的朋友不再分成）
+</div>
+
+<div class="sect">返利明细</div>
+<div id="listWrap"><div class="empty">加载中…</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var BASE = location.pathname.replace(/\/invite\/?.*$/, '').replace(/\/+$/, '');
+function $(id){ return document.getElementById(id); }
+var INV = null;
+
+function toast(t){
+  var el = $('toast');
+  el.textContent = t; el.classList.add('on');
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){ el.classList.remove('on'); }, 1800);
+}
+
+/* 复制：优先 navigator.clipboard（https 可用），失败退回 execCommand（老浏览器/非安全上下文） */
+function copyText(t){
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(t).then(function(){ toast('已复制'); },
+      function(){ fallbackCopy(t); });
+  } else {
+    fallbackCopy(t);
+  }
+}
+function fallbackCopy(t){
+  var ta = document.createElement('textarea');
+  ta.value = t; ta.style.cssText = 'position:fixed;left:-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); toast('已复制'); }
+  catch(e){ toast('复制失败，请手动选中复制'); }
+  document.body.removeChild(ta);
+}
+
+function fmtTime(ts){
+  if (!ts) return '-';
+  var d = new Date(ts * 1000);
+  function p(n){ return n < 10 ? '0' + n : '' + n; }
+  return (d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function render(d){
+  INV = d;
+  $('myCode').textContent = d.code || '------';
+  $('myHint').textContent = '分享后朋友注册，你立即得 ' + d.register_reward + ' 积分';
+  var link = location.origin + BASE + '/login?ref=' + encodeURIComponent(d.code || '');
+  $('linkInput').value = link;
+  $('stInvited').textContent = d.invited_count;
+  $('stTotal').textContent = d.total_reward;
+  $('stMonth').textContent = d.month_reward;
+
+  var items = d.items || [];
+  if (!items.length){
+    $('listWrap').innerHTML = '<div class="empty">还没有返利记录。把上面的链接发给朋友，TA 注册后这里就会出现。</div>';
+    return;
+  }
+  var h = '<table><tr><th>时间</th><th>被邀请人</th><th>类型</th><th>基数</th><th>返利</th></tr>';
+  items.forEach(function(it){
+    var isReg = it.kind === 'register';
+    h += '<tr><td>' + fmtTime(it.ts) + '</td>' +
+         '<td>' + esc(it.invitee || '-') + '</td>' +
+         '<td><span class="badge ' + (isReg ? 'reg' : 'rech') + '">' + (isReg ? '注册奖励' : '充值返利') + '</span></td>' +
+         '<td>' + (isReg ? '—' : (it.base_points + ' 分')) + '</td>' +
+         '<td class="plus">+' + it.reward + '</td></tr>';
+  });
+  h += '</table>';
+  $('listWrap').innerHTML = h;
+}
+
+$('btnLink').onclick = $('btnCopy2').onclick = function(){
+  copyText($('linkInput').value);
+};
+$('btnCode').onclick = function(){
+  copyText(($('myCode').textContent || '').trim());
+};
+/* 跳「充值 → 积分明细」：在外壳 iframe 里就切顶层视图（常驻 iframe 秒切），单独打开则直接跳 */
+$('goLedger').addEventListener('click', function(e){
+  e.preventDefault();
+  if (window.top !== window.self) {
+    try { window.top.location.hash = '#ledger'; return; } catch (err) {}
+  }
+  location.href = BASE + '/recharge/#ledger';
+});
+
+fetch(BASE + '/accounts/api/invite/info', { credentials: 'same-origin' })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d && d.ok && d.invite) render(d.invite);
+    else {
+      $('myHint').textContent = (d && d.error) || '读取失败，请刷新重试';
+      $('listWrap').innerHTML = '<div class="empty">读取失败：' + esc((d && d.error) || '未知错误') + '</div>';
+    }
+  })
+  .catch(function(){
+    $('myHint').textContent = '网络错误';
+    $('listWrap').innerHTML = '<div class="empty">网络错误，请刷新重试</div>';
+  });
+</script>
+</body>
+</html>

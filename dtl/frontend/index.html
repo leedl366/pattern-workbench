@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>详情页生成 · 上传产品图一键出整套电商详情页</title>
+<!-- 🔴 全站设计令牌 ui.css 的**唯一正确站内路径是 ../accounts/static/ui.css**（server.py 白名单路由）。
+     子应用在 /pattern/dtl/ 下，写 ../static/ui.css 会解析成 /pattern/static/ui.css → 401，
+     于是所有 var(--xxx) 失效：卡片边框、按钮底色、步骤圆点全没了，只剩裸布局（2026-11-18 踩过）。
+     与 static/pt.html 同款：COS 直链优先（快），失败自动回落站内路由。 -->
+<link rel="stylesheet" href="../accounts/static/ui.css">
+<style>
+/* ---------- 令牌兜底（防呆）----------
+   ui.css 若两条路都取不到（COS 挂 + 站内路由异常），var(--xxx) 会全部失效 →
+   页面退化成「没有边框、没有底色」的裸布局。这里先把同一套令牌用 :root 兜一份，
+   ui.css 加载成功时它的 :root 后到、覆盖本段（值完全一致，视觉无差别）。
+   这样即使图床和路由同时出问题，页面也仍然是完整可看的样子。 */
+:root{
+  /* 2026-11-19 与 static/ui.css 同步：深色能影风（此段仅作 ui.css 加载失败时的兜底，值必须与 ui.css 一致） */
+  --pri:#ffffff; --pri2:#d8dade; --pri-dark:#d8dade;
+  --pri-050:rgba(255,255,255,.07); --pri-100:rgba(255,255,255,.11); --pri-200:rgba(255,255,255,.22); --pri-300:#c9ccd2; --pri-bg:rgba(255,255,255,.05);
+  --grad-pri:linear-gradient(135deg,#ffffff,#d8dade);
+  --on-pri:#111214;
+  --bg:#090a0e; --card:#15171d; --card2:#0c0e16; --shell:#121212;
+  --tx:#e5e7eb; --sub:#9ca3af; --faint:#6b7280; --bd:rgba(255,255,255,.08); --hair:rgba(255,255,255,.045); --fill:#1a1c22; --gold:#f5af38;
+  --ok:#4ade80; --ok-bg:rgba(74,222,128,.14); --ok-bd:rgba(74,222,128,.32);
+  --err:#f87171; --err-bg:rgba(248,113,113,.14); --err-bd:rgba(248,113,113,.32); --bad:#f87171;
+  --warn:#fbbf24; --warn-bg:rgba(251,191,36,.14); --warn-bd:rgba(251,191,36,.32);
+  --r-card:16px; --r-ctl:10px; --r-sm:10px; --r-pill:999px;
+  --shadow-card:0 0 0 1px rgba(255,255,255,.045); --shadow-pop:0 12px 32px rgba(0,0,0,.6);
+  --ring:0 0 0 3px rgba(255,255,255,.18);
+  --font:-apple-system,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);font-size:14px;padding:18px 20px 48px}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:19px;font-weight:800;margin-bottom:4px}
+.sub{color:var(--sub);font-size:12.5px;margin-bottom:16px}
+.sub b{color:var(--pri)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:18px;box-shadow:var(--shadow-card);margin-bottom:16px}
+.card h2{font-size:15px;font-weight:800;margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px}
+.card h2 .cnt{font-size:12px;font-weight:700;padding:2px 9px;border-radius:var(--r-pill)}
+.cnt.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+.cnt.bad{background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
+.cnt.warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
+/* 架构区标题行：标题 + 可点计数徽标 + 就地数量下拉（2026-11-18）
+   起因：数量下拉原先只在步骤1，用户在步骤2 勾了 8 个却改不了数量 → 被校验拦死，
+   提示只说「请减少选择」，根本不知道要退回上一步。原站也是这个死胡同。 */
+h2.ah{flex-wrap:wrap;gap:8px}
+.cnt.clickable{cursor:pointer;transition:.15s}
+.cnt.clickable:hover{filter:brightness(.94);box-shadow:var(--ring)}
+.qty{margin-left:auto;display:flex;align-items:center;gap:7px;flex:none}
+.qty label{font-size:12px;font-weight:700;color:var(--sub);white-space:nowrap}
+.qty select{width:auto;min-width:88px;padding:6px 10px;font-size:12.5px;font-weight:700}
+/* 提示条里的「一键对齐」动作按钮：把报错变成可执行动作 */
+.note.act{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.note.act .txt{flex:1;min-width:200px}
+.note .fix{border:none;border-radius:var(--r-sm);padding:7px 13px;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap;font-family:inherit;color:#fff;flex:none}
+.note.bad .fix{background:var(--err)}
+.note.warn .fix{background:var(--warn)}
+.note .fix:hover{filter:brightness(1.08)}
+/* 步骤条 */
+.steps{display:flex;align-items:flex-start;justify-content:center;gap:0;margin:0 auto 20px;max-width:620px;position:relative}
+.steps:before{content:"";position:absolute;top:19px;left:12%;right:12%;height:2px;background:var(--bd);z-index:0}
+.st{display:flex;flex-direction:column;align-items:center;gap:8px;width:25%;position:relative;z-index:1;background:var(--bg)}
+.st .dot{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;background:var(--card);color:var(--faint);border:2px solid var(--bd);transition:.18s}
+.st.on .dot{background:var(--pri);color:var(--on-pri);border-color:var(--pri);box-shadow:0 0 0 5px var(--pri-100)}
+.st .lb{font-size:12.5px;font-weight:600;color:var(--faint)}
+.st.on .lb{color:var(--pri-dark);font-weight:800}
+.st.can{cursor:pointer}
+/* 布局 */
+.grid{display:grid;grid-template-columns:5fr 7fr;gap:16px;align-items:start}
+.grid.full{grid-template-columns:1fr}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+/* 上传 */
+#drop{border:2px dashed #cbd5d5;border-radius:12px;padding:22px 16px;text-align:center;color:var(--sub);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:14px}
+#drop.on{border-color:var(--pri);background:var(--pri-050)}
+#drop .ic{width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--pri);flex:none}
+#drop .big{font-size:14px;font-weight:700;color:var(--tx);margin-bottom:3px;text-align:left}
+#drop .sm{font-size:12px;color:var(--faint);text-align:left}
+.pv{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.pv .it{position:relative;aspect-ratio:1;border-radius:9px;overflow:hidden;border:1px solid var(--bd);background:var(--fill)}
+.pv .it img{width:100%;height:100%;object-fit:cover;display:block}
+.pv .it .x{position:absolute;right:4px;top:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;border:none;font-size:13px;cursor:pointer;line-height:1;opacity:0;transition:.15s}
+.pv .it:hover .x{opacity:1}
+.pv .add{aspect-ratio:1;border:2px dashed #cbd5d5;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:var(--faint);font-size:12px;background:var(--fill)}
+.pv .add:hover{border-color:var(--pri);color:var(--pri)}
+/* 表单 */
+label.fl{display:block;font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:6px}
+textarea,input[type=text],select{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:var(--r-ctl);background:var(--fill);font-family:inherit;font-size:13.5px;color:var(--tx);outline:none;transition:.15s}
+textarea:focus,input[type=text]:focus,select:focus{border-color:var(--pri);background:var(--card);box-shadow:var(--ring)}
+textarea{resize:vertical;line-height:1.65}
+.fld{margin-bottom:14px}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:620px){.pgrid{grid-template-columns:1fr}}
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;border-radius:var(--r-ctl);padding:13px 22px;font-size:14.5px;font-weight:800;cursor:pointer;background:var(--grad-pri);color:var(--on-pri);width:100%;transition:.15s}
+.btn:hover{opacity:.92}
+.btn:disabled{background:#d1d5db;color:#9ca3af;cursor:not-allowed;opacity:1}
+.btn.stop{background:var(--err)}
+.btn.ghost{background:var(--card);color:var(--tx);border:1px solid var(--bd);width:auto;padding:7px 14px;font-size:12.5px;font-weight:700}
+.btn.ghost:hover{background:var(--fill);border-color:var(--sub)}
+.btn.ghost.on{background:var(--pri-050);color:var(--pri-dark);border-color:var(--pri-200)}
+.btn.sm{width:auto;padding:6px 12px;font-size:12px;border-radius:var(--r-sm)}
+.cost{text-align:center;font-size:12px;font-weight:700;color:var(--sub);margin-top:8px}
+.cost.bad{color:var(--err)}
+/* 架构卡 */
+.agrid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+@media (max-width:620px){.agrid{grid-template-columns:1fr}}
+.acard{padding:12px 13px;border:2px solid var(--bd);border-radius:12px;background:var(--fill);cursor:pointer;transition:.15s;text-align:left}
+.acard:hover{border-color:var(--pri-200)}
+.acard.on{border-color:var(--pri);background:var(--pri-050)}
+.acard .at{font-size:13.5px;font-weight:800;margin-bottom:4px}
+.acard.on .at{color:var(--pri-dark)}
+.acard .ad{font-size:12px;color:var(--sub);line-height:1.55}
+.acard .tag{font-size:10.5px;color:var(--pri-dark);background:var(--pri-100);border-radius:var(--r-pill);padding:1px 7px;margin-left:6px;font-weight:700}
+/* 风格卡 */
+.scard{padding:13px;border:1.5px solid var(--bd);border-radius:12px;background:var(--fill);cursor:pointer;margin-bottom:10px;text-align:left;width:100%;font-family:inherit;transition:.15s}
+.scard:hover{border-color:var(--pri-200)}
+.scard.on{border-color:var(--pri);background:var(--pri-050);box-shadow:var(--ring)}
+.scard .sh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
+.scard .sn{font-size:13.5px;font-weight:800}
+.scard .sb{font-size:11px;padding:2px 9px;border-radius:var(--r-pill);background:var(--card);color:var(--sub);border:1px solid var(--bd);flex:none;font-weight:700}
+.scard.on .sb{background:var(--pri);color:var(--on-pri);border-color:var(--pri)}
+.scard .sd{font-size:12px;color:var(--sub);line-height:1.6;margin-bottom:8px}
+.cols{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.cols .c{display:flex;align-items:center;gap:5px;min-width:0}
+.cols .sw{width:15px;height:15px;border-radius:50%;border:1px solid var(--bd);flex:none}
+.cols .cl{font-size:10.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 开关 */
+.swrow{display:flex;align-items:center;gap:10px;margin-bottom:9px;cursor:pointer;user-select:none}
+.tgl{width:42px;height:23px;border-radius:var(--r-pill);background:#d1d5db;border:none;position:relative;cursor:pointer;flex:none;transition:.18s}
+.tgl.on{background:var(--pri)}
+.tgl i{position:absolute;top:3px;left:3px;width:17px;height:17px;border-radius:50%;background:#fff;transition:.18s}
+.tgl.on i{left:22px}
+/* 提示词 */
+.phead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;border-bottom:1px solid var(--bd);background:var(--fill);border-radius:var(--r-card) var(--r-card) 0 0;cursor:pointer;flex-wrap:wrap}
+.phead .pt{font-size:14.5px;font-weight:800}
+.pbody{padding:16px}
+.md{font-size:13px;line-height:1.85;white-space:pre-wrap;word-break:break-word;max-height:520px;overflow:auto}
+.md h3{font-size:14.5px;font-weight:800;color:var(--pri-dark);margin:14px 0 7px}
+.md h4{font-size:13.5px;font-weight:800;margin:12px 0 6px}
+.md b{font-weight:800}
+textarea.pe{height:420px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.7}
+/* ---------- 提示词分屏卡片（2026-11-18）----------
+   起因：8 页提示词全挤在一个 520px 滚动框里，想改第 5 页要滚半天，
+   还容易在整篇编辑时改坏「第 N 页」标识导致拆页错乱。
+   现在：全局规范一卡 + 每屏一卡，每卡可单独编辑/复制，页标识由系统保管不给改。 */
+.pnav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:13px;border-bottom:1px solid var(--bd)}
+.pnav .np{padding:5px 12px;border:1px solid var(--bd);border-radius:var(--r-pill);background:var(--card);
+  font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;transition:.15s;font-family:inherit}
+.pnav .np:hover{border-color:var(--pri);color:var(--pri-dark);background:var(--pri-050)}
+.pcard{border:1px solid var(--bd);border-radius:12px;background:var(--card);margin-bottom:13px;overflow:hidden}
+.pcard.glob{border-color:var(--pri-200);background:var(--pri-bg)}
+.pcard .ch{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--fill);
+  border-bottom:1px solid var(--bd);flex-wrap:wrap}
+.pcard.glob .ch{background:var(--pri-050)}
+.pcard .no{width:26px;height:26px;border-radius:50%;background:var(--pri);color:var(--on-pri);flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800}
+.pcard.glob .no{background:var(--pri-dark);font-size:11px}
+.pcard .ct{flex:1;min-width:150px}
+.pcard .ct .t1{font-size:13.5px;font-weight:800;color:var(--tx);line-height:1.4}
+.pcard .ct .t2{font-size:11.5px;color:var(--sub);margin-top:2px;line-height:1.5}
+.pcard .ca{display:flex;gap:6px;flex:none}
+.pcard .cb{padding:13px 15px}
+.pcard .md{max-height:none;overflow:visible}
+.pcard textarea.pe{height:300px}
+/* 13 字段结构化展示：字段名左、内容右，比纯文本好扫读 */
+.flds{display:flex;flex-direction:column;gap:9px}
+.fld2{display:grid;grid-template-columns:132px 1fr;gap:11px;align-items:start}
+@media (max-width:620px){.fld2{grid-template-columns:1fr;gap:3px}}
+.fld2 .fn{font-size:12px;font-weight:800;color:var(--pri-dark);line-height:1.6;padding-top:1px}
+.fld2 .fv{font-size:12.5px;line-height:1.75;color:var(--tx);white-space:pre-wrap;word-break:break-word}
+.fld2 .fv.dim{color:var(--faint)}
+.fld2.hl .fn{color:var(--warn)}
+.fld2.hl .fv{background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:var(--r-sm);padding:7px 10px;font-weight:600}
+.pmini{display:flex;gap:9px;margin-top:11px;flex-wrap:wrap}
+.pmini .btn{width:auto;padding:8px 16px;font-size:12.5px}
+.note{padding:10px 13px;border-radius:var(--r-ctl);font-size:12.5px;font-weight:600;line-height:1.6;margin-bottom:12px}
+.note.warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
+.note.bad{background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
+.note.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+/* 结果 */
+.rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.rgrid.two{grid-template-columns:repeat(2,1fr)}
+@media (max-width:900px){.rgrid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.rgrid,.rgrid.two{grid-template-columns:1fr}}
+.rc{border:1px solid var(--bd);border-radius:12px;overflow:hidden;background:var(--fill);display:flex;flex-direction:column}
+.rc .im{position:relative;background:var(--card);display:flex;align-items:center;justify-content:center;min-height:180px}
+.rc .im img{width:100%;display:block}
+.rc .ph{padding:30px 14px;text-align:center;color:var(--faint);font-size:12.5px;width:100%}
+.rc .bar{height:5px;background:var(--bd);border-radius:3px;overflow:hidden;margin:9px auto 0;width:80%}
+.rc .bar i{display:block;height:100%;background:var(--pri);width:40%;animation:slide 1.3s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-40%}100%{margin-left:100%}}
+.rc .ft{padding:8px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-top:1px solid var(--bd);background:var(--card)}
+.rc .no{font-size:11.5px;font-weight:800;color:var(--sub);margin-right:auto}
+.rc .ck{position:absolute;left:6px;top:6px;width:19px;height:19px;cursor:pointer;z-index:3}
+.rc .er{color:var(--err);font-size:11.5px;line-height:1.55;padding:0 4px}
+/* 可点击放大的图（2026-11-18 大图预览）
+   🔴 img 必须 pointer-events:none + user-drag:none，否则浏览器原生图片拖拽
+   会打断 pointer 事件链，表现为「第一次能拖、第二次拖一小段就停」。 */
+.rc .im.zoomable{cursor:zoom-in}
+.rc .im.zoomable img{pointer-events:none;-webkit-user-drag:none;user-select:none}
+.rc .im.zoomable:hover img{filter:brightness(1.02)}
+.rc .zhint{position:absolute;right:6px;bottom:6px;z-index:2;display:flex;align-items:center;gap:4px;
+  background:rgba(31,41,55,.78);color:#fff;font-size:10.5px;font-weight:700;padding:3px 8px;
+  border-radius:var(--r-pill);opacity:0;transition:opacity .16s;pointer-events:none;backdrop-filter:blur(2px)}
+.rc .im.zoomable:hover .zhint{opacity:1}
+@media (hover:none){.rc .zhint{opacity:1}}
+
+/* ---------- 大图灯箱 ---------- */
+#lb{position:fixed;inset:0;z-index:900;display:none;background:rgba(15,23,32,.93);
+  backdrop-filter:blur(4px);touch-action:none}
+#lb.on{display:block}
+#lbStage{position:absolute;inset:0;overflow:hidden;cursor:zoom-in}
+#lbStage.zoomed{cursor:grab}
+#lbStage.grabbing{cursor:grabbing}
+#lbBox{position:absolute;left:50%;top:50%;transform-origin:center center;
+  transition:transform .24s cubic-bezier(.2,.7,.3,1);will-change:transform}
+#lb.moving #lbBox{transition:none}
+#lbImg{display:block;width:100%;height:100%;object-fit:contain;background:#fff;
+  border-radius:4px;box-shadow:0 18px 60px rgba(0,0,0,.5);
+  pointer-events:none;-webkit-user-drag:none;user-select:none}
+#lbLoad{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;color:#e5e7eb}
+#lbLoad .spin{width:30px;height:30px;border-width:3px;border-color:rgba(255,255,255,.25);border-top-color:#fff}
+#lbLoad .t{font-size:12.5px;margin-top:11px;color:#cbd5e1}
+#lbErr{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;
+  color:#fca5a5;font-size:13px;line-height:1.7;max-width:80vw}
+/* 顶栏 */
+#lbBar{position:absolute;left:0;right:0;top:0;z-index:5;display:flex;align-items:center;gap:10px;
+  padding:11px 14px;background:linear-gradient(180deg,rgba(15,23,32,.88),rgba(15,23,32,0));
+  color:#fff;pointer-events:none}
+#lbBar>*{pointer-events:auto}
+#lbTitle{font-size:13px;font-weight:800}
+#lbMeta{font-size:11.5px;color:#94a3b8;font-weight:600}
+#lbBar .sp{margin-left:auto;display:flex;align-items:center;gap:7px}
+.lbtn{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);color:#fff;
+  border-radius:var(--r-sm);padding:6px 11px;font:700 12px/1 var(--font);cursor:pointer;
+  transition:.15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.lbtn:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.4)}
+.lbtn:disabled{opacity:.4;cursor:not-allowed}
+.lbtn.icon{padding:6px 9px;font-size:14px}
+#lbZoom{font:800 12px/1 ui-monospace,Consolas,monospace;background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.2);border-radius:var(--r-sm);padding:7px 10px;min-width:56px;text-align:center}
+/* 左右翻页 */
+.lbnav{position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:42px;height:64px;
+  border:none;background:rgba(255,255,255,.1);color:#fff;font-size:22px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:.15s}
+.lbnav:hover{background:rgba(255,255,255,.22)}
+.lbnav:disabled{opacity:.22;cursor:not-allowed}
+#lbPrev{left:0;border-radius:0 var(--r-sm) var(--r-sm) 0}
+#lbNext{right:0;border-radius:var(--r-sm) 0 0 var(--r-sm)}
+/* 底部提示 */
+#lbTip{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:5;
+  font-size:11.5px;color:#cbd5e1;background:rgba(15,23,32,.7);padding:6px 14px;
+  border-radius:var(--r-pill);pointer-events:none;white-space:nowrap;max-width:92vw;
+  overflow:hidden;text-overflow:ellipsis}
+@media (max-width:640px){
+  /* 🔴 窄屏顶栏拆两行：第一行标题+关闭，第二行缩放控件。
+     单行 flex-wrap 会让标题与控件挤在一起、且高度不可预测（已踩）。 */
+  #lbBar{padding:8px 10px 9px;gap:6px;display:grid;
+    grid-template-columns:1fr auto;grid-template-areas:"t c" "s s";align-items:center}
+  #lbTitle{grid-area:t;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #lbMeta{display:none}
+  #lbBar .sp{grid-area:s;margin-left:0;justify-content:center;gap:6px;flex-wrap:nowrap}
+  #lbClose{grid-area:c}
+  .lbtn{padding:6px 10px;font-size:11.5px}
+  #lbZoom{padding:7px 8px;min-width:50px;font-size:11.5px}
+  /* 翻页箭头在窄屏改为底部半透明圆形，避免贴边看不见、也不挡产品 */
+  .lbnav{top:auto;bottom:52px;transform:none;width:38px;height:38px;border-radius:50%;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);font-size:19px}
+  #lbPrev{left:14px;border-radius:50%}
+  #lbNext{right:14px;border-radius:50%}
+  #lbTip{font-size:10px;bottom:12px;padding:5px 10px;white-space:normal;text-align:center;line-height:1.5}
+}
+@media (prefers-reduced-motion:reduce){#lbBox{transition:none}}
+.spin{width:15px;height:15px;border:2px solid var(--pri-200);border-top-color:var(--pri);border-radius:50%;animation:sp .8s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.load{text-align:center;padding:34px 16px;color:var(--sub)}
+.load .big{font-size:14px;font-weight:700;color:var(--tx);margin:12px 0 6px}
+.load .tip{font-size:12.5px;color:var(--faint);min-height:20px}
+.pbar{height:7px;background:var(--bd);border-radius:4px;overflow:hidden;max-width:340px;margin:12px auto 0}
+.pbar i{display:block;height:100%;background:var(--pri);transition:width .35s}
+.empty{text-align:center;padding:40px 16px;color:var(--faint)}
+.empty .ei{font-size:30px;margin-bottom:10px;opacity:.4}
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--tx);color:#fff;padding:11px 20px;border-radius:var(--r-ctl);font-size:13px;font-weight:600;box-shadow:var(--shadow-pop);z-index:999;display:none;max-width:86vw;text-align:center;line-height:1.6}
+.hide{display:none!important}
+.mini{font-size:11.5px;color:var(--faint);line-height:1.6;margin-top:8px}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>详情页生成</h1>
+  <div class="sub">上传产品图 → AI 分析卖点与内容架构 → 生成整套设计提示词 → <b>一键出整套电商详情页</b></div>
+
+  <div class="steps" id="steps"></div>
+
+  <!-- 步骤1 -->
+  <div id="s1" class="grid">
+    <div>
+      <div class="card">
+        <h2>产品图上传 <span class="cnt ok" id="upCnt">(0/6)</span></h2>
+        <div id="drop">
+          <div class="ic">↑</div>
+          <div><div class="big">点击或拖拽上传产品图</div><div class="sm" id="upSm">支持 JPG, PNG, WEBP（最多 6 张）</div></div>
+        </div>
+        <input type="file" id="file" accept="image/*" multiple class="hide">
+        <div class="pv hide" id="pv"></div>
+      </div>
+      <div class="card">
+        <h2>产品卖点提示词</h2>
+        <textarea id="selling" rows="5" placeholder="输入产品的核心卖点、材质、使用场景等，帮助AI更精准地生成画面描述..."></textarea>
+        <div class="mini">可以只填卖点不上传图，AI 会完全依据文字创意发挥。</div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>参数配置</h2>
+        <div class="pgrid">
+          <div class="fld"><label class="fl">平台选择</label><select id="platform"></select></div>
+          <div class="fld"><label class="fl">画面语言</label><select id="lang"></select></div>
+          <div class="fld"><label class="fl">销售地区</label><select id="region"></select></div>
+          <div class="fld"><label class="fl">尺寸比例</label><select id="ratio"></select></div>
+          <div class="fld"><label class="fl">清晰度</label><select id="res"></select></div>
+          <div class="fld"><label class="fl">选择电商图类型</label><select id="kind"></select></div>
+          <div class="fld" style="grid-column:1/-1"><label class="fl">生成数量</label><select id="count"></select></div>
+        </div>
+        <div style="border-top:1px solid var(--bd);padding-top:15px;margin-top:4px">
+          <button class="btn" id="btnAnalyze">下一步分析产品</button>
+          <div class="cost">AI 分析与提示词生成不消耗积分</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 步骤2 -->
+  <div id="s2" class="grid hide">
+    <div>
+      <div class="card">
+        <h2>基本信息（可编辑）</h2>
+        <div class="fld"><label class="fl">产品名称</label><input type="text" id="product" placeholder="请输入产品名称"></div>
+        <div class="fld"><label class="fl">核心卖点</label><textarea id="selling2" rows="5" placeholder="请输入核心卖点"></textarea></div>
+        <div class="fld"><label class="fl">目标人群</label><textarea id="audience" rows="2" placeholder="请输入目标人群"></textarea></div>
+        <div class="fld"><label class="fl">设计风格</label><div id="styles"></div></div>
+        <div class="fld" style="border-top:1px solid var(--bd);padding-top:14px">
+          <label class="fl">模特</label>
+          <div class="swrow" id="swModel"><button class="tgl" id="tglModel"><i></i></button><span style="font-size:13px">是否需要模特</span></div>
+          <textarea id="modelPrompt" rows="3" placeholder="如：年轻女性模特、25-30岁、欧美气质、自然生活方式场景；也可以留空由AI推荐"></textarea>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2 class="ah"><span id="archTitle">电商详情页内容架构</span>
+          <span class="cnt ok clickable" id="archCnt" title="点击把生成数量对齐到已选架构数">(0/1)</span>
+          <span class="qty"><label for="count2">生成数量</label><select id="count2"></select></span>
+        </h2>
+        <div id="archNote"></div>
+        <div class="agrid" id="archGrid"></div>
+        <div style="border-top:1px solid var(--bd);padding-top:15px;margin-top:15px">
+          <button class="btn" id="btnPrompt">下一步生成提示词</button>
+          <div class="cost" id="archCost">已选架构数必须与生成数量一致</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 步骤3 -->
+  <div id="s3" class="hide">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="phead" id="pHead">
+        <div class="pt">生成电商详情页提示词 <span class="cnt ok" id="pCnt"></span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost" id="btnMode">整篇编辑</button>
+          <button class="btn ghost" id="btnCopy">复制全部</button>
+          <button class="btn ghost" id="btnFold">收起</button>
+        </div>
+      </div>
+      <div class="pbody" id="pBody">
+        <div id="pNote"></div>
+        <!-- 页码导航：8 页时点一下直达，不用滚 -->
+        <div class="pnav hide" id="pNav"></div>
+        <!-- 分屏视图：全局规范一卡 + 每屏一卡 -->
+        <div id="pCards"></div>
+        <!-- 整篇编辑兜底（想大改结构时用） -->
+        <div id="pRaw" class="hide">
+          <div class="note warn">整篇编辑：请保留每页开头的 <b>第 X 页</b> 标识行，否则系统无法正确拆页出图。</div>
+          <textarea class="pe" id="pEdit" placeholder="请输入详情页提示词..."></textarea>
+          <div style="display:flex;gap:9px;margin-top:11px;flex-wrap:wrap">
+            <button class="btn" style="width:auto;padding:10px 20px" id="btnRawSave">保存并回到分屏</button>
+            <button class="btn ghost" id="btnRawCancel">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button class="btn" id="btnGen">生成详情页图</button>
+    <div class="cost" id="genCost"></div>
+  </div>
+
+  <!-- 步骤4 -->
+  <div id="s4" class="hide">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="phead" style="cursor:default">
+        <div class="pt">生成的电商图</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost" id="btnStop">停止生成</button>
+          <button class="btn ghost" id="btnAll">全选</button>
+          <button class="btn ghost" id="btnZip">批量下载</button>
+        </div>
+      </div>
+      <div class="pbody">
+        <div id="genLoad" class="load hide">
+          <div class="spin" style="width:28px;height:28px;border-width:3px"></div>
+          <div class="big" id="genPct">正在生成电商图 (0%)...</div>
+          <div class="pbar"><i id="genBar" style="width:0%"></i></div>
+          <div class="tip" id="genTip"></div>
+        </div>
+        <div id="resNote"></div>
+        <div class="rgrid" id="resGrid"></div>
+        <div class="empty" id="resEmpty"><div class="ei">▣</div><div style="font-weight:700;color:var(--sub);margin-bottom:5px">等待生图</div><div style="font-size:12.5px">在上方生成提示词后点击「生成详情页图」</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<!-- 大图灯箱（2026-11-18）：点结果图放大看原图像素，再点缩回。
+     图片走站内 api/tasks/{tid}/png/{idx}（后端已返原图，有 COS 时 302 直链），
+     所以**不需要新增后端接口**。 -->
+<div id="lb" role="dialog" aria-modal="true" aria-label="大图预览">
+  <div id="lbStage">
+    <div id="lbBox"><img id="lbImg" alt="详情页大图"></div>
+    <div id="lbLoad"><div class="spin"></div><div class="t">正在加载原图…</div></div>
+    <div id="lbErr" class="hide"></div>
+  </div>
+  <div id="lbBar">
+    <span id="lbTitle">第 1 页</span>
+    <span id="lbMeta"></span>
+    <span class="sp">
+      <button class="lbtn icon" id="lbOut" title="缩小">−</button>
+      <span id="lbZoom">100%</span>
+      <button class="lbtn icon" id="lbIn" title="放大">+</button>
+      <button class="lbtn" id="lbFit" title="适配窗口">适配</button>
+      <button class="lbtn" id="lbOne" title="原始像素 1:1">1:1</button>
+      <a class="lbtn" id="lbDl" download>下载</a>
+      <button class="lbtn icon" id="lbClose" title="关闭（Esc）">✕</button>
+    </span>
+  </div>
+  <button class="lbnav" id="lbPrev" title="上一页（←）">‹</button>
+  <button class="lbnav" id="lbNext" title="下一页（→）">›</button>
+  <div id="lbTip">单击图片放大 / 缩回 · 滚轮缩放 · 拖动平移 · 双击复位 · ← → 翻页 · Esc 关闭</div>
+</div>
+
+<script>
+/* 详情页生成 · 四步向导
+   复刻 dst.yemanai.cn image2详情页：状态机、参数语义、提示词全部对齐原站。
+   与原站的差异（有意）：AI 调用走工作台站点池，计费 3 积分/张，批量下载走后端 ZIP。 */
+var BASE = location.pathname.replace(/\/+$/, '');   // 线上 /pattern/dtl
+var META = null;
+var S = {
+  step: 1, maxStep: 1, tid: '', nImg: 0,
+  opt: {}, ana: {}, archIds: [], archExtra: [],
+  prompt: '', parsed: {global:'', pages:[]}, rawMode: false, folded: false,
+  pages: [], picked: [], running: false, redoing: false, poll: null, tipTimer: null
+};
+var UNIT = 3;                                        // 3 积分/张（与后端一致）
+var TIPS = ['AI 正在为您绘制绝美大片...', '正在调配完美的光影色彩...', '处理画面细节中，美好的事物值得等待...',
+            '即将融合产品与场景...', '色彩魔法正在施展，渲染中...', '大片即将出炉，请不要离开...'];
+var PTIPS = ['正在结合产品特征与所选参数生成专业提示词...', 'AI 正在深入分析产品结构，为您量身定制描述...',
+             '正在构思光影与构图，为您的产品注入灵魂...', '为您挖掘最具吸引力的视觉语言中...',
+             '正在为您匹配最合适的场景与大片质感...', '细节决定成败，AI 正在为您打磨提示词细节...'];
+
+function $(id){ return document.getElementById(id); }
+function toast(m, ms){ var t=$('toast'); t.textContent=m; t.style.display='block';
+  clearTimeout(t._h); t._h=setTimeout(function(){ t.style.display='none'; }, ms||3200); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function api(p, opt){
+  return fetch(BASE + '/' + p.replace(/^\//,''), opt).then(function(r){
+    return r.text().then(function(t){
+      var j; try{ j=JSON.parse(t); }catch(e){ throw new Error('服务返回异常（'+r.status+'）'); }
+      if(!r.ok || j.ok===false){
+        var e=new Error(j.error || ('请求失败 '+r.status)); e.status=r.status; e.body=j; throw e;
+      }
+      return j;
+    });
+  });
+}
+function postJSON(p, d){ return api(p, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d||{})}); }
+function refreshPoints(){ try{ if(parent && parent.refreshPoints) parent.refreshPoints(); }catch(e){} }
+
+/* ---------- 步骤条 ---------- */
+var STEP_NAMES = ['上传信息','分析产品','提示词','生成套图'];
+function drawSteps(){
+  var h='';
+  for(var i=1;i<=4;i++){
+    var on = S.step>=i, can = S.maxStep>=i && i!==S.step;
+    h += '<div class="st'+(on?' on':'')+(can?' can':'')+'" data-s="'+i+'">'
+       + '<div class="dot">'+(S.step>i?'✓':i)+'</div><div class="lb">'+STEP_NAMES[i-1]+'</div></div>';
+  }
+  $('steps').innerHTML=h;
+  var els=$('steps').querySelectorAll('.st.can');
+  for(var k=0;k<els.length;k++){
+    els[k].onclick=function(){ go(parseInt(this.getAttribute('data-s'),10)); };
+  }
+}
+function go(n){
+  S.step=n; if(n>S.maxStep) S.maxStep=n;
+  for(var i=1;i<=4;i++) $('s'+i).classList.toggle('hide', i!==n);
+  drawSteps();
+  if(n===2) drawArch();
+  if(n===3) drawPrompt();
+  if(n===4) drawRes();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ---------- 初始化 ---------- */
+function fillSel(id, arr, def){
+  var s=$(id); s.innerHTML='';
+  for(var i=0;i<arr.length;i++){
+    var o=document.createElement('option'); o.value=arr[i]; o.textContent=arr[i]; s.appendChild(o);
+  }
+  if(def!=null) s.value=def;
+}
+function init(){
+  api('api/meta').then(function(m){
+    META=m;
+    fillSel('platform', m.platforms, '淘宝');
+    fillSel('lang', m.langs, '中文');
+    fillSel('region', m.regions, '中国');
+    fillSel('ratio', m.ratios, '3:4');
+    fillSel('res', m.resolutions, '1K');
+    fillSel('kind', m.types, '电商详情页');
+    var cs=$('count'); cs.innerHTML='';
+    var cs2=$('count2'); cs2.innerHTML='';
+    for(var i=1;i<=m.maxPages;i++){
+      var o=document.createElement('option'); o.value=i; o.textContent=i+' 张'; cs.appendChild(o);
+      var o2=document.createElement('option'); o2.value=i; o2.textContent=i+' 张'; cs2.appendChild(o2);
+    }
+    cs.value='1'; cs2.value='1';
+    $('upSm').textContent='支持 JPG, PNG, WEBP（最多 '+m.maxImages+' 张）';
+    $('kind').onchange=function(){ S.archIds=(m.defaults[this.value]||[]).slice(); S.archExtra=[]; drawArch(); };
+    /* 两个数量下拉双向同步：改任一个都立刻同步另一个并重画架构区。
+       步骤2 就地改数量后，若已有提示词且页数不符 → drawArch 会提示重新生成。 */
+    $('count').onchange=function(){ setCount(this.value); };
+    $('count2').onchange=function(){ setCount(this.value); };
+    $('archCnt').onclick=function(){ alignCount(); };
+    S.archIds=(m.defaults['电商详情页']||[]).slice();
+    drawSteps(); updUp(); updGenBtn();
+    restoreFromUrl();          // 素材库「回任务」：URL 带 ?tid= 时直接恢复到那条任务
+  }).catch(function(e){ toast('初始化失败：'+e.message); });
+}
+/* ---------------- 深链：?tid= 直接打开某条任务（素材库「回任务」） ---------------- */
+function restoreFromUrl(){
+  var m = /[?&]tid=([^&]+)/.exec(location.search);
+  if (!m) return;
+  var tid = decodeURIComponent(m[1]);
+  api('api/session/' + tid).then(function(r){
+    if (!r || r.ok === false){ toast((r && r.error) || '任务不存在或已过期', 5000); return; }
+    var o = r.opt || {};
+    S.tid = r.tid || tid;
+    S.nImg = r.n_images || 0;
+    S.opt = o;
+    S.ana = r.analysis || {};
+    S.prompt = r.prompt || '';
+    S.archIds = (o.arch_ids || []).slice();
+    S.archExtra = (o.arch_extra || []).slice();
+    if (o.platform) $('platform').value = o.platform;
+    if (o.lang) $('lang').value = o.lang;
+    if (o.region) $('region').value = o.region;
+    if (o.ratio) $('ratio').value = o.ratio;
+    if (o.res) $('res').value = o.res;
+    if (o.kind) $('kind').value = o.kind;
+    if (o.count) setCount(o.count);
+    if (o.selling){ $('selling').value = o.selling; if ($('selling2')) $('selling2').value = o.selling; }
+    if (o.product) $('product').value = o.product;
+    if (o.audience) $('audience').value = o.audience;
+    drawStyles();
+    updUp(); updGenBtn();
+    S.pages = r.pages || [];
+    if (S.pages.length){
+      S.maxStep = 4;
+      if (S.prompt) drawPrompt();
+      go(4);
+      startPoll();
+    } else if (S.prompt){
+      S.maxStep = Math.max(S.maxStep, 3);
+      go(3);
+    } else {
+      S.maxStep = Math.max(S.maxStep, 2);
+      go(2);
+    }
+    toast('已打开历史任务 ' + tid, 2600);
+  }).catch(function(e){ toast('打开失败：' + e.message, 5000); });
+}
+
+/* 数量单一入口：任何改数量的地方都走这里，保证两个下拉 + 架构区始终一致 */
+function setCount(v){
+  var max = META? META.maxPages : 15;
+  var n = Math.max(1, Math.min(max, parseInt(v,10)||1));
+  $('count').value=String(n); $('count2').value=String(n);
+  drawArch();
+  return n;
+}
+function getCount(){ return parseInt($('count').value,10)||1; }
+/* 一键对齐：把生成数量改成「已选架构数」（超上限则封顶并明确告知，不静默截断） */
+function alignCount(){
+  var got=S.archIds.length, max=META?META.maxPages:15;
+  if(got===0){ toast('请先选择内容架构'); return; }
+  if(got>max){ toast('最多 '+max+' 张，请先取消一些架构（当前已选 '+got+' 个）', 5000); return; }
+  setCount(got);
+  toast('已把生成数量调整为 '+got+' 张');
+}
+/* 选少了：按内置表顺序补足到目标张数（AI 自创架构排在内置之后） */
+function fillArch(){
+  var n=getCount(), arr=allArch();
+  for(var i=0;i<arr.length && S.archIds.length<n;i++){
+    if(S.archIds.indexOf(arr[i].id)<0) S.archIds.push(arr[i].id);
+  }
+  drawArch();
+  if(S.archIds.length<n) toast('可选架构只有 '+arr.length+' 个，已全部选上');
+  else toast('已补足到 '+n+' 个内容架构');
+}
+function readOpt(){
+  return {
+    tid:S.tid, platform:$('platform').value, lang:$('lang').value, region:$('region').value,
+    ratio:$('ratio').value, res:$('res').value, kind:$('kind').value,
+    count:parseInt($('count').value,10)||1,
+    selling:(S.step>=2 ? $('selling2').value : $('selling').value).trim(),
+    product:$('product').value.trim(), audience:$('audience').value.trim(),
+    style:S.ana.style||'', c1:S.ana.c1||'', c2:S.ana.c2||'', c3:S.ana.c3||'', c4:S.ana.c4||'',
+    needs_model:S.ana.needs_model?true:false, model_prompt:$('modelPrompt').value.trim(),
+    arch_ids:S.archIds.slice(), arch_extra:S.archExtra.slice()
+  };
+}
+
+/* ---------- 上传 ---------- */
+function updUp(){
+  var max = META? META.maxImages : 6;
+  $('upCnt').textContent='('+S.nImg+'/'+max+')';
+  $('upCnt').className='cnt '+(S.nImg>=max?'warn':'ok');
+  $('drop').classList.toggle('hide', S.nImg>0);
+  var pv=$('pv'); pv.classList.toggle('hide', S.nImg===0);
+  if(S.nImg===0){ pv.innerHTML=''; return; }
+  var h='';
+  for(var i=1;i<=S.nImg;i++){
+    h += '<div class="it"><img src="'+BASE+'/api/session/'+S.tid+'/src/'+i+'?t='+S.nImg+'" alt="产品图'+i+'">'
+       + '<button class="x" data-i="'+i+'">×</button></div>';
+  }
+  if(S.nImg<max) h += '<label class="add" id="addMore"><span style="font-size:17px">+</span><span>继续上传</span></label>';
+  pv.innerHTML=h;
+  var xs=pv.querySelectorAll('.x');
+  for(var k=0;k<xs.length;k++) xs[k].onclick=function(ev){ ev.stopPropagation(); delImg(parseInt(this.getAttribute('data-i'),10)); };
+  var am=$('addMore'); if(am) am.onclick=function(){ $('file').click(); };
+  $('btnAnalyze').disabled = (S.nImg===0 && !$('selling').value.trim());
+}
+function ensureSession(files){
+  var fd=new FormData();
+  for(var i=0;i<files.length;i++) fd.append('images', files[i]);
+  if(S.tid) return api('api/session/'+S.tid+'/upload', {method:'POST', body:fd});
+  return api('api/session', {method:'POST', body:fd});
+}
+function sendFiles(fl){
+  var files=[], max=META?META.maxImages:6;
+  for(var i=0;i<fl.length;i++) if(/^image\//.test(fl[i].type)) files.push(fl[i]);
+  if(!files.length){ toast('请选择图片文件'); return; }
+  if(S.nImg+files.length>max){ files=files.slice(0, max-S.nImg); toast('最多 '+max+' 张，已截取前 '+files.length+' 张'); }
+  if(!files.length) return;
+  ensureSession(files).then(function(r){
+    if(r.tid) S.tid=r.tid;
+    S.nImg=r.n; updUp();
+  }).catch(function(e){ toast(e.message); });
+}
+function delImg(i){
+  postJSON('api/session/'+S.tid+'/remove', {idx:i}).then(function(r){ S.nImg=r.n; updUp(); })
+    .catch(function(e){ toast(e.message); });
+}
+$('drop').onclick=function(){ $('file').click(); };
+$('file').onchange=function(){ if(this.files.length) sendFiles(this.files); this.value=''; };
+$('drop').ondragover=function(e){ e.preventDefault(); this.classList.add('on'); };
+$('drop').ondragleave=function(){ this.classList.remove('on'); };
+$('drop').ondrop=function(e){ e.preventDefault(); this.classList.remove('on');
+  if(e.dataTransfer.files.length) sendFiles(e.dataTransfer.files); };
+$('selling').oninput=function(){ $('btnAnalyze').disabled=(S.nImg===0 && !this.value.trim()); };
+
+/* ---------- 步骤2：分析 ---------- */
+$('btnAnalyze').onclick=function(){
+  var b=this;
+  if(S.nImg===0 && !$('selling').value.trim()){ toast('请先上传产品图或输入核心卖点。'); return; }
+  b.disabled=true; b.innerHTML='<span class="spin"></span> AI 正在深度提炼卖点及架构...';
+  postJSON('api/analyze', readOpt()).then(function(r){
+    S.tid=r.tid; S.ana=r.analysis; S.archIds=r.arch_ids.slice(); S.archExtra=r.arch_extra.slice();
+    $('product').value=S.ana.product||'';
+    $('selling2').value=S.ana.selling||'';
+    $('audience').value=S.ana.audience||'';
+    $('modelPrompt').value=S.ana.model_prompt||'';
+    setModel(S.ana.needs_model);
+    drawStyles();
+    go(2);
+    if(r.warn) toast(r.warn, 5000);
+  }).catch(function(e){ toast(e.message); })
+   .then(function(){ b.disabled=false; b.textContent='下一步分析产品'; updUp(); });
+};
+function drawStyles(){
+  var arr=S.ana.styles||[], h='';
+  if(!arr.length){ h='<div class="mini">AI 未给出风格方案，可在下方架构里直接继续。</div>'; }
+  for(var i=0;i<arr.length;i++){
+    var x=arr[i], on=(S.ana.style_id===x.id);
+    h += '<button type="button" class="scard'+(on?' on':'')+'" data-id="'+esc(x.id)+'">'
+       + '<div class="sh"><div><div class="sn">'+esc(x.name)+'</div></div><div class="sb">'+(on?'已选择':'选择')+'</div></div>'
+       + '<div class="sd">'+esc(x.description)+'</div><div class="cols">'
+       + [['主色',x.primaryColor],['辅色',x.secondaryColor],['点缀',x.accentColor],['背景',x.bgColor]].map(function(p){
+           return '<div class="c"><span class="sw" style="background:'+esc(p[1])+'"></span><span class="cl">'+p[0]+' '+esc(p[1])+'</span></div>';
+         }).join('')
+       + '</div></button>';
+  }
+  $('styles').innerHTML=h;
+  var bs=$('styles').querySelectorAll('.scard');
+  for(var k=0;k<bs.length;k++) bs[k].onclick=function(){ pickStyle(this.getAttribute('data-id')); };
+}
+function pickStyle(id){
+  var arr=S.ana.styles||[];
+  for(var i=0;i<arr.length;i++) if(arr[i].id===id){
+    var x=arr[i]; S.ana.style_id=id; S.ana.style=x.name+'：'+x.description;
+    S.ana.c1=x.primaryColor; S.ana.c2=x.secondaryColor; S.ana.c3=x.accentColor; S.ana.c4=x.bgColor;
+  }
+  drawStyles();
+}
+function setModel(on){ S.ana.needs_model=!!on; $('tglModel').classList.toggle('on', !!on); }
+$('swModel').onclick=function(){ setModel(!S.ana.needs_model); };
+/* 提示条动作按钮：事件委托（容器只绑一次，innerHTML 重建子节点也不会失效） */
+$('archNote').addEventListener('click', function(ev){
+  var t=ev.target;
+  while(t && t!==this && !t.id) t=t.parentNode;
+  if(!t || t===this) return;
+  if(t.id==='fixAlign') alignCount();
+  else if(t.id==='fixFill') fillArch();
+});
+
+/* ---------- 步骤2：架构 ---------- */
+function allArch(){
+  var k=$('kind').value;
+  return (META.arch[k]||[]).concat(S.archExtra||[]);
+}
+function drawArch(){
+  if(!META) return;
+  var k=$('kind').value, n=getCount(), max=META.maxPages;
+  $('count2').value=String(n);                 // 保持两个下拉一致（外部直接改 count 时也同步）
+  $('archTitle').textContent=META.headings[k]||'内容架构';
+  var got=S.archIds.length;
+  $('archCnt').textContent='('+got+'/'+n+')';
+  $('archCnt').className='cnt clickable '+(got===n?'ok':(got>n?'bad':'warn'));
+  $('archCnt').title = (got===n)? '已选 '+got+' 个 · 生成 '+n+' 张'
+                                : '点击把生成数量对齐到已选的 '+got+' 个';
+  /* 提示条不只是报错，直接给可执行动作（一键对齐 / 自动补足） */
+  var note='';
+  if(got>max){
+    note='<div class="note bad act"><span class="txt">已选 '+got+' 个内容架构，超过单次上限 '+max
+       + ' 张。请取消一些架构后再生成。</span></div>';
+  } else if(got>n){
+    note='<div class="note bad act"><span class="txt">已选 '+got+' 个内容架构，当前生成数量只有 '+n
+       + ' 张。可以直接按已选数量生成，或减少勾选。</span>'
+       + '<button class="fix" id="fixAlign">按已选 '+got+' 个生成</button></div>';
+  } else if(got>0 && got<n){
+    note='<div class="note warn act"><span class="txt">已选 '+got+' 个内容架构，少于生成数量 '+n
+       + ' 张。可以继续勾选，或让系统按内置顺序补足。</span>'
+       + '<button class="fix" id="fixFill">自动补足到 '+n+' 个</button></div>';
+  }
+  /* 🔴 提示条统一在本函数**末尾**一次性写入（见下方 archNote.innerHTML=note）。
+     不在这里提前写：早先写法是「先写入 → 绑 onclick → 末尾 innerHTML += 追加提示」，
+     那一步会重建全部子节点把 onclick 抹成 null，按钮点了没反应（2026-11-18 真跑踩到）。
+     现在动作按钮走事件委托（绑在 archNote 容器上），双保险。 */
+  var arr=allArch(), builtin={};
+  (META.arch[k]||[]).forEach(function(a){ builtin[a.id]=1; });
+  var h='';
+  for(var i=0;i<arr.length;i++){
+    var a=arr[i], on=S.archIds.indexOf(a.id)>=0;
+    h += '<div class="acard'+(on?' on':'')+'" data-id="'+esc(a.id)+'">'
+       + '<div class="at">'+esc(a.title)+(builtin[a.id]?'':'<span class="tag">AI 自创</span>')+'</div>'
+       + '<div class="ad">'+esc(a.subtitle)+'</div></div>';
+  }
+  $('archGrid').innerHTML=h;
+  var cs=$('archGrid').querySelectorAll('.acard');
+  for(var m=0;m<cs.length;m++) cs[m].onclick=function(){
+    var id=this.getAttribute('data-id'), i=S.archIds.indexOf(id);
+    if(i>=0) S.archIds.splice(i,1); else S.archIds.push(id);
+    drawArch();
+  };
+  $('btnPrompt').disabled=(got===0);
+  /* 底部实时说清「选几个 → 出几张 → 花多少积分」，不用户自己算 */
+  var c=$('archCost');
+  if(got===0){ c.textContent='请至少选择 1 个内容架构'; c.className='cost'; }
+  else if(got===n){ c.textContent='已选 '+got+' 个 · 将生成 '+n+' 张 · '+(n*UNIT)+' 积分'; c.className='cost'; }
+  else { c.textContent='已选 '+got+' 个 · 生成数量 '+n+' 张（需一致才能继续）'; c.className='cost bad'; }
+  /* 数量改了但提示词还是旧页数 → 明确提醒重新生成，避免拿 1 页的提示词去出 8 张。
+     一次性拼进 note 再写入（不用 innerHTML +=，避免重建子节点）。 */
+  if(S.prompt){
+    var pn=nPages();
+    if(pn && pn!==n){
+      note += '<div class="note warn">生成数量已改为 '+n+' 张，但现有提示词是 '+pn
+            + ' 页。请重新生成提示词，否则会按 '+pn+' 页出图。</div>';
+    }
+  }
+  $('archNote').innerHTML=note;
+}
+
+/* ---------- 步骤3：提示词 ---------- */
+$('btnPrompt').onclick=function(){
+  var n=getCount(), got=S.archIds.length, max=META?META.maxPages:15;
+  if(got>max){ toast('最多 '+max+' 张，请先取消一些架构（当前已选 '+got+' 个）', 5000); return; }
+  if(got>n){ toast('已选 '+got+' 个架构、生成数量 '+n+' 张。点上方「按已选 '+got+' 个生成」可一键对齐。', 5000); return; }
+  if(got<n){ toast('已选 '+got+' 个架构、生成数量 '+n+' 张。点上方「自动补足到 '+n+' 个」可一键补齐。', 5000); return; }
+  go(3);
+  S.prompt=''; S.rawMode=false;
+  $('pCards').innerHTML=''; $('pNav').innerHTML=''; $('pEdit').value='';
+  $('pNote').innerHTML='<div class="load"><div class="spin" style="width:26px;height:26px;border-width:3px"></div>'
+    +'<div class="big">AI 正在构思电商详情页视觉方案...</div><div class="tip" id="pTip"></div></div>';
+  var ti=0; clearInterval(S.tipTimer);
+  S.tipTimer=setInterval(function(){ var e=$('pTip'); if(e){ e.textContent=PTIPS[ti%PTIPS.length]; ti++; } }, 3000);
+  var b=this; b.disabled=true;
+  postJSON('api/prompt', readOpt()).then(function(r){
+    S.prompt=r.prompt; $('pNote').innerHTML = r.warn? '<div class="note warn">'+esc(r.warn)+'</div>' : '';
+    drawPrompt(); updGenBtn();
+  }).catch(function(e){
+    $('pNote').innerHTML='<div class="note bad">'+esc(e.message)+'</div>';
+    toast(e.message);
+  }).then(function(){ clearInterval(S.tipTimer); b.disabled=false; drawArch(); });
+};
+function mdLite(t){
+  var h=esc(t);
+  h=h.replace(/^###\s*(.+)$/gm,'<h4>$1</h4>').replace(/^##\s*(.+)$/gm,'<h4>$1</h4>').replace(/^#\s*(.+)$/gm,'<h3>$1</h3>');
+  h=h.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  return h;
+}
+/* ---------- 提示词分屏 ----------
+   拆页正则与后端 prompts.RE_SPLIT 严格同源（只认行首「第 N 页」）。
+   🔴 关键设计：**每页的原始标题行单独保存**（head），编辑只改正文（body），
+   重组时 head + body 拼回去 —— 用户永远改不到页标识，拆页不会错乱。 */
+var RE_SPLIT_JS = /^[ \t]*#*[ \t]*第[ \t]*(\d+)[ \t]*页[ \t]*[：:]?[ \t]*/gm;
+var PAGE_FIELDS = ['展示方式与视角','设计目标与核心表达','产品呈现与占比','本页图片尺寸比例',
+  '构图与排版','必须显示的画面文字','文字位置与排版','视觉重点与卖点','背景与装饰元素',
+  '氛围、情绪与光影','模特要求','禁止事项','AI生图Prompt(中文)'];
+
+/* 把整篇拆成 {global, pages:[{no, head, title, body}]}；head 含原始「第N页」整行 */
+function parsePrompt(txt){
+  txt = txt || '';
+  var lines = txt.split('\n'), pages = [], gLines = [], cur = null;
+  var re = /^[ \t]*#*[ \t]*第[ \t]*(\d+)[ \t]*页[ \t]*[：:]?[ \t]*(.*)$/;
+  for(var i=0;i<lines.length;i++){
+    var m = lines[i].match(re);
+    if(m){
+      if(cur) pages.push(cur);
+      cur = {no:parseInt(m[1],10), head:lines[i], title:(m[2]||'').trim(), body:[]};
+    } else if(cur){ cur.body.push(lines[i]); }
+    else { gLines.push(lines[i]); }
+  }
+  if(cur) pages.push(cur);
+  return {global:gLines.join('\n').replace(/^\s*#+\s*整体设计规范\s*$/m,'').trim(),
+          pages:pages.map(function(p){ return {no:p.no, head:p.head, title:p.title, body:p.body.join('\n').trim()}; })};
+}
+/* 重组：标题行原样 + 正文，保证标识不被改坏 */
+function joinPrompt(o){
+  var out = (o.global||'').trim();
+  for(var i=0;i<o.pages.length;i++){
+    out += (out? '\n\n' : '') + o.pages[i].head + '\n' + (o.pages[i].body||'').trim();
+  }
+  return out;
+}
+/* 抽字段（与后端 prompts.field 同源）*/
+function pField(text, label){
+  var esc=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  var m=(text||'').match(new RegExp('- \\*\\*'+esc+'\\*\\*[：:]\\s*([\\s\\S]*?)(?=\\n- \\*\\*|\\n## |$)'));
+  return m? m[1].trim() : '';
+}
+function pTitle(text, label){
+  var m=(text||'').match(new RegExp(label+'必须显示为[：:]\\s*[“"]([^”"]+)[”"]'));
+  /* 与后端 prompts.title_of 同源：剥掉 AI 爱加的 Markdown 装饰（**标题**） */
+  return m? m[1].replace(/^[\s*_#`~]+|[\s*_#`~]+$/g,'').trim() : '';
+}
+function drawPrompt(){
+  var o = parsePrompt(S.prompt);
+  S.parsed = o;
+  var n = o.pages.length;
+  $('pCnt').textContent = n? ('共 '+n+' 屏') : '';
+  $('pCnt').classList.toggle('hide', !n);
+  $('pBody').classList.toggle('hide', S.folded);
+  $('btnFold').textContent = S.folded? '展开' : '收起';
+  $('btnMode').classList.toggle('on', S.rawMode);
+  $('btnMode').textContent = S.rawMode? '回到分屏' : '整篇编辑';
+  $('pRaw').classList.toggle('hide', !S.rawMode);
+  $('pCards').classList.toggle('hide', S.rawMode);
+  $('pNav').classList.toggle('hide', S.rawMode || n<2);
+  if(S.rawMode){ $('pEdit').value = S.prompt||''; updGenBtn(); return; }
+
+  /* 页码导航 */
+  var nav='';
+  for(var i=0;i<n;i++) nav += '<button class="np" data-go="'+i+'">第 '+o.pages[i].no+' 屏</button>';
+  $('pNav').innerHTML = nav;
+
+  /* 卡片：全局规范 + 每屏 */
+  var h='';
+  if(o.global){
+    h += '<div class="pcard glob" id="pc-g"><div class="ch"><div class="no">全局</div>'
+       + '<div class="ct"><div class="t1">整体设计规范</div>'
+       + '<div class="t2">色彩 / 字体 / 视觉语言 / 摄影风格 / 模特一致性 —— 对每一屏都生效</div></div>'
+       + '<div class="ca"><button class="btn ghost" data-edit="g">编辑</button>'
+       + '<button class="btn ghost" data-copy="g">复制</button></div></div>'
+       + '<div class="cb"><div class="md" id="pv-g">'+mdLite(o.global)+'</div>'
+       + '<textarea class="pe hide" id="pe-g"></textarea>'
+       + '<div class="pmini hide" id="pm-g"><button class="btn" data-save="g">保存</button>'
+       + '<button class="btn ghost" data-cancel="g">取消</button></div></div></div>';
+  }
+  for(var k=0;k<n;k++){
+    var p=o.pages[k];
+    var texts=pField(p.body,'必须显示的画面文字') || p.body;
+    var mt=pTitle(texts,'主标题'), st=pTitle(texts,'副标题');
+    var arch=(p.title||'').replace(/^\[|\]$/g,'');
+    h += '<div class="pcard" id="pc-'+k+'"><div class="ch"><div class="no">'+p.no+'</div>'
+       + '<div class="ct"><div class="t1">'+esc(mt||arch||('第 '+p.no+' 屏'))+'</div>'
+       + '<div class="t2">'+(st? esc(st)+' · ' : '')+(arch? esc(arch) : '本页画面要求')+'</div></div>'
+       + '<div class="ca"><button class="btn ghost" data-edit="'+k+'">编辑</button>'
+       + '<button class="btn ghost" data-copy="'+k+'">复制</button></div></div>'
+       + '<div class="cb"><div class="flds" id="pv-'+k+'">'+renderFields(p.body)+'</div>'
+       + '<textarea class="pe hide" id="pe-'+k+'"></textarea>'
+       + '<div class="pmini hide" id="pm-'+k+'"><button class="btn" data-save="'+k+'">保存本屏</button>'
+       + '<button class="btn ghost" data-cancel="'+k+'">取消</button></div></div></div>';
+  }
+  if(!n && !o.global){
+    h = '<div class="empty"><div class="ei">✎</div><div style="font-weight:700;color:var(--sub)">等待生成</div>'
+      + '<div style="font-size:12.5px">点右上「整篇编辑」也可以直接手输提示词</div></div>';
+  }
+  $('pCards').innerHTML = h;
+  updGenBtn();
+}
+/* 13 字段结构化；没匹配到的字段不硬造，剩余原文兜底展示 */
+function renderFields(body){
+  var h='', hit=0;
+  for(var i=0;i<PAGE_FIELDS.length;i++){
+    var f=PAGE_FIELDS[i], v=pField(body,f);
+    if(!v) continue;
+    hit++;
+    var hl=(f==='必须显示的画面文字');
+    h += '<div class="fld2'+(hl?' hl':'')+'"><div class="fn">'+esc(f)+'</div>'
+       + '<div class="fv">'+esc(v)+'</div></div>';
+  }
+  if(!hit) return '<div class="fld2"><div class="fn">本页内容</div><div class="fv">'+esc(body)+'</div></div>';
+  return h;
+}
+/* 事件委托：卡片内所有动作按钮（innerHTML 会重写，绝不逐个绑 onclick） */
+$('pCards').addEventListener('click', function(ev){
+  var t=ev.target;
+  while(t && t!==this && !(t.getAttribute && (t.getAttribute('data-edit')||t.getAttribute('data-copy')
+        ||t.getAttribute('data-save')||t.getAttribute('data-cancel')))) t=t.parentNode;
+  if(!t || t===this) return;
+  var k;
+  if((k=t.getAttribute('data-edit'))!==null) return editCard(k);
+  if((k=t.getAttribute('data-copy'))!==null) return copyCard(k, t);
+  if((k=t.getAttribute('data-save'))!==null) return saveCard(k);
+  if((k=t.getAttribute('data-cancel'))!==null) return cancelCard(k);
+});
+$('pNav').addEventListener('click', function(ev){
+  var t=ev.target;
+  while(t && t!==this && !t.getAttribute('data-go')) t=t.parentNode;
+  if(!t || t===this) return;
+  var el=$('pc-'+t.getAttribute('data-go'));
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+});
+function cardEls(k){
+  return {v:$('pv-'+k), e:$('pe-'+k), m:$('pm-'+k)};
+}
+function editCard(k){
+  var o=S.parsed, el=cardEls(k);
+  if(!el.e) return;
+  el.e.value = (k==='g')? o.global : o.pages[parseInt(k,10)].body;
+  el.v.classList.add('hide'); el.e.classList.remove('hide'); el.m.classList.remove('hide');
+  el.e.focus();
+}
+function cancelCard(k){
+  var el=cardEls(k);
+  if(!el.e) return;
+  el.e.classList.add('hide'); el.m.classList.add('hide'); el.v.classList.remove('hide');
+}
+function copyCard(k, btn){
+  var o=S.parsed;
+  var t = (k==='g')? o.global : (o.pages[parseInt(k,10)].head+'\n'+o.pages[parseInt(k,10)].body);
+  copyText(t, btn, '复制');
+}
+function saveCard(k){
+  var el=cardEls(k), v=(el.e.value||'').trim();
+  if(!v){ toast('内容不能为空'); return; }
+  var o=S.parsed;
+  if(k==='g') o.global=v;
+  else {
+    var i=parseInt(k,10);
+    /* 防呆：用户若在正文里手打了「第 N 页」行，会被后端当成新页 → 提前拦掉 */
+    if(/^[ \t]*#*[ \t]*第[ \t]*\d+[ \t]*页/m.test(v)){
+      toast('本屏正文里不要再写「第 N 页」标题行，页标识由系统保管', 5000); return;
+    }
+    o.pages[i].body=v;
+  }
+  var full=joinPrompt(o);
+  postJSON('api/prompt/save', {tid:S.tid, prompt:full, opt:readOpt()}).then(function(r){
+    S.prompt=full; drawPrompt(); drawArch();
+    toast(k==='g'? '整体设计规范已保存' : ('第 '+o.pages[parseInt(k,10)].no+' 屏已保存'));
+  }).catch(function(e){ toast(e.message); });
+}
+function copyText(t, btn, back){
+  if(!t){ toast('没有内容'); return; }
+  (navigator.clipboard? navigator.clipboard.writeText(t) : Promise.reject())
+    .then(function(){ var old=btn.textContent; btn.textContent='已复制'; btn.classList.add('on');
+      setTimeout(function(){ btn.textContent=back||old; btn.classList.remove('on'); }, 1800); })
+    .catch(function(){ toast('复制失败，请手动选择文本'); });
+}
+/* 整篇编辑（兜底：想大改结构时用） */
+$('btnMode').onclick=function(ev){
+  ev.stopPropagation();
+  if(S.rawMode){ saveRaw(); } else { S.rawMode=true; drawPrompt(); }
+};
+$('btnRawSave').onclick=function(ev){ ev.stopPropagation(); saveRaw(); };
+$('btnRawCancel').onclick=function(ev){ ev.stopPropagation(); S.rawMode=false; drawPrompt(); };
+function saveRaw(){
+  var v=($('pEdit').value||'').trim();
+  if(!v){ toast('提示词不能为空'); return; }
+  postJSON('api/prompt/save', {tid:S.tid, prompt:v, opt:readOpt()}).then(function(r){
+    S.prompt=v; S.rawMode=false; drawPrompt(); drawArch();
+    if(!r.pages) toast('没识别到「第 N 页」标识，请检查格式', 5000);
+  }).catch(function(e){ toast(e.message); });
+}
+$('btnCopy').onclick=function(ev){
+  ev.stopPropagation();
+  copyText(S.rawMode? $('pEdit').value : S.prompt, this, '复制全部');
+};
+$('btnFold').onclick=function(ev){ ev.stopPropagation(); S.folded=!S.folded; drawPrompt(); };
+$('pHead').onclick=function(){ S.folded=!S.folded; drawPrompt(); };
+
+/* 🔴 必须与后端 prompts.RE_PAGE_NO 同源：只认**行首**的页标题。
+   老写法 /第 \d+ 页/g 会把正文里「模特与第2页一致」这类交叉引用也算进去，
+   导致「预估 3 张、实际拆 7 张」多扣分（2026-11-18 线上真跑复现过）。
+   分屏改造后统一走 parsePrompt，保证「显示的屏数 = 预估张数 = 后端拆页数」三者同源。 */
+function nPages(){ return parsePrompt(S.prompt).pages.length; }
+function updGenBtn(){
+  var n=nPages(), b=$('btnGen');
+  if(S.running){ b.className='btn stop'; b.innerHTML='<span class="spin" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> 停止生成'; b.disabled=false; }
+  else { b.className='btn'; b.textContent='生成详情页图'; b.disabled=(n===0); }
+  $('genCost').textContent = n? ('生成 '+n+' 张图需要消耗 '+(n*UNIT)+' 积分（每张 '+UNIT+' 积分）') : '提示词里需包含「第 N 页」标识';
+  $('genCost').className='cost';
+  /* 步骤3 也提醒：实际出图张数由提示词页数决定，与步骤2 选的数量不一致时说清楚 */
+  var want=getCount();
+  if(n && want && n!==want && !S.running){
+    $('genCost').textContent += ' · 注意：与所选生成数量 '+want+' 张不一致，实际按提示词的 '+n+' 页出图';
+    $('genCost').className='cost bad';
+  }
+}
+
+/* ---------- 步骤4：出图 ---------- */
+$('btnGen').onclick=function(){
+  if(S.running){ doStop(); return; }
+  if(!nPages()){ toast('提示词里没有「第 N 页」标识'); return; }
+  var b=this; b.disabled=true;
+  postJSON('api/generate', {tid:S.tid, prompt:S.prompt, opt:readOpt(), n:nPages()}).then(function(r){
+    S.running=true; S.picked=[]; go(4); startPoll(); updGenBtn();
+  }).catch(function(e){
+    b.disabled=false;
+    if(e.status===402){ toast(e.message, 6000); }
+    else toast(e.message);
+  });
+};
+function doStop(){
+  postJSON('api/tasks/'+S.tid+'/stop', {}).then(function(r){ toast(r.msg||'已停止', 5000); })
+    .catch(function(e){ toast(e.message); });
+}
+$('btnStop').onclick=doStop;
+function startPoll(){
+  clearInterval(S.poll); clearInterval(S.tipTimer);
+  var ti=0;
+  S.tipTimer=setInterval(function(){ var e=$('genTip'); if(e) e.textContent=TIPS[ti++%TIPS.length]; }, 3000);
+  S.poll=setInterval(tick, 2200); tick();
+}
+function tick(){
+  api('api/tasks/'+S.tid).then(function(r){
+    S.pages=r.pages||[];
+    /* 🔴 不能只看会话级 status：单页「重新生成」时会话 status 仍是上次的 done，
+       只看它会让轮询第一轮就退出，页面永远停在「生成中」（2026-11-18 真跑踩到）。
+       正确判据 = 会话在跑 **或** 还有任何一页在 running/queued。 */
+    var pageBusy = S.pages.some(function(p){ return p.status==='running' || p.status==='pending'; });
+    var wasRedo = S.redoing;
+    S.running = (r.status==='running') || (S.redoing && pageBusy);
+    if(!pageBusy) S.redoing=false;
+    drawRes();
+    var pc=r.progress||0;
+    $('genLoad').classList.toggle('hide', !S.running);
+    $('genPct').textContent='正在生成电商图 ('+pc+'%)...';
+    $('genBar').style.width=pc+'%';
+    $('btnStop').classList.toggle('hide', !S.running);
+    updGenBtn();
+    if(!S.running){
+      clearInterval(S.poll); clearInterval(S.tipTimer);
+      refreshPoints();
+      /* 单页重生成走的是自己的计费（dtl_redo），**不能**再调整批退分，
+         否则会把「本次只重做 1 张」误判成「整批只出了 1 张」而乱退。 */
+      if(!wasRedo){
+        postJSON('api/tasks/'+S.tid+'/refund', {}).then(function(rf){
+          if(rf.refunded>0){ toast('已退回 '+rf.refunded+' 积分（未出图部分）', 5000); refreshPoints(); }
+        }).catch(function(){});
+      }
+      if(r.status==='stopped') toast('已停止生图，已生成的图片已保留', 5000);
+      else if(r.err) $('resNote').innerHTML='<div class="note bad">'+esc(r.err)+'</div>';
+    }
+  }).catch(function(e){ clearInterval(S.poll); S.running=false; updGenBtn(); toast(e.message); });
+}
+function drawRes(){
+  var pgs=S.pages||[];
+  $('resEmpty').classList.toggle('hide', pgs.length>0);
+  $('resGrid').classList.toggle('two', S.step!==4);
+  var h='';
+  for(var i=0;i<pgs.length;i++){
+    var p=pgs[i], no=i+1;
+    h += '<div class="rc"><div class="im'+((p.status==='done'&&p.url)?' zoomable':'')+'"'
+       + ((p.status==='done'&&p.url)?(' data-zoom="'+no+'"'):'')+'>';
+    if(p.status==='done' && p.url){
+      h += '<input type="checkbox" class="ck" data-i="'+no+'"'+(S.picked.indexOf(no)>=0?' checked':'')+'>'
+         + '<img src="'+BASE+'/'+p.url+'?v='+(p.w||0)+'" alt="第'+no+'页">'
+         + '<span class="zhint">⊕ 点击看大图</span>';
+    } else if(p.status==='running'){
+      h += '<div class="ph"><div class="spin"></div><div style="margin-top:9px">生成中...</div><div class="bar"><i></i></div></div>';
+    } else if(p.status==='failed'){
+      h += '<div class="ph"><div class="er">'+esc(p.err||'生成失败')+'</div></div>';
+    } else if(p.status==='skipped'){
+      h += '<div class="ph">未生成（已停止）</div>';
+    } else {
+      h += '<div class="ph">排队中...</div>';
+    }
+    h += '</div><div class="ft"><span class="no">第 '+no+' 页'+(p.w?(' · '+p.w+'×'+p.h):'')+'</span>';
+    if(p.status==='done' && p.url) h += '<a class="btn ghost" style="padding:4px 9px;font-size:11.5px" href="'+BASE+'/'+p.url+'" download>下载</a>';
+    if(p.status!=='running') h += '<button class="btn ghost" style="padding:4px 9px;font-size:11.5px" data-redo="'+no+'">重新生成</button>';
+    /* 🔴 2026-11-19：running 页也给一个「强制重试」入口。
+       服务重启会留下 running 僵尸态，后端虽已自愈，但轮询到之前用户界面上
+       只有一个转圈、没有任何可点的东西 —— 给个出口，点了走 redo（后端会先复位僵死态）。 */
+    else h += '<button class="btn ghost" style="padding:4px 9px;font-size:11.5px" data-redo="'+no+'" title="若长时间卡住不动，可强制重试该页">卡住了？重试</button>';
+    h += '</div></div>';
+  }
+  $('resGrid').innerHTML=h;
+  /* 🔴 事件委托绑在容器上：drawRes 每次都重写 innerHTML，
+     直接给子元素绑 onclick 会在下次重绘后失效（本项目 2026-11-18 踩过）。 */
+  if(!$('resGrid')._bound){
+    $('resGrid')._bound = true;
+    $('resGrid').addEventListener('change', function(e){
+      var ck = e.target.closest ? e.target.closest('.ck') : null;
+      if(!ck) return;
+      var i=parseInt(ck.getAttribute('data-i'),10), j=S.picked.indexOf(i);
+      if(ck.checked){ if(j<0) S.picked.push(i); } else if(j>=0) S.picked.splice(j,1);
+      updZip();
+    });
+    $('resGrid').addEventListener('click', function(e){
+      var t = e.target;
+      /* 勾选框、底部按钮/链接一律不触发放大 */
+      if(t.closest && (t.closest('.ck') || t.closest('.ft'))) return;
+      var rb = t.closest ? t.closest('[data-redo]') : null;
+      if(rb){ redo(parseInt(rb.getAttribute('data-redo'),10)); return; }
+      var zm = t.closest ? t.closest('[data-zoom]') : null;
+      if(zm){ LB.open(parseInt(zm.getAttribute('data-zoom'),10)); }
+    });
+  }
+  updZip();
+}
+function updZip(){
+  $('btnZip').textContent='批量下载'+(S.picked.length? (' ('+S.picked.length+')') : '');
+  $('btnZip').disabled=S.running;
+  var done=(S.pages||[]).filter(function(p){ return p.status==='done'; }).length;
+  $('btnAll').disabled=(done===0||S.running);
+  $('btnAll').textContent=(done>0 && S.picked.length===done)? '取消全选' : '全选';
+}
+$('btnAll').onclick=function(){
+  var done=[]; (S.pages||[]).forEach(function(p,i){ if(p.status==='done') done.push(i+1); });
+  S.picked = (S.picked.length===done.length)? [] : done;
+  drawRes();
+};
+$('btnZip').onclick=function(){
+  if(!S.tid) return;
+  var q=S.picked.length? ('?idxs='+S.picked.join(',')) : '';
+  window.location.href = BASE+'/api/tasks/'+S.tid+'/zip'+q;
+};
+function redo(i){
+  postJSON('api/tasks/'+S.tid+'/redo', {idx:i, opt:readOpt()}).then(function(){
+    S.redoing=true; S.running=true; startPoll(); updGenBtn();
+  }).catch(function(e){ toast(e.message, 5000); });
+}
+
+/* ================= 大图灯箱 LB（2026-11-18）=================
+   设计要点：
+   · 打开即加载**原图**（api/tasks/{tid}/png/{idx}，后端已返原图，无需新接口）
+   · 默认「适配窗口」；单击图片 → 放大到 1:1 原始像素（受上限约束）；再单击 → 缩回适配
+   · 滚轮以光标为锚点缩放；拖动平移；双击复位；← → 翻页；Esc / 点遮罩 / ✕ 关闭
+   · 坐标全部相对「适配基准尺寸」计算，换页/换分辨率都不需要重算逻辑
+   🔴 img 必须 pointer-events:none + user-drag:none，否则原生图片拖拽会打断 pointer 链
+   🔴 事件一律绑容器/window，不用 innerHTML 后临时绑（drawRes 会重绘）
+*/
+var LB = (function(){
+  var el, stage, box, img, load, err;
+  var cur = 0;                 // 当前页号（1-based）
+  var nat = {w:0, h:0};        // 原图像素
+  var base = {w:0, h:0};       // 适配窗口后的显示尺寸（zoom=1 基准）
+  var z = 1, px = 0, py = 0;   // 缩放倍数与平移
+  var MINZ = 1, MAXZ = 8;      // 相对适配基准的倍数
+  var open = false, ready = false;
+  var down = null, moved = false;
+  var tapTimer = null;         // 单击延迟判定（用于区分双击）
+  var pinch = null;
+  var ptrHandled = false;      // 本次交互已由 pointer 处理，避免 click 重复触发
+
+  function $(i){ return document.getElementById(i); }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function doneList(){
+    var a=[]; (S.pages||[]).forEach(function(p,i){ if(p.status==='done' && p.url) a.push(i+1); });
+    return a;
+  }
+  function pageOf(no){ return (S.pages||[])[no-1] || null; }
+  function urlOf(no){
+    var p=pageOf(no); if(!p||!p.url) return '';
+    return BASE+'/'+p.url+'?v='+(p.w||0);
+  }
+
+  /* 适配窗口：留出顶栏与提示条的空间。
+     🔴 顶栏高度必须实测（窄屏是两行、桌面是一行），写死数值会让图被顶栏压住。 */
+  function fitBase(){
+    var vw = stage.clientWidth, vh = stage.clientHeight;
+    var barH = $('lbBar') ? $('lbBar').offsetHeight : 48;
+    var narrow = vw < 640;
+    var padX = narrow ? 20 : 96;        // 桌面留出左右翻页按钮位
+    var padY = barH + (narrow ? 104 : 60);   // 顶栏 + 底部提示/翻页区
+    var aw = Math.max(80, vw - padX), ah = Math.max(80, vh - padY);
+    if(!nat.w || !nat.h){ base = {w:aw, h:ah}; return; }
+    var k = Math.min(aw/nat.w, ah/nat.h);
+    base = {w: Math.round(nat.w*k), h: Math.round(nat.h*k)};
+  }
+  function apply(){
+    box.style.width = base.w+'px';
+    box.style.height = base.h+'px';
+    box.style.marginLeft = (-base.w/2)+'px';
+    box.style.marginTop = (-base.h/2)+'px';
+    /* 顶栏两行时把图整体下移，保证不被压住（偏移量按顶栏与底部占位差的一半算） */
+    var barH = $('lbBar') ? $('lbBar').offsetHeight : 48;
+    var narrow = stage.clientWidth < 640;
+    var botH = narrow ? 104 : 60;
+    var shift = Math.round((barH - botH)/2);
+    box.style.transform = 'translate('+px+'px,'+(py+shift)+'px) scale('+z+')';
+    var realPct = nat.w ? Math.round(base.w*z/nat.w*100) : 100;
+    $('lbZoom').textContent = realPct+'%';
+    stage.classList.toggle('zoomed', z>1.001);
+    $('lbOut').disabled = z<=MINZ+0.001;
+    $('lbIn').disabled = z>=MAXZ-0.001;
+    var one = nat.w ? (nat.w/base.w) : 1;
+    $('lbOne').disabled = !ready || Math.abs(z-one)<0.01;
+    $('lbTip').textContent = z>1.001
+      ? '滚轮缩放 · 拖动平移 · 双击复位 · 单击缩回 · ← → 翻页 · Esc 关闭'
+      : '单击图片放大到高清 · 滚轮缩放 · ← → 翻页 · Esc 关闭';
+  }
+  function reset(){ z=1; px=0; py=0; apply(); }
+
+  /* 以视口某点为锚缩放 */
+  function zoomAt(nz, cx, cy){
+    nz = clamp(nz, MINZ, MAXZ);
+    if(Math.abs(nz-z)<1e-4) return;
+    var r = stage.getBoundingClientRect();
+    var ox = (cx==null? r.width/2 : cx-r.left) - r.width/2;
+    var oy = (cy==null? r.height/2 : cy-r.top) - r.height/2;
+    var k = nz/z;
+    px = ox - (ox-px)*k;
+    py = oy - (oy-py)*k;
+    z = nz;
+    if(z<=MINZ+0.001){ z=MINZ; px=0; py=0; }
+    apply();
+  }
+  function toOne(){
+    if(!nat.w) return;
+    zoomAt(clamp(nat.w/base.w, MINZ, MAXZ));
+  }
+
+  function show(no){
+    var list = doneList();
+    if(list.indexOf(no)<0){ toast('该页还没有生成图片'); return; }
+    cur = no; ready = false;
+    if(tapTimer){ clearTimeout(tapTimer); tapTimer=null; }
+    var p = pageOf(no);
+    nat = {w: p.w||0, h: p.h||0};
+    $('lbTitle').textContent = '第 '+no+' 页'+(p.title? ' · '+p.title : '');
+    $('lbMeta').textContent = (p.w&&p.h)? (p.w+'×'+p.h+' px') : '';
+    $('lbDl').href = urlOf(no);
+    $('lbDl').setAttribute('download', '详情页-第'+no+'页.png');
+    $('lbPrev').disabled = list.indexOf(no)<=0;
+    $('lbNext').disabled = list.indexOf(no)>=list.length-1;
+    img.removeAttribute('src');
+    img.style.visibility='hidden';
+    load.classList.remove('hide'); err.classList.add('hide');
+    z=1; px=0; py=0; fitBase(); apply();
+    var u = urlOf(no);
+    /* 用 Image 预加载拿真实像素（记录里的 w/h 可能缺） */
+    var pre = new Image();
+    pre.onload = function(){
+      if(cur!==no) return;
+      nat = {w:pre.naturalWidth, h:pre.naturalHeight};
+      $('lbMeta').textContent = nat.w+'×'+nat.h+' px';
+      img.src = u; img.style.visibility='visible';
+      load.classList.add('hide'); ready=true;
+      fitBase(); reset();
+    };
+    pre.onerror = function(){
+      if(cur!==no) return;
+      load.classList.add('hide');
+      err.textContent = '原图加载失败，可能已过 72h 清理。可关闭后重新生成该页。';
+      err.classList.remove('hide');
+    };
+    pre.src = u;
+  }
+
+  function openAt(no){
+    if(!el) init();
+    open = true;
+    el.classList.add('on');
+    document.body.style.overflow='hidden';
+    show(no);
+  }
+  function close(){
+    open=false; el.classList.remove('on');
+    if(tapTimer){ clearTimeout(tapTimer); tapTimer=null; }
+    document.body.style.overflow='';
+    img.removeAttribute('src'); ready=false;
+    down=null; pinch=null;
+  }
+  function step(d){
+    var list=doneList(), i=list.indexOf(cur);
+    if(i<0) return;
+    var j=i+d;
+    if(j<0||j>=list.length) return;
+    show(list[j]);
+  }
+
+  /* 单击/双击的统一判定：延迟执行单击，第二次点击取消并复位。
+     pointer 与 click 两条路都走这里，用 ptrHandled 去重。 */
+  function tapAt(cx, cy){
+    if(!open || !ready) return;
+    if(tapTimer){
+      clearTimeout(tapTimer); tapTimer=null;
+      reset();
+      return;
+    }
+    tapTimer = setTimeout(function(){
+      tapTimer=null;
+      if(!open||!ready) return;
+      if(z>1.001) reset();
+      else zoomAt(clamp(nat.w/base.w, MINZ, MAXZ), cx, cy);
+    }, 240);
+  }
+
+  function init(){
+    el=$('lb'); stage=$('lbStage'); box=$('lbBox'); img=$('lbImg'); load=$('lbLoad'); err=$('lbErr');
+
+    /* 单击放大 / 再单击缩回；拖动与双击不算单击 */
+    stage.addEventListener('pointerdown', function(e){
+      if(e.pointerType==='touch' && e.isPrimary===false) return;
+      ptrHandled = true;
+      down={x:e.clientX, y:e.clientY, px:px, py:py, t:Date.now(), id:e.pointerId};
+      moved=false;
+      if(z>1.001){ stage.classList.add('grabbing'); el.classList.add('moving');
+        try{ stage.setPointerCapture(e.pointerId); }catch(_){} }
+    });
+    window.addEventListener('pointermove', function(e){
+      if(pinch) return;
+      if(!down) return;
+      var dx=e.clientX-down.x, dy=e.clientY-down.y;
+      if(Math.abs(dx)>4||Math.abs(dy)>4) moved=true;
+      if(z>1.001 && moved){ px=down.px+dx; py=down.py+dy; apply(); }
+    });
+    window.addEventListener('pointerup', function(e){
+      if(!down) return;
+      var wasMoved=moved, dt=Date.now()-down.t;
+      down=null; stage.classList.remove('grabbing'); el.classList.remove('moving');
+      if(wasMoved || dt>500) return;
+      tapAt(e.clientX, e.clientY);
+    });
+    window.addEventListener('pointercancel', function(){
+      down=null; stage.classList.remove('grabbing'); el.classList.remove('moving');
+    });
+    stage.addEventListener('dragstart', function(e){ e.preventDefault(); });
+    /* 原生 dblclick 兜底（部分环境不派发 pointer 序列） */
+    stage.addEventListener('dblclick', function(e){
+      e.preventDefault();
+      if(tapTimer){ clearTimeout(tapTimer); tapTimer=null; }
+      reset();
+    });
+
+    stage.addEventListener('wheel', function(e){
+      if(!open||!ready) return;
+      e.preventDefault();
+      el.classList.add('moving');
+      zoomAt(z*(e.deltaY<0?1.14:1/1.14), e.clientX, e.clientY);
+      clearTimeout(stage._wt);
+      stage._wt=setTimeout(function(){ el.classList.remove('moving'); }, 140);
+    }, {passive:false});
+
+    /* 触屏双指缩放。
+       🔴 进入 pinch 必须同时清掉 tapTimer 与 down，并把 ptrHandled 置真，
+       否则 pinch 结束后残留的单击判定会把缩放又改回去（已踩）。 */
+    stage.addEventListener('touchstart', function(e){
+      if(e.touches.length===1 && !down){
+        var t=e.touches[0];
+        down={x:t.clientX, y:t.clientY, px:px, py:py, t:Date.now(), id:'touch'};
+        moved=false; ptrHandled=true;
+        if(z>1.001) el.classList.add('moving');
+      }
+      if(e.touches.length===2){
+        var a=e.touches[0], b=e.touches[1];
+        pinch={d:Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY), z:z};
+        down=null; ptrHandled=true;
+        if(tapTimer){ clearTimeout(tapTimer); tapTimer=null; }
+        el.classList.add('moving');
+      }
+    }, {passive:true});
+    stage.addEventListener('touchmove', function(e){
+      if(pinch && e.touches.length===2){
+        e.preventDefault();
+        var a=e.touches[0], b=e.touches[1];
+        var d=Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+        if(pinch.d>0) zoomAt(pinch.z*(d/pinch.d), (a.clientX+b.clientX)/2, (a.clientY+b.clientY)/2);
+        return;
+      }
+      /* 单指拖动：部分触屏环境不派发 pointermove，这里兜底 */
+      if(!pinch && e.touches.length===1 && down && z>1.001){
+        var t=e.touches[0];
+        var dx=t.clientX-down.x, dy=t.clientY-down.y;
+        if(Math.abs(dx)>4||Math.abs(dy)>4){
+          e.preventDefault(); moved=true; ptrHandled=true;
+          px=down.px+dx; py=down.py+dy; apply();
+        }
+      }
+    }, {passive:false});
+    stage.addEventListener('touchend', function(e){
+      if(!pinch && down && e.touches.length===0){
+        var wasMoved=moved, dt=Date.now()-down.t;
+        /* 🔴 坐标优先取 changedTouches，取不到就回落按下时的坐标：
+           某些环境（含自动化合成事件）touchend 的 changedTouches 可能为空，
+           若直接 return 会导致「触屏单击完全没反应」（已踩）。 */
+        var ct=(e.changedTouches && e.changedTouches[0]) || null;
+        var tx=ct? ct.clientX : down.x, ty=ct? ct.clientY : down.y;
+        down=null; el.classList.remove('moving');
+        if(!wasMoved && dt<=500){ tapAt(tx, ty); }
+        setTimeout(function(){ ptrHandled=false; }, 350);
+        return;
+      }
+      if(pinch && e.touches.length<2){
+        pinch=null; el.classList.remove('moving');
+        down=null; ptrHandled=true;      // 吞掉 pinch 尾随的 click
+        setTimeout(function(){ ptrHandled=false; }, 350);
+      }
+    }, {passive:true});
+
+    /* click 兜底 + 点遮罩关闭。
+       🔴 部分触屏环境只派发 click 不派发 pointer 序列（CDP 模拟与某些 WebView），
+       所以单击放大必须在这里也走一遍；ptrHandled 保证鼠标路径不重复触发。 */
+    stage.addEventListener('click', function(e){
+      if(!ready){ ptrHandled=false; return; }
+      var r=box.getBoundingClientRect();
+      var hit = e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom;
+      if(!hit){ close(); ptrHandled=false; return; }
+      if(ptrHandled){ ptrHandled=false; return; }   // 已由 pointerup 处理
+      tapAt(e.clientX, e.clientY);
+    });
+
+    $('lbClose').onclick=close;
+    $('lbIn').onclick=function(){ zoomAt(z*1.35); };
+    $('lbOut').onclick=function(){ zoomAt(z/1.35); };
+    $('lbFit').onclick=reset;
+    $('lbOne').onclick=toOne;
+    $('lbPrev').onclick=function(){ step(-1); };
+    $('lbNext').onclick=function(){ step(1); };
+
+    document.addEventListener('keydown', function(e){
+      if(!open) return;
+      if(e.key==='Escape'){ e.preventDefault(); close(); }
+      else if(e.key==='ArrowLeft'){ e.preventDefault(); step(-1); }
+      else if(e.key==='ArrowRight'){ e.preventDefault(); step(1); }
+      else if(e.key==='+'||e.key==='='){ e.preventDefault(); zoomAt(z*1.35); }
+      else if(e.key==='-'||e.key==='_'){ e.preventDefault(); zoomAt(z/1.35); }
+      else if(e.key==='0'){ e.preventDefault(); reset(); }
+      else if(e.key==='1'){ e.preventDefault(); toOne(); }
+    });
+
+    var rt;
+    window.addEventListener('resize', function(){
+      if(!open) return;
+      clearTimeout(rt);
+      rt=setTimeout(function(){ var old=base.w; fitBase();
+        if(old){ var k=old/base.w; px*=k; py*=k; } apply(); }, 140);
+    });
+  }
+
+  return { open: openAt, close: close, isOpen: function(){ return open; } };
+})();
+
+init();
+</script>
+</body>
+</html>

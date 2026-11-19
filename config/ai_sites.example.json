@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "model_order": [
+    "gpt-image-2",
+    "gpt-image-2.5",
+    "gpt-image-2.5-flare",
+    "gpt-image-2.5-sunburst",
+    "gpt-image-2.6"
+  ],
+  "routing": {
+    "multi": {
+      "sites": [
+        "huahuaapi"
+      ],
+      "models": [
+        "gpt-image-2",
+        "gpt-image-2.5",
+        "gpt-image-2.6",
+        "gpt-image-2.6-sunburst"
+      ],
+      "timeout": 600
+    },
+    "i2i": {
+      "sites": [
+        "lensapi",
+        "huahuaapi"
+      ],
+      "models": [
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5",
+        "gpt-image-2",
+        "gpt-image-2.6",
+        "gpt-image-2.6-sunburst",
+        "gpt-image-2.5-flare"
+      ],
+      "timeout": 420
+    },
+    "t2i": {
+      "sites": [
+        "lensapi",
+        "huahuaapi",
+        "apib"
+      ],
+      "models": [],
+      "timeout": 420
+    },
+    "single": {
+      "sites": [
+        "lensapi",
+        "huahuaapi",
+        "apib"
+      ],
+      "models": [],
+      "timeout": 420
+    }
+  },
+  "sites": [
+    {
+      "name": "apib",
+      "label": "apib.ai（gpt-image-2 · 异步）",
+      "base": "https://api.apib.ai/v1",
+      "key": "REPLACE_WITH_YOUR_API_KEY",
+      "protocol": "apib",
+      "models": [
+        "gpt-image-2",
+        "gemini-3-pro-image-preview",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3.1-flash-lite-image",
+        "gemini-nano-banana-2.1"
+      ],
+      "enabled": false
+    },
+    {
+      "name": "lensapi",
+      "label": "lensapi.cn",
+      "base": "https://lensapi.cn",
+      "key": "REPLACE_WITH_YOUR_API_KEY",
+      "protocol": "openai",
+      "models": [
+        "gpt-image-2",
+        "gpt-image-2.5",
+        "gpt-image-2.5-flare",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.6"
+      ],
+      "enabled": true
+    },
+    {
+      "name": "grsai",
+      "label": "grsaiapi.com",
+      "base": "https://grsaiapi.com",
+      "key": "REPLACE_WITH_YOUR_API_KEY",
+      "protocol": "openai",
+      "models": [
+        "gpt-image-2",
+        "gpt-image-2.5",
+        "nano-banana-2.1",
+        "nano-banana-2"
+      ],
+      "enabled": false
+    },
+    {
+      "name": "huahuaapi",
+      "label": "花花API",
+      "base": "https://api.huahuaapi.com",
+      "key": "REPLACE_WITH_YOUR_API_KEY",
+      "protocol": "openai",
+      "models": [
+        "gpt-image-2",
+        "gpt-image-2.5",
+        "gpt-image-2.5-flare",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.6",
+        "gpt-image-2.6-sunburst"
+      ],
+      "enabled": true
+    }
+  ]
+}

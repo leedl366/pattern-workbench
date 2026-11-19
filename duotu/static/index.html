@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>多图融合编辑工作台 · 图1-图5</title>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --ink:#1b1f24; --muted:#6b7280; --line:#e5e7eb;
+  --accent:#2563eb; --accent-soft:#eff6ff; --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
+  --radius:14px; --shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;padding-bottom:140px}
+header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{font-size:17px;font-weight:700;letter-spacing:.2px}
+.logo span{color:var(--accent)}
+.sub{color:var(--muted);font-size:12px}
+.pill{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);border:1px solid #dbeafe}
+.pill.gray{background:#f3f4f6;color:#4b5563;border-color:var(--line)}
+main{max-width:1360px;margin:0 auto;padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+h2{font-size:14px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+h2 .n{width:20px;height:20px;border-radius:6px;background:var(--ink);color:#fff;font-size:11px;display:grid;place-items:center}
+/* 图位 */
+.slots{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.slot{border:1px dashed #cbd5e1;border-radius:12px;background:#fbfcfe;overflow:hidden;display:flex;flex-direction:column;min-height:190px;transition:.15s}
+.slot:hover{border-color:var(--accent);background:#fff}
+.slot.has{border-style:solid;border-color:#dbeafe;background:#fff}
+.slot .tag{padding:6px 10px;font-size:12px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#fafbfc}
+.slot .ph{flex:1;display:grid;place-items:center;cursor:pointer;color:#94a3b8;font-size:12px;text-align:center;padding:10px}
+.slot img.thumb{width:100%;height:118px;object-fit:contain;background:#f8fafc;border-bottom:1px solid var(--line);cursor:pointer}
+.slot .meta{padding:6px 8px;font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.slot select{width:100%;font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.del{color:var(--bad);cursor:pointer;font-size:11px}
+/* 需求输入 */
+.row{display:flex;gap:12px;flex-wrap:wrap}
+textarea{width:100%;min-height:88px;border:1px solid var(--line);border-radius:12px;padding:12px;font:14px/1.6 inherit;resize:vertical;outline:none}
+textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.chip{font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;color:#374151;cursor:pointer}
+.chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.ghost{background:#fff;color:#374151;border:1px solid var(--line)}
+.btn.sm{padding:6px 12px;font-size:12px}
+/* 方案 */
+.steps{display:flex;flex-direction:column;gap:8px}
+.step{display:flex;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fcfdff}
+.step .no{width:22px;height:22px;flex:0 0 22px;border-radius:7px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;display:grid;place-items:center}
+.step .t{font-weight:600;font-size:13px}
+.step .d{font-size:12.5px;color:#374151}
+.step .w{font-size:11.5px;color:var(--muted);margin-top:3px}
+/* 结果 */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.ver{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+.ver.best{border-color:var(--ok);box-shadow:0 0 0 2px rgba(22,163,74,.15)}
+.ver .hd{padding:8px 10px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);background:#fafbfc}
+.ver .nm{font-weight:700;font-size:13px}
+.ver .sc{font-size:11px;padding:2px 8px;border-radius:999px;background:#f3f4f6;color:#374151}
+.ver.best .sc{background:#dcfce7;color:#15803d}
+.ver img{width:100%;height:220px;object-fit:contain;background:#f8fafc;cursor:zoom-in}
+.ms{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:8px 10px;font-size:11.5px;color:#374151}
+.ms b{color:var(--ink)}
+.ms .k{color:var(--muted)}
+.ver .ft{padding:8px 10px;display:flex;gap:6px;border-top:1px solid var(--line)}
+.ver .vision{padding:8px 10px;font-size:11.5px;color:#374151;background:#faf9ff;border-top:1px dashed #e5e7eb;white-space:pre-wrap;max-height:170px;overflow:auto;line-height:1.55}
+/* 聊天 */
+.chat{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(16,24,40,.07);z-index:30}
+.chat .hd2{max-width:1360px;margin:0 auto;padding:8px 20px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.chat .body{max-width:1360px;margin:0 auto;padding:0 20px 12px;max-height:38vh;overflow:auto}
+.msgs{display:flex;flex-direction:column;gap:10px;padding:8px 0}
+.ptext{white-space:pre-wrap;line-height:1.62;font-size:12.5px}
+.planact{display:flex;gap:8px;align-items:center;margin-top:9px;flex-wrap:wrap}
+.basebar{display:none;align-items:center;gap:8px;font-size:12px;padding:6px 10px;margin:4px 0 6px;border-radius:9px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
+.basebar.on{display:flex}
+.basebar .x{margin-left:auto;cursor:pointer;color:#047857;font-weight:700}
+.msg{max-width:78%;padding:9px 12px;border-radius:12px;font-size:13px;white-space:pre-wrap}
+.msg.me{align-self:flex-end;background:var(--accent);color:#fff}
+.msg.ai{align-self:flex-start;background:#f3f4f6;color:#1f2937}
+.msg .mv{margin-top:6px;font-size:12px}
+.cin{display:flex;gap:8px;align-items:flex-end}
+.cin textarea{min-height:44px;max-height:120px}
+.hint{font-size:11.5px;color:var(--muted)}
+.empty{color:var(--muted);font-size:13px;padding:22px;text-align:center;border:1px dashed var(--line);border-radius:12px}
+.toast{position:fixed;top:14px;right:14px;background:#111827;color:#fff;padding:9px 14px;border-radius:10px;font-size:13px;z-index:99;opacity:0;transition:.2s}
+.toast.on{opacity:1}
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.72);display:none;place-items:center;z-index:100;padding:24px}
+.modal.on{display:grid}
+.modal img{max-width:94vw;max-height:90vh;border-radius:10px;background:#fff}
+/* 页面内确认框（替代 confirm/prompt —— 内嵌浏览器里原生弹窗常被屏蔽） */
+.dlg{position:fixed;inset:0;background:rgba(15,23,42,.62);display:none;place-items:center;z-index:120;padding:20px}
+.dlg.on{display:grid}
+.dlgbox{background:#fff;border-radius:14px;max-width:440px;width:100%;padding:18px;box-shadow:0 24px 64px rgba(0,0,0,.28)}
+.dlgbox h3{margin:0 0 8px;font-size:15px}
+.dlgbox p{margin:0 0 12px;color:#374151;font-size:13px;white-space:pre-wrap;line-height:1.6}
+.dlgbox input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;font:14px inherit;outline:none}
+.dlgbox input:focus{border-color:var(--accent)}
+.dlgb{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.dlgb button{padding:8px 15px;border-radius:9px;border:1px solid var(--line);background:#fff;color:#374151;cursor:pointer;font-size:13px;font-weight:600}
+.dlgb button:hover{border-color:var(--accent);color:var(--accent)}
+.dlgb button.ok{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dlgb button.ok:hover{opacity:.9;color:#fff}
+.dlgb button.ok.danger{background:var(--bad);border-color:var(--bad)}
+.dlgb button.ok.danger:hover{opacity:.9;color:#fff}
+/* 历史生成图（参考图位下方） */
+.galhd{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.gstrip{display:flex;gap:10px;overflow-x:auto;padding:10px 2px 4px}
+.gcard{flex:0 0 108px;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.gcard.cur{border-color:var(--ok);box-shadow:0 0 0 2px rgba(22,163,74,.16)}
+.gcard img{width:100%;height:84px;object-fit:contain;background:#f8fafc;display:block;cursor:zoom-in;border-bottom:1px solid var(--line)}
+.gcard .gn{font-size:10.5px;color:var(--muted);padding:4px 6px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gcard .gb{display:flex;gap:4px;padding:0 6px 6px}
+.gcard .gb button{flex:1;font-size:10.5px;padding:4px 2px;border-radius:6px;border:1px solid var(--line);background:#fff;color:#374151;cursor:pointer;white-space:nowrap}
+.gcard .gb button:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.gcard .gb button.x{flex:0 0 28px;color:var(--bad);font-weight:700}
+.gcard .gb button.x:hover{border-color:var(--bad);color:var(--bad);background:#fef2f2}
+#boxModal{flex-direction:column;gap:10px}
+#boxModal img{max-height:74vh;max-width:92vw;display:block}
+.boxwrap{position:relative;display:inline-block;line-height:0}
+#boxSel{position:absolute;border:2px solid #dc2626;background:rgba(220,38,38,.16);display:none;pointer-events:none}
+@media(max-width:980px){.slots{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">多图融合编辑<span>工作台</span></div>
+  <div class="sub">图1-图5 · 先出方案再执行 · 结果可继续聊天微调</div>
+  <div style="flex:1"></div>
+  <button id="coskey" style="font-size:12px;padding:5px 11px;border-radius:9px;background:#fffbeb;border:1px solid #fde68a;color:#92400e">☁️ 存储设置</button>
+  <a href="parts.html" target="_blank" style="font-size:12px;color:#059669;text-decoration:none;border:1px solid #bfe3d4;background:#effaf4;padding:5px 11px;border-radius:9px">分部位编辑</a>
+  <a href="help.html" target="_blank" style="font-size:12px;color:var(--brand);text-decoration:none;border:1px solid #bfdbfe;background:#eff6ff;padding:5px 11px;border-radius:9px">使用说明</a>
+  <select id="engineSel" style="font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px;background:#fff">
+    <option value="prog">程序引擎 · 本地秒出</option>
+    <option value="ai">AI 引擎 · gpt-image-2</option>
+  </select>
+  <div class="pill gray" id="stat">就绪</div>
+</header>
+
+<main>
+  <section class="card">
+    <h2><i class="n">1</i>参考图位（图1 - 图5，按上传顺序排列）</h2>
+    <div class="slots" id="slots"></div>
+    <div class="hint" style="margin-top:10px">放图方式：点击任意图位选文件 · 直接把图片<b>拖进</b>来 · 或在页面里 <b>Ctrl+V 粘贴</b>剪贴板里的图（会自动落到第一个空位）。</div>
+    <div class="hint" style="margin-top:4px">角色说明：<b>材质源</b>=提供颜色/质感 · <b>图案源</b>=提供要贴的图案 · <b>目标底图</b>=被编辑的图 · <b>形态底图</b>=用它当最终机身外形 · <b>参考图</b>=仅参考不参与计算。可自动识别，也可手动改。</div>
+
+    <div id="galWrap" style="display:none">
+      <div class="galhd">
+        <div class="hint"><b style="color:var(--ink);font-size:13px">历史生成图</b>（每次出图自动累加，最新在前 · 共 <b id="galN">0</b> 张）</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn sm ghost" id="galReload">刷新</button>
+          <button class="btn sm ghost" id="galClear">清空全部</button>
+        </div>
+      </div>
+      <div class="gstrip" id="gallery"></div>
+      <div class="hint" style="margin-top:2px">「加入图位」＝把这张生成图放回上面的图1-图5 继续当底图/参考编辑（默认角色=目标底图，下拉可改）· ✕ 或结果卡的「删除」＝真删文件。回填后建议只描述「要改的那一点」，避免同一套动作二次叠加把图压过头。</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><i class="n">2</i>融合需求（一句话说清楚怎么合）</h2>
+    <textarea id="prompt" placeholder="例：把图2的手机壳材质换成图1的银白材质，卡通图案不变重新贴上去，左边小熊之家只留小熊、去掉底部原托，摄像头区域不要有图案"></textarea>
+    <div class="chips">
+      <div class="chip">把图2的手机壳材质换成图1的材质，图案不变重新贴上</div>
+      <div class="chip">用图3整机形态，把图2的图案满版铺到壳背，摄像头区留白</div>
+      <div class="chip">去掉底部原托，只留小熊</div>
+      <div class="chip">图案再密一点，铺满壳背</div>
+      <div class="chip">摄像头区域再干净一点</div>
+      <div class="chip">整体再亮一点、更银白</div>
+    </div>
+    <div class="row" style="margin-top:12px;align-items:center">
+      <button class="btn" id="run">生成方案并执行</button>
+      <button class="btn ghost" id="pickbox">框定排除区（摄像头/不许贴图）</button>
+      <button class="btn ghost" id="aiq">加入 AI 出图队列</button>
+      <button class="btn ghost" id="aikey">AI 接口设置</button>
+      <span class="hint" id="tip">程序引擎秒出结果、可复现；排除区：<b id="camtag">自动识别</b></span>
+    </div>
+
+    <div id="aiBox" style="display:none;margin-top:12px;border:1px dashed #cbd5e1;border-radius:12px;padding:12px;background:#fcfdff">
+      <div class="row" style="align-items:center">
+        <label class="hint">模型
+          <select id="aiModel" style="font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></select>
+        </label>
+        <label class="hint">张数
+          <select id="aiN" style="font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px">
+            <option>1</option><option selected>2</option><option>3</option><option>4</option>
+          </select>
+        </label>
+        <label class="hint">尺寸
+          <select id="aiSize" style="font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px">
+            <option>1024x1024</option><option>1536x1024</option><option>1024x1536</option><option>auto</option>
+          </select>
+        </label>
+        <label class="hint"><input type="checkbox" id="aiVision" checked> 出图后 AI 自检（视觉模型看图打分）</label>
+        <span class="hint" id="aiHint"></span>
+      </div>
+      <div style="margin-top:10px">
+        <div class="hint" style="margin-bottom:4px">AI 出图提示词（自动拼装，可手工改；改完以这里为准）</div>
+        <textarea id="aiPrompt" style="min-height:120px;font-size:12.5px" placeholder="点下方「拼装提示词」自动生成"></textarea>
+        <div class="chips">
+          <div class="chip" id="mkPrompt">拼装提示词</div>
+          <div class="chip" id="clrPrompt">清空（用默认自动拼装）</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="cosBox" style="display:none;margin-top:12px;border:1px dashed #cbd5e1;border-radius:12px;padding:12px;background:#fcfdff">
+      <div class="hint" style="margin-bottom:8px">☁️ 腾讯云 COS：图片上传/下载/存放经 COS（公有读私有写）。SecretKey 留空＝沿用已保存值；不配置则图片存服务器本地。</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <label class="hint">地域 <input id="cosRegion" placeholder="如 ap-guangzhou" style="width:120px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+        <label class="hint">桶名 <input id="cosBucket" placeholder="如 duotu-125xxxxxx" style="width:140px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+        <label class="hint">SecretId <input id="cosSid" style="width:190px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+        <label class="hint">SecretKey <input id="cosSkey" type="password" placeholder="留空＝不改" style="width:140px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px">
+        <label class="hint">路径前缀 <input id="cosPrefix" placeholder="可留空" style="width:100px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+        <label class="hint">自定义域名 <input id="cosBase" placeholder="可选（CDN）" style="width:150px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+        <button class="btn" id="cosSave">保存并测试</button>
+        <span class="hint" id="cosHint"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="planCard" style="display:none">
+    <h2><i class="n">3</i>执行方案 <span class="pill gray" id="planTag" style="display:none"></span></h2>
+    <div class="steps" id="plan"></div>
+  </section>
+
+  <section class="card" id="resCard" style="display:none">
+    <h2><i class="n">4</i>生成结果（按综合分排序，绿框为推荐）</h2>
+    <div class="grid" id="results"></div>
+  </section>
+</main>
+
+<div class="chat">
+  <div class="hd2" id="chatHd">
+    <div style="font-weight:700;font-size:13px">继续编辑（对结果哪里不满意，直接说）</div>
+    <div class="hint" id="chatToggle">展开 ▲</div>
+  </div>
+  <div class="body" id="chatBody">
+    <div class="msgs" id="msgs"><div class="msg ai">上传图1-图5 → 写需求 → 「生成方案并执行」。出图后在这里继续说：图案再密一点 / 摄像头再干净 / 再亮一点 / 换回图1材质。</div></div>
+    <div class="basebar" id="baseBar"></div>
+    <div class="cin">
+      <textarea id="cinput" placeholder="例：图案再密一点，摄像头那一块再干净些，整体再亮一点"></textarea>
+      <button class="btn" id="send">发送</button>
+    </div>
+    <div class="hint" style="margin-top:4px">发送后先给你<b>方案</b>，点「执行方案」才真出图。想换基准就在结果卡上点「设为基准继续改」。</div>
+  </div>
+</div>
+
+<div class="modal" id="modal"><img id="modalImg" src=""></div>
+<div class="modal" id="boxModal">
+  <div class="boxwrap"><img id="boxImg" src=""><div id="boxSel"></div></div>
+  <div style="display:flex;gap:8px;justify-content:center">
+    <button class="btn sm" id="boxOk">用这个框</button>
+    <button class="btn sm ghost" id="boxClear">清除，回到自动识别</button>
+    <button class="btn sm ghost" id="boxCancel">取消</button>
+  </div>
+  <div class="hint" style="text-align:center">在图上按住鼠标拖出一个框＝摄像头/不许被贴图覆盖的区域</div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="dlg" id="dlg">
+  <div class="dlgbox">
+    <h3 id="dlgTitle"></h3>
+    <p id="dlgText"></p>
+    <input id="dlgInput" style="display:none">
+    <div class="dlgb"><button id="dlgNo">取消</button><button id="dlgOk" class="ok">确定</button></div>
+  </div>
+</div>
+
+<script>
+const API='';
+const state={slots:[1,2,3,4,5].map(i=>({index:i,path:null,url:null,thumb:null,role:'auto',name:null})),
+  roles:null,acts:null,params:null,current:null,plan:null,results:[],gallery:[],
+  basePick:null,baseFile:null,aiBase:null};   // basePick = 用户显式点「设为基准」的那张图
+const $=s=>document.querySelector(s);
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),2200);}
+function stat(t){$('#stat').textContent=t;}
+
+/* ---------- 页面内确认 / 输入弹窗（替代 confirm、prompt） ----------
+   原因：内嵌浏览器 / 预览面板里原生 confirm、prompt 常被直接吞掉，
+   导致「点删除没反应」。这里用页面自己的弹窗，永远可用。 */
+function showDlg(opt){
+  return new Promise(res=>{
+    const box=$('#dlg'), inp=$('#dlgInput'), ok=$('#dlgOk');
+    const hasInput=Object.prototype.hasOwnProperty.call(opt,'input');
+    $('#dlgTitle').textContent=opt.title||'';
+    $('#dlgText').textContent=opt.text||'';
+    inp.style.display=hasInput?'':'none';
+    if(hasInput)inp.value=opt.input||'';
+    ok.textContent=opt.okText||'确定';
+    ok.className='ok'+(opt.danger?' danger':'');
+    box.classList.add('on');
+    setTimeout(()=>{if(hasInput){inp.focus();inp.select();}},30);
+    const done=v=>{box.classList.remove('on');res(v);};
+    $('#dlgNo').textContent=opt.cancelText||'取消';
+    ok.onclick=()=>done(hasInput?inp.value:true);
+    $('#dlgNo').onclick=()=>done(hasInput?null:false);
+    box.onclick=e=>{if(e.target===box)done(hasInput?null:false);};
+    inp.onkeydown=e=>{
+      if(e.key==='Enter'){e.preventDefault();done(inp.value);}
+      if(e.key==='Escape'){e.preventDefault();done(null);}
+    };
+  });
+}
+const ask=(t,x,ok,danger)=>showDlg({title:t,text:x,okText:ok||'确定',danger:!!danger});
+const askInput=(t,x,def)=>showDlg({title:t,text:x,input:def||''});
+
+const ROLES=[['auto','自动识别'],['material','材质源'],['pattern','图案源'],['target','目标底图'],['shape','形态底图'],['ref','参考图']];
+
+function renderSlots(){
+  $('#slots').innerHTML=state.slots.map((s,i)=>{
+    const has=!!s.url;
+    return `<div class="slot ${has?'has':''}" data-i="${i}">
+      <div class="tag"><span>图${i+1}</span>${has?`<span class="del" data-del="${i}">移除</span>`:''}</div>
+      ${has?`<img class="thumb" src="${s.thumb}" data-zoom="${s.url}">`
+           :`<div class="ph" data-up="${i}">点击或拖拽上传<br>图${i+1}</div>`}
+      <div class="meta">
+        <select data-role="${i}">${ROLES.map(r=>`<option value="${r[0]}" ${s.role===r[0]?'selected':''}>${r[1]}</option>`).join('')}</select>
+        <div>${s.name?escapeHtml(s.name.slice(0,18)):'<span class="hint">未上传</span>'}</div>
+      </div></div>`;
+  }).join('');
+  bindSlots();
+}
+function escapeHtml(t){return (t||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function bindSlots(){
+  document.querySelectorAll('[data-up]').forEach(el=>{
+    el.onclick=()=>pickFile(+el.dataset.up);
+    el.ondragover=e=>{e.preventDefault();};
+    el.ondrop=e=>{e.preventDefault();upload(+el.dataset.up,e.dataTransfer.files[0]);};
+  });
+  document.querySelectorAll('[data-del]').forEach(el=>el.onclick=()=>{
+    const i=+el.dataset.del;state.slots[i]={index:i+1,path:null,url:null,thumb:null,role:'auto',name:null};renderSlots();});
+  document.querySelectorAll('[data-role]').forEach(el=>el.onchange=()=>{state.slots[+el.dataset.role].role=el.value;});
+  $('#slots').querySelectorAll('[data-zoom]').forEach(el=>el.onclick=()=>openModal(el.dataset.zoom));
+}
+function pickFile(i){
+  const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
+  inp.onchange=()=>upload(i,inp.files[0]);inp.click();
+}
+async function upload(i,f){
+  if(!f)return;stat('上传中…');
+  const fd=new FormData();fd.append('slot',i+1);fd.append('file',f);
+  const r=await fetch(API+'/api/upload',{method:'POST',body:fd}).then(x=>x.json());
+  if(r.error){toast('上传失败');stat('就绪');return;}
+  state.slots[i]={index:i+1,path:r.path,url:r.url,thumb:r.thumb,role:state.slots[i].role,name:r.name,info:r.info};
+  renderSlots();stat('就绪');toast('图'+(i+1)+' 已就位');
+}
+function openModal(u){$('#modalImg').src=u;$('#modal').classList.add('on');}
+$('#modal').onclick=()=>$('#modal').classList.remove('on');
+
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+  const t=$('#prompt');t.value=c.textContent.trim();t.focus();});
+
+function renderPlan(plan){
+  $('#planCard').style.display='';
+  $('#plan').innerHTML=plan.map(s=>`<div class="step"><div class="no">${s.no}</div>
+    <div><div class="t">${s.title}</div><div class="d">${escapeHtml(s.detail)}</div>
+    <div class="w">为什么这么做：${escapeHtml(s.why||'')}</div></div></div>`).join('');
+}
+function mrow(v){
+  const m=v.metrics||{};
+  const cov=(m.body_color_ratio*100||0).toFixed(1), cam=(m.cam_color_ratio*100||0).toFixed(2);
+  return `<div class="ms">
+    <div><span class="k">图案覆盖</span> <b>${cov}%</b></div>
+    <div><span class="k">摄像头污染</span> <b style="color:${cam>1?'var(--bad)':'var(--ok)'}">${cam}%</b></div>
+    <div><span class="k">中位亮度</span> <b>${m.body_neutral_med??'-'}</b></div>
+    <div><span class="k">层次跨度</span> <b>${m.layers??'-'}</b></div>
+    <div><span class="k">主色</span> <b>${(m.main_color||[]).join(',')}</b></div>
+    <div><span class="k">白底占比</span> <b>${((m.white_bg_ratio||0)*100).toFixed(0)}%</b></div>
+  </div>`;
+}
+function renderResults(list){
+  list=list||[];
+  addGallery(list);
+  if(!list.length){$('#results').innerHTML='<div class="empty">还没有生成结果</div>';return;}
+  $('#resCard').style.display='';
+  $('#results').innerHTML=list.map((v,i)=>`<div class="ver ${i===0?'best':''}">
+    <div class="hd"><div class="nm">${v.name}${v.ai?' <span class="sc" style="background:#ede9fe;color:#6d28d9">AI·'+escapeHtml(v.model||'')+'</span>':''}</div><div class="sc">${v.score??'-'} 分${i===0?' · 推荐':''}</div></div>
+    <img src="${v.preview}" data-zoom="${v.url}">
+    ${mrow(v)}
+    ${v.vision?`<div class="vision">AI 自检：${escapeHtml(v.vision)}</div>`:''}
+    <div class="ft"><button class="btn sm ${state.basePick===v.file?'':'ghost'}" data-base="${v.file}">${state.basePick===v.file?'✓ 当前基准':'设为基准继续改'}</button>
+    ${v.ai?'<button class="btn sm ghost" data-vis="'+v.file+'">AI 自检</button>':''}
+    <button class="btn sm ghost" data-delr="${v.file}">删除</button>
+    <a class="btn sm ghost" href="${v.url}" download="${v.file}">下载</a></div></div>`).join('');
+  $('#results').querySelectorAll('[data-zoom]').forEach(el=>el.onclick=()=>openModal(el.dataset.zoom));
+  $('#results').querySelectorAll('[data-base]').forEach(el=>el.onclick=()=>{
+    const f=el.dataset.base;
+    if(state.basePick===f){                       // 再点一次 = 取消，回到原始底图重跑
+      state.basePick=null;toast('已取消基准，下一轮从原始底图重跑（不会越改越糊）');
+    }else{
+      state.basePick=f;state.current=f;
+      toast('已设为基准：'+f+'\n下一轮聊天修改会在这张图上继续');
+    }
+    updateBaseBar();renderResults(state.results);renderGallery();});
+  $('#results').querySelectorAll('[data-vis]').forEach(el=>el.onclick=async()=>{
+    toast('视觉模型看图中…');
+    const r=await fetch(API+'/api/ai_vision',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({path:el.dataset.vis})}).then(x=>x.json());
+    if(r.error){toast('自检失败：'+r.error);return;}
+    addMsg('ai','【'+el.dataset.vis+' 自检】\n'+r.text);toast('已写入下方对话');});
+  if(!state.current&&list[0])state.current=list[0].file;
+}
+
+$('#run').onclick=async()=>{
+  const used=state.slots.filter(s=>s.url);
+  const isAI=$('#engineSel').value==='ai';
+  if(used.length<2){toast('至少上传 2 张图');return;}
+  if(isAI){await runAI();return;}
+  const btn=$('#run');btn.disabled=true;btn.textContent='执行中…';stat('生成中…');
+  try{
+    const body={slots:state.slots.map(s=>({index:s.index,path:s.path,role:s.role})),
+      prompt:$('#prompt').value.trim(),params:curParams()};
+    const r=await fetch(API+'/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(x=>x.json());
+    if(r.error){toast('执行失败：'+r.error);console.error(r.trace);stat('出错');return;}
+    state.plan=r.plan;state.roles=r.roles;state.acts=r.acts;state.params=r.params;state.results=r.results;state.current=r.results[0]?.file||null;state.baseFile=r.base_file||null;state.basePick=null;
+    renderPlan(r.plan);renderResults(r.results);updateBaseBar();
+    addMsg('ai','方案已生成并执行，共 '+r.results.length+' 个版本。推荐：'+r.results[0].name+'（'+r.results[0].score+' 分）。\n不满意就在下面继续说，例如「图案再密一点」。');
+    stat('完成');
+  }catch(e){toast('请求失败');stat('出错');}
+  finally{btn.disabled=false;btn.textContent='生成方案并执行';}
+};
+
+async function runAI(){
+  const btn=$('#run');btn.disabled=true;btn.textContent='AI 出图中…';stat('AI 出图中（约 30-90 秒）…');
+  addMsg('me','（AI 出图）'+$('#prompt').value.trim());
+  try{
+    const slots=state.slots.filter(s=>s.url).map(s=>({index:s.index,path:s.path,role:s.role}));
+    const body={slots:slots,prompt:$('#prompt').value.trim(),roles:state.roles,acts:state.acts,
+      model:$('#aiModel').value||undefined,n:+$('#aiN').value||2,
+      size:$('#aiSize').value==='auto'?null:$('#aiSize').value,
+      vision_check:$('#aiVision').checked,
+      prompt_text:$('#aiPrompt').value.trim()||undefined};
+    const r=await fetch(API+'/api/ai_gen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(x=>x.json());
+    if(r.error){toast('AI 失败：'+r.error);addMsg('ai','AI 出图失败：'+r.error);console.error(r.trace);stat('出错');return;}
+    state.roles=r.roles||state.roles;state.acts=r.acts||state.acts;state.results=r.results;state.aiBase=r.ai_base;state.basePick=null;
+    if(r.plan&&r.plan.length){state.plan=r.plan;renderPlan(r.plan);}
+    state.current=r.results[0]?.file||null;
+    renderResults(r.results);updateBaseBar();
+    addMsg('ai','AI（'+r.model+'）已出 '+r.results.length+' 张。'+(r.results[0].vision?'\n自检：'+r.results[0].vision:''));
+    stat('完成');toast('AI 出图完成');
+  }catch(e){toast('请求失败');stat('出错');}
+  finally{btn.disabled=false;btn.textContent='生成方案 + AI 出图';}
+}
+
+$('#aiq').onclick=async()=>{
+  const body={slots:state.slots.filter(s=>s.url).map(s=>({index:s.index,path:s.path,role:s.role})),
+    prompt:$('#prompt').value.trim(),current:state.current};
+  await fetch(API+'/api/ai_queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  toast('已加入 AI 队列，回到对话里说「执行队列」即可');
+  addMsg('me','（提交 AI 出图）'+$('#prompt').value.trim());
+  addMsg('ai','已写入 AI 队列 data/ai_queue.jsonl。在对话里对我说「执行队列任务」，我会用 ImageGen 出图并放回结果区。');
+};
+
+function addMsg(who,text,extra){
+  const d=document.createElement('div');d.className='msg '+who;d.textContent=text;
+  if(extra)d.innerHTML+=extra;
+  $('#msgs').appendChild(d);$('#chatBody').scrollTop=1e9;
+}
+/* ---------- 当前基准提示条 ---------- */
+function updateBaseBar(){
+  const b=$('#baseBar');
+  if(state.basePick){
+    b.classList.add('on');
+    b.innerHTML='本轮基准：<b>'+escapeHtml(state.basePick)+'</b> · 下面的修改会在这张图上叠加'
+      +'<span class="x" id="baseX">改回原图 ✕</span>';
+    $('#baseX').onclick=()=>{state.basePick=null;updateBaseBar();renderResults(state.results);
+      toast('已改回：下一轮从原始底图重跑，不会越改越糊');};
+  }else{b.classList.remove('on');b.innerHTML='';}
+  const tag=$('#planTag');
+  if(tag){tag.style.display='';tag.textContent=state.basePick?('基准：'+state.basePick):'基准：原始底图';}
+}
+/* ---------- 对话里的方案卡：先看方案，确认后才执行 ---------- */
+function addPlanMsg(rep){
+  const steps=(rep.plan||[]).map(s=>`${s.no}. 【${s.title}】${s.detail}`).join('\n');
+  const d=document.createElement('div');d.className='msg ai';
+  d.innerHTML='<div class="ptext">'+escapeHtml((rep.text||'方案')+'\n'+steps)+'</div>'
+    +'<div class="planact"><button class="btn sm" data-exec>▶ 执行方案</button>'
+    +'<button class="btn sm ghost" data-cancel>取消</button>'
+    +'<span class="hint">不合意就在下面继续说，我会重出一版方案</span></div>';
+  $('#msgs').appendChild(d);$('#chatBody').scrollTop=1e9;
+  d.querySelector('[data-exec]').onclick=()=>execPlan(d,rep);
+  d.querySelector('[data-cancel]').onclick=()=>{
+    d.querySelector('.planact').innerHTML='<span class="hint">已取消，可以继续提要求</span>';stat('已取消');};
+}
+async function execPlan(node,rep){
+  const btn=node.querySelector('[data-exec]');if(!btn||btn.disabled)return;
+  btn.disabled=true;btn.textContent='执行中…';stat('执行中…');toast('执行中，稍等…');
+  const isAI=(rep.engine||'prog')==='ai';
+  const sz=$('#aiSize')?$('#aiSize').value:'auto';
+  const body={phase:'exec',message:rep.message,
+    slots:state.slots.map(s=>({index:s.index,path:s.path,role:s.role})),
+    roles:rep.roles||state.roles,acts:rep.acts||state.acts,params:rep.params||state.params,
+    current:state.current,base_pick:state.basePick,base_file:rep.base_file,
+    engine:rep.engine||'prog',model:$('#aiModel').value||undefined,
+    n:isAI?+($('#aiN').value||1):undefined,size:(sz&&sz!=='auto')?sz:null,
+    vision_check:$('#aiVision').checked,hits:rep.hits||[]};
+  const t0=Date.now();
+  try{
+    const r=await fetch(API+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)}).then(x=>x.json());
+    if(r.error){btn.disabled=false;btn.textContent='重试执行方案';addMsg('ai','执行失败：'+r.error);stat('出错');return;}
+    btn.textContent='✓ 已执行';
+    applyReply(r.reply,r.params,'耗时 '+((Date.now()-t0)/1000).toFixed(1)+'s');
+  }catch(e){btn.disabled=false;btn.textContent='重试执行方案';addMsg('ai','请求失败：'+e);stat('出错');}
+}
+function applyReply(rep,params,tail){
+  if(rep.kind==='ai'){
+    const v=rep.version;state.current=v.file;state.aiBase=v.file;
+    state.results=[v].concat(state.results||[]);renderResults(state.results);
+    addMsg('ai',rep.text+'（'+v.score+' 分）'+(rep.vision?'\n自检：'+rep.vision:'')+(tail?'\n'+tail:''));
+    stat('完成');return;
+  }
+  if(rep.kind==='result'){
+    state.current=rep.version.file;
+    state.results=[rep.version].concat(state.results);renderResults(state.results);
+    addMsg('ai',rep.text+'（新版本：'+rep.version.name+'，'+rep.version.score+' 分）');
+  }else{
+    state.plan=rep.plan;state.roles=rep.roles;state.acts=rep.acts;state.params=rep.params;state.results=rep.results;
+    if(rep.base_file)state.baseFile=rep.base_file;
+    renderPlan(rep.plan);renderResults(rep.results);
+    addMsg('ai',rep.text+'\n共 '+rep.results.length+' 个版本，推荐 '+rep.results[0].name
+      +'（'+rep.results[0].score+' 分）。'+(tail?'\n'+tail:'')
+      +'\n不满意就继续说，或在结果卡上换一张「设为基准继续改」。');
+  }
+  updateBaseBar();
+  state.params=params||state.params;stat('完成');
+}
+async function send(){
+  const msg=$('#cinput').value.trim();if(!msg)return;
+  $('#cinput').value='';addMsg('me',msg);stat('正在出方案…');
+  const isAI=$('#engineSel').value==='ai';
+  const sz=$('#aiSize')?$('#aiSize').value:'auto';
+  const body={phase:'plan',message:msg,
+    slots:state.slots.map(s=>({index:s.index,path:s.path,role:s.role})),
+    roles:state.roles,acts:state.acts,params:curParams(),current:state.current,
+    base_pick:state.basePick,base_file:state.baseFile,engine:isAI?'ai':'prog',
+    model:$('#aiModel').value||undefined,n:isAI?+($('#aiN').value||1):undefined,
+    size:(sz&&sz!=='auto')?sz:null,vision_check:$('#aiVision').checked};
+  let r;
+  try{
+    r=await fetch(API+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)}).then(x=>x.json());
+  }catch(e){addMsg('ai','请求失败：'+e);stat('出错');return;}
+  if(r.error){addMsg('ai','出方案失败：'+r.error);stat('出错');return;}
+  if(r.reply&&r.reply.kind==='plan'){addPlanMsg(r.reply);stat('方案已出，等你确认');return;}
+  applyReply(r.reply,r.params);
+}
+$('#send').onclick=send;
+$('#chatHd').onclick=()=>{
+  const b=$('#chatBody');const on=b.style.display!=='none';
+  b.style.display=on?'none':'';$('#chatToggle').textContent=on?'展开 ▲':'收起 ▼';
+};
+function curParams(){
+  const p=Object.assign({}, state.params||{});
+  delete p.cam_box;                       // 避免残留旧的排除区
+  if(state.camBox)p.cam_box=state.camBox;
+  return p;
+}
+/* ---------- 直接粘贴图片进空图位（Ctrl+V），省去点素材库 ---------- */
+document.addEventListener('paste',e=>{
+  const items=(e.clipboardData&&e.clipboardData.items)||[];
+  for(const it of items){
+    if(!it.type||it.type.indexOf('image')!==0)continue;
+    const f=it.getAsFile();
+    if(!f)continue;
+    let i=state.slots.findIndex(s=>!s.url);
+    if(i<0){toast('5 个图位都满了，先移除一张');return;}
+    e.preventDefault();upload(i,f);return;
+  }
+});
+// 整张卡片都支持拖拽（不只是占位区）
+['dragover','dragenter'].forEach(ev=>$('#slots').addEventListener(ev,e=>e.preventDefault()));
+$('#slots').addEventListener('drop',e=>{
+  e.preventDefault();
+  const f=e.dataTransfer&&e.dataTransfer.files[0];
+  if(!f)return;
+  const card=e.target.closest('.slot');
+  let i=card?+card.dataset.i:state.slots.findIndex(s=>!s.url);
+  if(i<0||!(i>=0&&i<5))i=state.slots.findIndex(s=>!s.url);
+  if(i>=0)upload(i,f);
+});
+
+/* ---------- 历史生成图（参考图位下方） ---------- */
+async function loadGallery(){
+  try{
+    const r=await fetch(API+'/api/outputs').then(x=>x.json());
+    (r.items||[]).forEach(it=>{
+      if(state.gallery.some(g=>g.file===it.file))return;
+      state.gallery.push(it);
+    });
+    state.gallery.sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+    renderGallery();
+  }catch(e){}
+}
+function addGallery(list){
+  (list||[]).forEach(v=>{
+    if(!v||!v.file)return;
+    const i=state.gallery.findIndex(g=>g.file===v.file);
+    if(i>=0){state.gallery[i]=Object.assign({},state.gallery[i],v);return;}
+    state.gallery.unshift(Object.assign({},v,{ts:new Date().toTimeString().slice(0,8)}));
+  });
+  renderGallery();
+}
+function renderGallery(){
+  const w=$('#galWrap');
+  w.style.display=state.gallery.length?'':'none';
+  $('#galN').textContent=state.gallery.length;
+  // 注意：这里用「文件名」而不是下标做标记 —— 删除后下标会错位，极易误删
+  // loading=lazy：图廊几十张时不会一次性抢光浏览器的 6 个并发连接，
+  // 否则「删除/清空」的 POST 要等图片请求排完队才发得出去（表现就是卡几秒没反应）
+  $('#gallery').innerHTML=state.gallery.map(g=>`<div class="gcard ${state.current===g.file?'cur':''}">
+    <img src="${g.preview}" loading="lazy" data-zoom="${g.url}" title="${escapeHtml(g.name)}">
+    <div class="gn">${escapeHtml(g.name||'')}${g.score!=null?' · '+g.score+'分':''}</div>
+    <div class="gb"><button data-toslot="${escapeHtml(g.file)}">加入图位</button><button class="x" data-delg="${escapeHtml(g.file)}" title="删除这张">✕</button></div>
+  </div>`).join('');
+}
+
+/* 事件委托：绑在容器上一次，重渲染后永不失效 */
+$('#results').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-delr]');
+  if(!b)return;
+  e.stopPropagation();delGalFile(b.dataset.delr);
+});
+$('#gallery').addEventListener('click',e=>{
+  const t=e.target.closest('[data-delg],[data-toslot],[data-zoom]');
+  if(!t)return;
+  e.stopPropagation();
+  if(t.dataset.delg)delGalFile(t.dataset.delg);
+  else if(t.dataset.toslot)toSlot(t.dataset.toslot);
+  else if(t.dataset.zoom)openModal(t.dataset.zoom);
+});
+
+/* 删文件前先把页面上的图片引用放掉并等一拍：
+   浏览器正在显示的图会占住文件句柄，Windows 上会导致服务端删不掉缩略图（原图删了、prev_ 留下） */
+async function releaseImgs(ms){
+  try{
+    document.querySelectorAll('#gallery img,#results img').forEach(im=>{try{im.src='';}catch(e){}});
+    await new Promise(r=>setTimeout(r,ms||400));
+  }catch(e){}
+}
+async function delGalFile(file){
+  if(!file)return;
+  const g=state.gallery.find(x=>x.file===file);
+  if(!g){toast('图廊里已经没有这张了');return;}
+  const ok=await ask('删除这张生成图？', g.name+'\n删除后不可恢复。', '删除', true);
+  if(!ok)return;
+  const btn=document.querySelector('[data-delg="'+file.replace(/"/g,'\\"')+'"]');
+  if(btn){btn.textContent='…';btn.disabled=true;}
+  toast('正在删除…');
+  await releaseImgs(350);
+  let r;
+  try{
+    r=await Promise.race([
+      fetch(API+'/api/delete_output',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({file:file})}).then(x=>x.json()),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('服务端响应超时')),15000))
+    ]);
+  }catch(e){ r={error:'请求失败：'+e}; }
+  if(r.error && !(r.deleted && r.deleted.length)){
+    toast('删除失败：'+r.error);
+    if(btn){btn.textContent='✕';btn.disabled=false;}
+    return;
+  }
+  state.gallery=state.gallery.filter(x=>x.file!==file);
+  if(state.current===file)state.current=null;
+  state.results=(state.results||[]).filter(v=>v.file!==file);
+  renderGallery();renderResults(state.results);
+  const np=(r.pending||[]).length;
+  if(np)setTimeout(()=>loadGallery(),2500);
+  toast(np?('已删除 '+g.name+'（缩略图稍后由后台删掉）'):('已删除 '+g.name));
+}
+async function toSlot(file){
+  const g=state.gallery.find(x=>x.file===file);
+  if(!g)return;
+  if(!g.path){toast('该图缺少本地路径，无法回填');return;}
+  let k=state.slots.findIndex(s=>!s.url);
+  if(k<0){
+    const t=await askInput('5 个图位都满了','要替换哪一个？请输入 1-5（取消＝不替换）','');
+    if(!t)return;
+    k=parseInt(t,10)-1;
+    if(!(k>=0&&k<5)){toast('序号无效（需 1-5）');return;}
+  }
+  state.slots[k]={index:k+1,path:g.path,url:g.url,thumb:g.preview||('/api/thumb?p='+encodeURIComponent(g.path)),
+    role:'target',name:g.name,info:null};
+  renderSlots();
+  toast('已把「'+g.name+'」放回图'+(k+1)+'（角色=目标底图，下拉可改），可继续编辑');
+  addMsg('ai','已把生成图「'+g.name+'」回填到 图'+(k+1)+'，角色默认「目标底图」。现在可以直接改需求再执行，或在聊天框说要改哪里。');
+}
+$('#galReload').onclick=async()=>{const b=$('#galReload');b.disabled=true;b.textContent='刷新中…';await loadGallery();b.disabled=false;b.textContent='刷新';toast('已刷新，共 '+state.gallery.length+' 张');};
+/* 说明：清空要删掉「每张图 + 它的缩略图」两个文件，张数多时服务端要花几秒，
+   期间如果界面零反馈，看起来就像「点了没反应」。所以这里：
+   ① 按下就立刻 toast + 按钮变「清空中…」 ② 先把页面清空（乐观更新）
+   ③ 再去等服务端，失败才回滚 ④ 20 秒兜底超时。 */
+$('#galClear').onclick=async()=>{
+  if(!state.gallery.length){toast('历史生成图已经是空的');loadGallery();return;}
+  const n=state.gallery.length;
+  const ok=await ask('清空全部历史生成图？','共 '+n+' 张，删除后不可恢复（你上传的参考图不会被删）。','清空全部',true);
+  if(!ok)return;
+  toast('正在清空 '+n+' 张…');
+  const btn=$('#galClear'),old=btn.textContent;
+  btn.disabled=true;btn.textContent='清空中…';
+  // 先把页面清空（乐观更新：立刻看到结果，不用干等服务端）；失败时用它回滚
+  const backup=state.gallery.slice();
+  state.gallery=[];state.current=null;state.results=[];
+  renderGallery();renderResults([]);
+  await releaseImgs(400);   // 页面不再引用这些图 + 等一拍，服务端才删得动
+  let r;
+  try{
+    r=await Promise.race([
+      fetch(API+'/api/delete_output',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({all:true})}).then(x=>x.json()),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('服务端响应超时，可点「刷新」看是否已删完')),20000))
+    ]);
+  }catch(e){ r={error:String((e&&e.message)||e)}; }
+  btn.disabled=false;btn.textContent=old;
+  if(r.error&&!(r.deleted&&r.deleted.length)){
+    state.gallery=backup;renderGallery();
+    toast('清空失败：'+r.error);return;
+  }
+  await loadGallery();
+  const np=(r.pending||[]).length;
+  const ms=r.ms?('，'+(r.ms/1000).toFixed(1)+'s'):'';
+  if(np){
+    toast('已清空 '+(r.count||0)+' 个文件，'+np+' 个当时被占用，后台正在自动删掉');
+    setTimeout(()=>loadGallery(),2500);   // 后台删完后再刷一次
+  }else{
+    toast('已清空 '+(r.count||0)+' 个文件'+ms);
+  }
+};
+
+/* ---------- AI 引擎 ---------- */
+function engine(){
+  const v=$('#engineSel').value;
+  $('#aiBox').style.display=v==='ai'?'':'none';
+  $('#run').textContent=v==='ai'?'生成方案 + AI 出图':'生成方案并执行';
+  $('#tip').innerHTML=v==='ai'
+    ? 'AI 引擎：把图1-图5全部喂给模型做整体重绘（约 30-90 秒/张，按量计费）'
+    : '程序引擎秒出结果、可复现；排除区：<b id="camtag">自动识别</b>';
+}
+$('#engineSel').onchange=engine;
+async function loadModels(){
+  const r=await fetch(API+'/api/ai_models').then(x=>x.json()).catch(()=>({items:[]}));
+  const items=r.items||[];
+  const def=(await fetch(API+'/api/ai_config').then(x=>x.json()).catch(()=>({conf:{}}))).conf||{};
+  const opts=items.length?items:[def.model||'gpt-image-2'];
+  $('#aiModel').innerHTML=opts.map(m=>`<option value="${m}" ${m===(def.model||'gpt-image-2')?'selected':''}>${m}</option>`).join('');
+  $('#aiHint').textContent=items.length?('可用图像模型 '+items.length+' 个 · 当前 Key '+(def.api_key||'')):(r.error||'模型列表拉取失败');
+}
+$('#mkPrompt').onclick=async()=>{
+  const r=await fetch(API+'/api/ai_build_prompt',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({slots:state.slots.filter(s=>s.url).map(s=>({index:s.index,path:s.path,role:s.role})),
+      prompt:$('#prompt').value.trim()})}).then(x=>x.json());
+  if(r.error){toast('拼装失败');return;}
+  $('#aiPrompt').value=r.prompt;state.roles=r.roles;state.acts=r.acts;
+  if(r.plan&&r.plan.length){state.plan=r.plan;renderPlan(r.plan);}
+  toast('提示词已拼装（可改）');
+};
+$('#clrPrompt').onclick=()=>{$('#aiPrompt').value='';toast('已清空，出图时自动拼装');};
+$('#aikey').onclick=async()=>{
+  const k=await askInput('apib.ai API Key','留空＝不改（当前已保存的 Key 会继续用）','');
+  if(k===null)return;
+  const m=await askInput('默认出图模型','例如 gpt-image-2 / seedream-5-0-pro','gpt-image-2');
+  const r=await fetch(API+'/api/ai_config',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({api_key:k||undefined,model:m||undefined})}).then(x=>x.json());
+  toast('已保存 AI 配置');loadModels();
+};
+/* ☁️ COS 存储设置 */
+async function cosLoad(){
+  const r=await fetch(API+'/api/cos_conf').then(x=>x.json()).catch(()=>({conf:{}}));
+  const c=r.conf||{};
+  $('#cosRegion').value=c.region||'';$('#cosBucket').value=c.bucket||'';
+  $('#cosSid').value=c.secret_id||'';$('#cosSkey').value='';
+  $('#cosPrefix').value=c.prefix||'';$('#cosBase').value=c.base||'';
+  $('#cosHint').textContent=c.ready?('✅ COS 已启用（桶 '+(c.bucket||'')+'），图片走 COS')
+    :(c.has_key?'⚠️ 已配但未启用或不完整':'未配置（图片存服务器本地）');
+}
+$('#coskey').onclick=()=>{const b=$('#cosBox');
+  b.style.display=b.style.display==='none'?'':'none';
+  if(b.style.display!=='none'){cosLoad();b.scrollIntoView({behavior:'smooth',block:'start'});}};
+$('#cosSave').onclick=async()=>{
+  const body={region:$('#cosRegion').value.trim(),bucket:$('#cosBucket').value.trim(),
+    secret_id:$('#cosSid').value.trim(),secret_key:$('#cosSkey').value.trim(),
+    prefix:$('#cosPrefix').value.trim(),base:$('#cosBase').value.trim(),enabled:true};
+  if(!body.bucket||!body.region||!body.secret_id){toast('地域/桶名/SecretId 都要填');return}
+  $('#cosHint').textContent='正在验证（传一个小探针文件）…';
+  const r=await fetch(API+'/api/cos_conf',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)}).then(x=>x.json()).catch(()=>({error:'网络错误'}));
+  $('#cosHint').textContent=r.ok?('✅ '+r.msg):('❌ '+(r.error||r.msg||'失败'));
+  toast(r.ok?'COS 已配置并验证通过':'COS 验证失败，看面板提示');
+  if(r.ok)cosLoad();
+};
+
+renderSlots();
+engine();
+loadGallery();
+loadModels();
+fetch(API+'/health').then(()=>stat('服务已连接')).catch(()=>stat('服务未连接'));
+</script>
+</body>
+</html>

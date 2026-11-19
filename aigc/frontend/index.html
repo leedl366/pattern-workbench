@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 生图 · 单张融合 / 批量出图</title>
+<!-- 🔴 站内 ui.css 的唯一正确路径是 ../accounts/static/ui.css（server.py 白名单路由）。
+     子应用在 /pattern/aigc/ 下，写 ../static/ui.css 会解析成 /pattern/static/ui.css → 401，
+     于是所有 var(--xxx) 失效：卡片边框、按钮底色全没了只剩裸布局（dtl 2026-11-18 踩过）。
+     COS 直链优先（快），失败自动回落站内。 -->
+<link rel="stylesheet" href="../accounts/static/ui.css">
+<style>
+/* ---------- 令牌兜底（防呆）----------
+   ui.css 两条路都取不到时 var(--xxx) 会全失效 → 页面退化成裸布局。
+   这里先兜一份完全相同的令牌；ui.css 加载成功时它的 :root 后到覆盖（值一致，视觉无差）。 */
+:root{
+  /* 2026-11-19 与 static/ui.css 同步：深色能影风（此段仅作 ui.css 加载失败时的兜底，值必须与 ui.css 一致） */
+  --pri:#ffffff; --pri2:#d8dade; --pri-dark:#d8dade;
+  --pri-050:rgba(255,255,255,.07); --pri-100:rgba(255,255,255,.11); --pri-200:rgba(255,255,255,.22); --pri-300:#c9ccd2; --pri-bg:rgba(255,255,255,.05);
+  --grad-pri:linear-gradient(135deg,#ffffff,#d8dade);
+  --on-pri:#111214;
+  --bg:#090a0e; --card:#15171d; --card2:#0c0e16; --shell:#121212;
+  --tx:#e5e7eb; --sub:#9ca3af; --faint:#6b7280; --bd:rgba(255,255,255,.08); --hair:rgba(255,255,255,.045); --fill:#1a1c22; --gold:#f5af38;
+  --ok:#4ade80; --ok-bg:rgba(74,222,128,.14); --ok-bd:rgba(74,222,128,.32);
+  --err:#f87171; --err-bg:rgba(248,113,113,.14); --err-bd:rgba(248,113,113,.32); --bad:#f87171;
+  --warn:#fbbf24; --warn-bg:rgba(251,191,36,.14); --warn-bd:rgba(251,191,36,.32);
+  --r-card:16px; --r-ctl:10px; --r-sm:10px; --r-pill:999px;
+  --shadow-card:0 0 0 1px rgba(255,255,255,.045); --shadow-pop:0 12px 32px rgba(0,0,0,.6);
+  --ring:0 0 0 3px rgba(255,255,255,.18);
+  --font:-apple-system,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);font-size:14px;padding:18px 20px 48px}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:19px;font-weight:800;margin-bottom:4px}
+.sub{color:var(--sub);font-size:12.5px;margin-bottom:16px}
+.sub b{color:var(--pri)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:18px;box-shadow:var(--shadow-card);margin-bottom:16px}
+.card h2{font-size:15px;font-weight:800;margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h2 .cnt{font-size:12px;font-weight:700;padding:2px 9px;border-radius:var(--r-pill)}
+.cnt.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+.cnt.bad{background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
+.cnt.warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
+
+/* 模式 tab —— 两个模式语义完全不同，所以 tab 上直接写清各自干什么，防止误解成「张数切换」 */
+.tabs{display:flex;gap:8px;background:rgba(255,255,255,.06);border-radius:12px;padding:5px;margin-bottom:16px}
+.tab{flex:1;border:none;background:transparent;border-radius:9px;padding:11px 10px;cursor:pointer;font-family:inherit;
+     display:flex;flex-direction:column;align-items:center;gap:2px;transition:.15s;color:var(--sub)}
+.tab .t1{font-size:14px;font-weight:800}
+.tab .t2{font-size:11.5px;font-weight:600;opacity:.9}
+.tab.on{background:var(--card);color:var(--pri-dark);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tab:hover:not(.on){color:var(--tx)}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+@media (max-width:980px){.grid{grid-template-columns:1fr}}
+
+/* 上传区 */
+#drop{border:2px dashed #cbd5d5;border-radius:12px;padding:20px 16px;text-align:center;color:var(--sub);
+      cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:14px}
+#drop.on{border-color:var(--pri);background:var(--pri-050)}
+#drop .ic{width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--bd);
+          display:flex;align-items:center;justify-content:center;font-size:19px;color:var(--pri);flex:none;font-weight:800}
+#drop .big{font-size:14px;font-weight:700;color:var(--tx);margin-bottom:3px;text-align:left}
+#drop .sm{font-size:12px;color:var(--faint);text-align:left}
+.pv{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+.pv .it{position:relative;aspect-ratio:1;border-radius:9px;overflow:hidden;border:1px solid var(--bd);background:var(--fill)}
+.pv .it img{width:100%;height:100%;object-fit:cover;display:block}
+.pv .it .no{position:absolute;left:4px;top:4px;background:rgba(0,0,0,.6);color:#fff;font-size:10.5px;
+            font-weight:800;border-radius:var(--r-pill);padding:1px 7px}
+.pv .it .x{position:absolute;right:4px;top:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);
+           color:#fff;border:none;font-size:13px;cursor:pointer;line-height:1;opacity:0;transition:.15s}
+.pv .it:hover .x{opacity:1}
+.pv .add{aspect-ratio:1;border:2px dashed #cbd5d5;border-radius:9px;display:flex;flex-direction:column;
+         align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--faint);font-size:11.5px;background:var(--fill)}
+.pv .add:hover{border-color:var(--pri);color:var(--pri)}
+.pv .add .plus{font-size:20px;font-weight:800;line-height:1}
+
+/* 表单 */
+label.fl{display:block;font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:6px}
+textarea,input[type=text],select{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:var(--r-ctl);
+  background:var(--fill);font-family:inherit;font-size:13.5px;color:var(--tx);outline:none;transition:.15s}
+textarea:focus,input[type=text]:focus,select:focus{border-color:var(--pri);background:var(--card);box-shadow:var(--ring)}
+textarea{resize:vertical;line-height:1.65}
+textarea.pr{height:190px}
+.fld{margin-bottom:14px}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:620px){.pgrid{grid-template-columns:1fr}}
+.hint{font-size:11.5px;color:var(--faint);margin-top:5px;line-height:1.5}
+.hint.warn{color:var(--warn)}
+
+/* @ 选图菜单（照原站：贴在输入框下方、全宽、带缩略图） */
+.pwrap{position:relative}
+.atmenu{position:absolute;left:0;right:0;top:100%;z-index:30;margin-top:4px;max-height:208px;overflow-y:auto;
+        border:1px solid var(--bd);border-radius:12px;background:var(--card);padding:6px;box-shadow:var(--shadow-pop)}
+.atmenu .ait{display:flex;align-items:center;gap:10px;width:100%;border:none;background:none;border-radius:8px;
+             padding:7px 8px;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;color:var(--tx)}
+.atmenu .ait:hover{background:var(--pri-050)}
+.atmenu .ait img{width:34px;height:34px;border-radius:6px;object-fit:cover;flex:none;border:1px solid var(--bd)}
+.atmenu .empty{padding:10px 8px;font-size:12.5px;color:var(--sub)}
+
+/* 引用状态条 */
+.refbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--sub)}
+.refbar .chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--pri-200);background:var(--pri-050);
+              color:var(--pri-dark);border-radius:var(--r-pill);padding:2px 9px;font-weight:700;font-size:11.5px}
+.refbar .bad{color:var(--err);font-weight:700}
+
+/* 批量数量只读块（照原站：不是下拉，只展示） */
+.qtyro{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;
+       border:1px solid var(--bd);border-radius:var(--r-ctl);background:var(--fill)}
+.qtyro .n{font-weight:800;font-size:14px}
+.qtyro .qh{font-size:11.5px;color:var(--faint);text-align:right}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;border-radius:var(--r-ctl);
+     padding:13px 22px;font-size:14.5px;font-weight:800;cursor:pointer;background:var(--grad-pri);color:var(--on-pri);
+     width:100%;transition:.15s;font-family:inherit}
+.btn:hover{opacity:.92}
+.btn:disabled{background:#d1d5db;color:#9ca3af;cursor:not-allowed;opacity:1}
+.btn.stop{background:var(--err)}
+.btn.ghost{background:var(--card);color:var(--tx);border:1px solid var(--bd);width:auto;padding:6px 12px;
+           font-size:12.5px;font-weight:700}
+.btn.ghost:hover{background:var(--fill);border-color:var(--sub)}
+.btn.ghost.on{background:var(--pri-050);color:var(--pri-dark);border-color:var(--pri-200)}
+.cost{text-align:center;font-size:12px;font-weight:700;color:var(--sub);margin-top:8px}
+.cost.bad{color:var(--err)}
+
+/* 进度 */
+.prog{margin-bottom:14px}
+.prog .prow{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:6px}
+.prog .track{height:8px;border-radius:var(--r-pill);background:var(--bd);overflow:hidden}
+.prog .bar{height:100%;width:0;background:var(--grad-pri);border-radius:var(--r-pill);transition:width .4s}
+
+/* 结果网格 */
+.rgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media (max-width:620px){.rgrid{grid-template-columns:1fr}}
+.rc{position:relative;border:1px solid var(--bd);border-radius:12px;overflow:hidden;background:var(--fill)}
+.rc .im{aspect-ratio:3/4;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;position:relative}
+.rc .im img{width:100%;height:100%;object-fit:contain;display:block}
+.rc .im .ph{color:var(--faint);font-size:12.5px;text-align:center;padding:10px;line-height:1.6}
+.rc .im .ph.err{color:var(--err)}
+.rc .im .sp{width:26px;height:26px;border-radius:50%;border:3px solid var(--bd);border-top-color:var(--pri);
+            animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.rc .ft{display:flex;align-items:center;gap:6px;padding:8px 9px;background:var(--card);border-top:1px solid var(--bd);flex-wrap:wrap}
+.rc .ft .no{font-size:11.5px;font-weight:800;color:var(--sub);margin-right:auto}
+.rc .ft .ck{width:15px;height:15px;accent-color:var(--pri);cursor:pointer;flex:none}
+.rc .ft button{border:1px solid var(--bd);background:var(--card);border-radius:var(--r-sm);padding:4px 9px;
+               font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--tx)}
+.rc .ft button:hover{background:var(--fill);border-color:var(--sub)}
+.rc .ft button.primary{background:var(--pri-050);border-color:var(--pri-200);color:var(--pri-dark)}
+
+.empty{text-align:center;color:var(--faint);padding:34px 16px;font-size:13px;line-height:1.8}
+.empty .ei{font-size:30px;opacity:.35;margin-bottom:8px}
+.note{padding:10px 13px;border-radius:var(--r-ctl);font-size:12.5px;line-height:1.6;margin-bottom:12px}
+.note.bad{background:var(--err-bg);border:1px solid var(--err-bd);color:var(--err)}
+.note.warn{background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--warn)}
+.note.ok{background:var(--ok-bg);border:1px solid var(--ok-bd);color:var(--ok)}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,20px);background:#111827;color:#fff;
+       padding:11px 20px;border-radius:var(--r-pill);font-size:13px;font-weight:700;opacity:0;pointer-events:none;
+       transition:.25s;z-index:99;max-width:80vw;text-align:center;line-height:1.5}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI 生图</h1>
+  <div class="sub">单张生图里用 <b>@图片N</b> 可以把多张参考图<b>融合</b>成一张；批量生图是每张图<b>各自</b>出图。积分与左侧其它版块通用，右上角可见。</div>
+
+  <div class="tabs">
+    <button class="tab on" data-mode="single"><span class="t1">单张生图</span><span class="t2">融合多张参考图 · 出 1 张</span></button>
+    <button class="tab" data-mode="batch"><span class="t1">批量生图</span><span class="t2">每张各自出图 · 出 N 张</span></button>
+  </div>
+
+  <div class="grid">
+    <!-- 左栏 -->
+    <div>
+      <div class="card">
+        <h2>参考图 <span class="cnt ok" id="upCnt">(0/6)</span>
+          <button class="btn ghost" id="btnClearUp" style="margin-left:auto">清空</button>
+        </h2>
+        <div id="drop">
+          <div class="ic">+</div>
+          <div>
+            <div class="big">点击或拖拽上传参考图</div>
+            <div class="sm" id="upHint">支持 JPG / PNG / WEBP，最多 6 张</div>
+          </div>
+        </div>
+        <input type="file" id="file" accept="image/*" multiple style="display:none">
+        <div class="pv" id="pv"></div>
+      </div>
+
+      <div class="card">
+        <h2>生图提示词</h2>
+        <div class="pwrap">
+          <textarea class="pr" id="prompt" placeholder="输入生图提示词，输入 @ 选择已上传的参考图..."></textarea>
+          <div class="atmenu hide" id="atMenu"></div>
+        </div>
+        <div class="refbar" id="refBar"></div>
+      </div>
+    </div>
+
+    <!-- 右栏 -->
+    <div>
+      <div class="card">
+        <h2>参数配置</h2>
+        <div class="fld">
+          <label class="fl">模型选择</label>
+          <select id="model"></select>
+          <div class="hint" id="modelHint"></div>
+        </div>
+        <div class="pgrid">
+          <div class="fld">
+            <label class="fl">尺寸比例</label>
+            <select id="ratio"></select>
+            <div class="hint" id="ratioHint"></div>
+          </div>
+          <div class="fld">
+            <label class="fl">清晰度</label>
+            <select id="res"></select>
+          </div>
+        </div>
+        <div class="fld" id="qtyBox">
+          <label class="fl">生成数量</label>
+          <div class="qtyro">
+            <span class="n" id="qtyN">1 张</span>
+            <span class="qh" id="qtyHint">单张生图固定 1 张；要按图批量出图请切「批量生图」</span>
+          </div>
+        </div>
+        <button class="btn" id="btnGen">一键生成</button>
+        <div class="cost" id="cost"></div>
+      </div>
+
+      <div class="card">
+        <h2>生成结果 <span class="cnt ok" id="resCnt">0 张</span>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn ghost" id="btnAll">全选</button>
+            <button class="btn ghost" id="btnZip">打包下载</button>
+          </div>
+        </h2>
+        <div class="prog hide" id="prog">
+          <div class="prow"><span id="progTxt">正在生成…</span><span id="progPct">0%</span></div>
+          <div class="track"><div class="bar" id="progBar"></div></div>
+        </div>
+        <div id="resNote"></div>
+        <div class="rgrid" id="resGrid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+var BASE = location.pathname.replace(/\/+$/, '');
+var UNIT = 3;                        // 每张 3 积分（与工作台其它版块一致）
+var S = {
+  tid: null, mode: 'single', nImg: 0, meta: null,
+  prompt: '', items: [], running: false, redoing: false,
+  poll: null, picked: [], atPos: null, notice: '', usedModel: '',
+  /* 🔴 图片地址缓存键不能用尺寸（w）：重新生成同样尺寸时地址不变，浏览器会一直给旧图，
+     用户会以为「点了没变化」。用递增版本号，每次刷新结果 +1。 */
+  ver: 0
+};
+
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+var _tt = null;
+function toast(msg, ms){
+  var t = $('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(_tt);
+  _tt = setTimeout(function(){ t.classList.remove('on'); }, ms || 3200);
+}
+
+function getJSON(u){
+  return fetch(BASE + u, {credentials: 'include'}).then(function(r){
+    return r.json().then(function(j){
+      if (!r.ok || j.ok === false) throw new Error(j.error || ('请求失败 ' + r.status));
+      return j;
+    });
+  });
+}
+function postJSON(u, body){
+  return fetch(BASE + u, {
+    method: 'POST', credentials: 'include',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body || {})
+  }).then(function(r){
+    return r.json().then(function(j){
+      if (!r.ok || j.ok === false) throw new Error(j.error || ('请求失败 ' + r.status));
+      return j;
+    });
+  });
+}
+
+/* ---------------- @ 引用（与后端 refs_of / reindex_refs 同源） ---------------- */
+var RE_REF = /@图片(\d+)/g;
+function refsOf(text){
+  var out = [], m;
+  RE_REF.lastIndex = 0;
+  while ((m = RE_REF.exec(text || '')) !== null){
+    var v = parseInt(m[1], 10) - 1;
+    if (v >= 0 && out.indexOf(v) < 0) out.push(v);
+  }
+  return out;
+}
+/* 删图重排：被删那张引用置空，编号更大的减 1，更小的不动（原站 fj 原文逻辑）。
+   前端即时算一遍给用户看，后端 /remove 也会返回权威结果并覆盖。 */
+function reindexRefs(text, removed){
+  return String(text || '').replace(/@图片(\d+)/g, function(all, d){
+    var n = parseInt(d, 10) - 1;
+    if (n === removed) return '';
+    if (n > removed) return '@图片' + n;
+    return all;
+  });
+}
+
+/* ---------------- 深链：?tid= 直接打开某条任务 ---------------- */
+function restoreFromUrl(){
+  var m = /[?&]tid=([^&]+)/.exec(location.search);
+  if (!m) return;
+  var tid = decodeURIComponent(m[1]);
+  getJSON('/api/session/' + tid).then(function(s){
+    if (!s || s.ok === false){ toast((s && s.error) || '任务不存在或已过期', 5000); return; }
+    S.tid = s.tid || tid;
+    S.nImg = s.n_images || 0;
+    S.mode = s.mode || 'single';
+    if (s.prompt) $('prompt').value = s.prompt;
+    if (s.opt && s.opt.ratio) $('ratio').value = s.opt.ratio;
+    if (s.opt && s.opt.res) $('res').value = s.opt.res;
+    // 模式页签直接跟着状态走（setMode 在 md===S.mode 时会 early-return，不能靠它刷 UI）
+    var ts = document.querySelectorAll('.tab');
+    for (var i = 0; i < ts.length; i++){
+      ts[i].classList.toggle('on', ts[i].getAttribute('data-mode') === S.mode);
+    }
+    drawUp(); drawQty(); drawCost(); refreshPoints();
+    if ((s.items || []).length){
+      S.items = s.items;
+      drawRes();
+      startPoll();
+    }
+    toast('已打开历史任务 ' + tid, 2600);
+  }).catch(function(e){ toast('打开失败：' + e.message, 5000); });
+}
+
+/* ---------------- 初始化 ---------------- */
+function init(){
+  getJSON('/api/meta').then(function(m){
+    S.meta = m;
+    // 比例
+    var rs = $('ratio'); rs.innerHTML = '';
+    m.ratios.forEach(function(r){
+      var o = document.createElement('option'); o.value = r; o.textContent = r; rs.appendChild(o);
+    });
+    rs.value = '3:4';
+    // 清晰度
+    var es = $('res'); es.innerHTML = '';
+    m.resolutions.forEach(function(r){
+      var o = document.createElement('option'); o.value = r; o.textContent = r; es.appendChild(o);
+    });
+    es.value = '1K';
+    // 模型（不可用的标出来并禁选，避免「选了却出不来图」）
+    var ms = $('model'); ms.innerHTML = '';
+    var firstOk = '';
+    m.models.forEach(function(x){
+      var o = document.createElement('option');
+      o.value = x.id;
+      o.textContent = x.label + (x.note ? ' · ' + x.note : '');
+      if (!x.available) { o.disabled = true; o.textContent += '（当前不可用）'; }
+      else if (!firstOk) firstOk = x.id;
+      ms.appendChild(o);
+    });
+    ms.value = firstOk || m.defaultModel || (m.models[0] && m.models[0].id) || '';
+    if (!ms.value && ms.options.length) ms.selectedIndex = 0;
+    updModelHint();
+    // 会话：URL 带 tid（素材库「回任务」）就**不新建**，直接恢复那一条 ——
+    // 否则每次从素材库点进来都会多造一个空 draft 会话（aigc 28 条记录里 25 条就是这么来的）
+    if (/[?&]tid=/.test(location.search)) return null;
+    return postJSON('/api/session?mode=' + S.mode, {});
+  }).then(function(j){
+    if (!j){ restoreFromUrl(); return; }
+    S.tid = j.tid; S.nImg = 0;
+    drawUp(); drawQty(); drawCost();
+    refreshPoints();
+  }).catch(function(e){
+    toast('初始化失败：' + e.message, 5000);
+  });
+}
+
+/* 积分显示统一由父页面负责（与 dtl 同款），这里只负责触发刷新 */
+function refreshPoints(){
+  try { if (parent && parent.refreshPoints) parent.refreshPoints(); } catch (e) {}
+}
+
+function updModelHint(){
+  var m = $('model');
+  var opt = m.options[m.selectedIndex];
+  var dis = opt && opt.disabled;
+  var h = $('modelHint');
+  if (dis){
+    h.className = 'hint warn';
+    h.textContent = '该模型当前站点池里没有，选择后会自动切到可用模型出图。';
+  } else {
+    h.className = 'hint';
+    h.textContent = '对应原站同名模型；实际出图会按站点池可用情况自动兜底。';
+  }
+}
+
+/* ---------------- 上传 ---------------- */
+function drawUp(){
+  var cap = S.meta ? (S.meta.maxImages[S.mode]) : 6;
+  $('upCnt').textContent = '(' + S.nImg + '/' + cap + ')';
+  $('upCnt').className = 'cnt ' + (S.nImg >= cap ? 'warn' : 'ok');
+  $('upHint').textContent = '支持 JPG / PNG / WEBP，最多 ' + cap + ' 张'
+    + (S.mode === 'single' ? '（用 @图片N 融合多张）' : '（每张各出一张）');
+  var h = '';
+  for (var i = 0; i < S.nImg; i++){
+    h += '<div class="it"><span class="no">图片' + (i + 1) + '</span>'
+      + '<img src="' + BASE + '/api/session/' + S.tid + '/src/' + (i + 1) + '?t=' + Date.now() + '" alt="">'
+      + '<button class="x" data-del="' + (i + 1) + '" title="删除">×</button></div>';
+  }
+  if (S.nImg < cap) h += '<div class="add" id="btnAdd"><span class="plus">+</span><span>添加</span></div>';
+  $('pv').innerHTML = h;
+  var add = $('btnAdd');
+  if (add) add.onclick = function(){ $('file').click(); };
+  var xs = $('pv').querySelectorAll('[data-del]');
+  for (var k = 0; k < xs.length; k++){
+    xs[k].onclick = function(ev){
+      ev.stopPropagation();
+      delImg(parseInt(this.getAttribute('data-del'), 10));
+    };
+  }
+  drawRefBar();
+  drawQty();
+}
+
+function uploadFiles(files){
+  if (!files || !files.length) return;
+  var fd = new FormData();
+  for (var i = 0; i < files.length; i++) fd.append('images', files[i]);
+  var cap = S.meta ? S.meta.maxImages[S.mode] : 6;
+  if (S.nImg + files.length > cap){
+    toast('最多 ' + cap + ' 张，当前已有 ' + S.nImg + ' 张', 4200);
+    return;
+  }
+  toast('上传中…', 1200);
+  fetch(BASE + '/api/session/' + S.tid + '/upload?mode=' + S.mode, {
+    method: 'POST', credentials: 'include', body: fd
+  }).then(function(r){
+    return r.json().then(function(j){
+      if (!r.ok || j.ok === false) throw new Error(j.error || '上传失败');
+      return j;
+    });
+  }).then(function(j){
+    S.nImg = j.n; drawUp();
+  }).catch(function(e){ toast(e.message, 4500); });
+}
+
+function delImg(idx){
+  var prompt = $('prompt').value;
+  postJSON('/api/session/' + S.tid + '/remove', {idx: idx, prompt: prompt}).then(function(j){
+    S.nImg = j.n;
+    // 后端返回的是权威重排结果，直接覆盖（前端自己算的那遍只在本地即时预览）。
+    // 🔴 判空不能用 `!== ''`：删掉唯一被引用的那张图时，重排结果就是空串，
+    //    不覆盖会让输入框里残留 @图片1 而图已删 → 生成被拦且用户看不出原因。
+    if (typeof j.prompt === 'string' && prompt !== '') {
+      $('prompt').value = j.prompt;
+      S.prompt = j.prompt;
+    }
+    drawUp(); drawRefBar(); drawCost();
+    toast('已删除，提示词里的引用已自动重排', 3000);
+  }).catch(function(e){ toast(e.message, 4000); });
+}
+
+/* ---------------- 模式 ---------------- */
+function setMode(md){
+  if (S.running){ toast('正在生成中，等这批出完再切模式', 3200); return; }
+  if (md === S.mode) return;
+  postJSON('/api/session/' + S.tid + '/mode', {mode: md}).then(function(){
+    S.mode = md;
+    S.picked = [];
+    var ts = document.querySelectorAll('.tab');
+    for (var i = 0; i < ts.length; i++){
+      ts[i].classList.toggle('on', ts[i].getAttribute('data-mode') === md);
+    }
+    drawUp(); drawQty(); drawCost();
+    toast(md === 'single'
+      ? '单张生图：多张参考图会融合成 1 张（可先切到批量删掉多余图）'
+      : '批量生图：N 张参考图 = N 张成品', 3600);
+  }).catch(function(e){
+    toast(e.message, 5000);
+  });
+}
+
+/* ---------------- 提示词 / @ 菜单 ---------------- */
+function drawRefBar(){
+  var txt = $('prompt').value || '';
+  var refs = refsOf(txt);
+  var h = '';
+  if (!S.nImg){
+    h = '<span class="bad">还没上传参考图</span>';
+  } else if (!refs.length){
+    h = '<span>输入 @ 选择参考图；未引用时默认使用全部上传图片</span>';
+  } else {
+    var bad = refs.filter(function(k){ return k >= S.nImg; });
+    h = '<span>本次使用：</span>';
+    refs.forEach(function(k){
+      var label = k < S.nImg ? ('图片' + (k + 1)) : ('图片' + (k + 1) + '(不存在)');
+      h += '<span class="chip' + (k >= S.nImg ? ' bad' : '') + '">' + esc(label) + '</span>';
+    });
+    if (bad.length) h += '<span class="bad">引用了不存在的图片，生成会被拦下</span>';
+    else if (S.mode === 'batch') h += '<span>（批量模式下每张都会用这几张当参考）</span>';
+  }
+  $('refBar').innerHTML = h;
+}
+
+function detectAt(){
+  var el = $('prompt');
+  var pos = el.selectionStart;
+  var before = el.value.slice(0, pos);
+  var m = before.match(/@(?:图片?)?\d*$/);
+  var menu = $('atMenu');
+  if (!m){ menu.classList.add('hide'); S.atPos = null; return; }
+  S.atPos = pos - m[0].length;
+  if (!S.nImg){
+    menu.innerHTML = '<div class="empty">请先上传参考图</div>';
+    menu.classList.remove('hide');
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < S.nImg; i++){
+    h += '<button type="button" class="ait" data-pick="' + i + '">'
+      + '<img src="' + BASE + '/api/session/' + S.tid + '/src/' + (i + 1) + '" alt="">'
+      + '<span>图片' + (i + 1) + '</span></button>';
+  }
+  menu.innerHTML = h;
+  menu.classList.remove('hide');
+  var bts = menu.querySelectorAll('[data-pick]');
+  for (var k = 0; k < bts.length; k++){
+    // 用 mousedown 而不是 click：blur 会先触发把菜单关掉
+    bts[k].onmousedown = function(ev){
+      ev.preventDefault();
+      insertRef(parseInt(this.getAttribute('data-pick'), 10));
+    };
+  }
+}
+
+function insertRef(i){
+  var el = $('prompt');
+  var pos = el.selectionStart;
+  var before = el.value.slice(0, pos);
+  var after = el.value.slice(pos);
+  var m = before.match(/@(?:图片?)?\d*$/);
+  var start = m ? pos - m[0].length : pos;
+  var token = '@图片' + (i + 1) + ' ';
+  el.value = before.slice(0, start) + token + after;
+  var np = start + token.length;
+  S.atPos = null;
+  $('atMenu').classList.add('hide');
+  el.focus();
+  el.setSelectionRange(np, np);
+  S.prompt = el.value;
+  drawRefBar(); drawCost();
+}
+
+/* ---------------- 数量 / 积分 ---------------- */
+function drawQty(){
+  var n = planCount();
+  $('qtyN').textContent = n + ' 张';
+  if (S.mode === 'single'){
+    $('qtyHint').textContent = '单张生图固定 1 张；要按图批量出图请切「批量生图」';
+  } else {
+    $('qtyHint').textContent = '基于上传的多张产品图生成对应数量的图片（数量 = 图数，不可改）';
+  }
+}
+function planCount(){
+  if (S.mode === 'single') return 1;
+  return Math.max(1, S.nImg);
+}
+function drawCost(){
+  var n = planCount(), el = $('cost');
+  if (!S.nImg && S.mode === 'batch'){
+    el.className = 'cost bad';
+    el.textContent = '批量生图请先上传参考图（张数按图数计算）';
+    return;
+  }
+  el.className = 'cost';
+  el.textContent = '生成 ' + n + ' 张图需要消耗 ' + (n * UNIT) + ' 积分（每张 ' + UNIT + ' 积分）';
+}
+
+/* ---------------- 生成 ---------------- */
+function genBody(){
+  return {
+    tid: S.tid, mode: S.mode, prompt: $('prompt').value,
+    ratio: $('ratio').value, res: $('res').value, model: $('model').value,
+    n: planCount()
+  };
+}
+
+function doGenerate(){
+  var b = genBody();
+  if (!b.prompt.trim()){ toast('请输入生图提示词', 3000); return; }
+  var refs = refsOf(b.prompt);
+  var bad = refs.filter(function(k){ return k >= S.nImg; });
+  if (bad.length){
+    toast('提示词引用的图片不存在，请重新输入 @ 选择已上传的参考图', 4600);
+    return;
+  }
+  $('btnGen').disabled = true;
+  postJSON('/api/generate', b).then(function(j){
+    S.items = [];
+    S.running = true;
+    S.notice = '';
+    drawRes(); startPoll();
+    toast('已开始生成 ' + j.n + ' 张', 2400);
+  }).catch(function(e){
+    toast(e.message, 5000);
+    $('btnGen').disabled = false;
+    updGenBtn();
+  });
+}
+
+function startPoll(){
+  if (S.poll) clearInterval(S.poll);
+  S.poll = setInterval(tick, 2500);
+  tick();
+}
+
+function tick(){
+  if (!S.tid) return;
+  getJSON('/api/tasks/' + S.tid).then(function(r){
+    S.items = r.items || [];
+    S.usedModel = r.used_model || '';
+    var busy = S.items.some(function(x){ return x.status === 'running' || x.status === 'pending'; });
+    // 🔴 不能只看会话级 status：单张重生成时会话仍是上一批的 done，第一轮就会退出轮询
+    //    （dtl 2026-11-18 踩过完全一样的坑，这里提前规避）
+    S.running = (r.status === 'running') || (S.redoing && busy);
+    if (!busy) S.redoing = false;
+    drawRes();
+    var pc = (r.progress != null) ? r.progress : 0;
+    $('progPct').textContent = pc + '%';
+    $('progBar').style.width = pc + '%';
+    $('progTxt').textContent = S.running ? ('正在生成电商图 (' + pc + '%)') : '已完成';
+    $('prog').classList.toggle('hide', !S.running);
+    updGenBtn();
+    if (!S.running){
+      clearInterval(S.poll); S.poll = null;
+      refreshPoints();
+      postJSON('/api/tasks/' + S.tid + '/refund', {}).then(function(rf){
+        if (rf.refunded > 0){
+          toast('已退回 ' + rf.refunded + ' 积分（未出图部分）', 4600);
+          refreshPoints();
+        }
+      }).catch(function(){});
+      if (r.status === 'stopped') toast('已停止生成，已出的图保留了', 4200);
+      else if (r.err) $('resNote').innerHTML = '<div class="note bad">' + esc(r.err) + '</div>';
+      if (S.usedModel){
+        $('resNote').innerHTML = '<div class="note ok">本次出图模型：' + esc(S.usedModel) + '</div>';
+      }
+    }
+  }).catch(function(){});
+}
+
+function updGenBtn(){
+  var b = $('btnGen');
+  if (S.running){
+    b.className = 'btn stop';
+    b.innerHTML = '<span class="spin" style="width:15px;height:15px;border-radius:50%;border:2.5px solid rgba(255,255,255,.45);border-top-color:#fff;display:inline-block;animation:spin .8s linear infinite"></span> 停止生成';
+    b.disabled = false;
+  } else {
+    b.className = 'btn';
+    b.textContent = '一键生成';
+    b.disabled = false;
+  }
+  drawCost();
+}
+
+function doStop(){
+  postJSON('/api/tasks/' + S.tid + '/stop', {}).then(function(j){
+    toast(j.msg || '已停止', 4200);
+  }).catch(function(e){ toast(e.message, 4000); });
+}
+
+/* ---------------- 结果区 ---------------- */
+function drawRes(){
+  S.ver++;
+  var its = S.items || [];
+  var done = its.filter(function(x){ return x.status === 'done'; }).length;
+  $('resCnt').textContent = done + ' / ' + its.length + ' 张';
+  $('resCnt').className = 'cnt ' + (its.length && done === its.length ? 'ok' : (done ? 'warn' : 'ok'));
+  if (!its.length){
+    $('resGrid').innerHTML = '<div class="empty" style="grid-column:1/-1">'
+      + '<div class="ei">▢</div><div style="font-weight:700;color:var(--sub)">还没有生成结果</div>'
+      + '<div style="font-size:12.5px">上传参考图 → 写提示词 → 点「一键生成」</div></div>';
+    $('btnAll').textContent = '全选';
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < its.length; i++){
+    var it = its[i], no = i + 1;
+    var on = S.picked.indexOf(no) >= 0;
+    h += '<div class="rc">';
+    h += '<div class="im">';
+    if (it.status === 'done' && it.url){
+      h += '<img src="' + BASE + '/' + it.url + '?v=' + S.ver + '" alt="">';
+    } else if (it.status === 'running'){
+      h += '<div class="sp"></div>';
+    } else if (it.status === 'failed'){
+      h += '<div class="ph err">生成失败<br>' + esc((it.err || '').slice(0, 60)) + '</div>';
+    } else if (it.status === 'skipped'){
+      h += '<div class="ph">未生成<br>（已停止）</div>';
+    } else {
+      h += '<div class="ph">排队中…</div>';
+    }
+    h += '</div>';
+    h += '<div class="ft">';
+    if (it.status === 'done'){
+      h += '<input type="checkbox" class="ck" data-ck="' + no + '"' + (on ? ' checked' : '') + '>';
+    }
+    h += '<span class="no">第 ' + no + ' 张' + (it.w ? ' · ' + it.w + '×' + it.h : '') + '</span>';
+    if (it.status === 'done') h += '<button data-dl="' + no + '">下载</button>';
+    if (it.status !== 'running') h += '<button data-redo="' + no + '" class="primary">重新生成</button>';
+    h += '</div></div>';
+  }
+  $('resGrid').innerHTML = h;
+  var cks = $('resGrid').querySelectorAll('[data-ck]');
+  for (var a = 0; a < cks.length; a++){
+    cks[a].onchange = function(){
+      var n = parseInt(this.getAttribute('data-ck'), 10);
+      var k = S.picked.indexOf(n);
+      if (this.checked && k < 0) S.picked.push(n);
+      if (!this.checked && k >= 0) S.picked.splice(k, 1);
+      updZipBtn();
+    };
+  }
+  var dls = $('resGrid').querySelectorAll('[data-dl]');
+  for (var b2 = 0; b2 < dls.length; b2++){
+    dls[b2].onclick = function(){
+      var n = parseInt(this.getAttribute('data-dl'), 10);
+      window.open(BASE + '/api/tasks/' + S.tid + '/zip?idxs=' + n, '_blank');
+    };
+  }
+  var rds = $('resGrid').querySelectorAll('[data-redo]');
+  for (var c = 0; c < rds.length; c++){
+    rds[c].onclick = function(){
+      redo(parseInt(this.getAttribute('data-redo'), 10));
+    };
+  }
+  updZipBtn();
+}
+
+function updZipBtn(){
+  var n = S.picked.length;
+  $('btnZip').textContent = n ? ('打包下载 (' + n + ')') : '打包下载';
+  var done = (S.items || []).filter(function(x){ return x.status === 'done'; }).length;
+  $('btnAll').textContent = (n && n === done) ? '取消全选' : '全选';
+}
+
+function redo(idx){
+  if (S.running) { toast('正在生成中，稍后再试', 3000); return; }
+  S.redoing = true;
+  postJSON('/api/tasks/' + S.tid + '/redo', {idx: idx, opt: genBody()}).then(function(){
+    startPoll();
+  }).catch(function(e){
+    S.redoing = false;
+    toast(e.message, 4600);
+  });
+}
+
+/* ---------------- 事件绑定 ---------------- */
+$('drop').onclick = function(){ $('file').click(); };
+$('drop').ondragover = function(ev){ ev.preventDefault(); this.classList.add('on'); };
+$('drop').ondragleave = function(){ this.classList.remove('on'); };
+$('drop').ondrop = function(ev){
+  ev.preventDefault(); this.classList.remove('on');
+  uploadFiles(ev.dataTransfer.files);
+};
+$('file').onchange = function(){
+  uploadFiles(this.files);
+  this.value = '';
+};
+$('btnClearUp').onclick = function(){
+  if (!S.nImg) return;
+  if (!confirm('清空全部参考图？提示词里的 @图片 引用也会一并清掉。')) return;
+  (function step(){
+    if (S.nImg <= 0){ $('prompt').value = ''; S.prompt = ''; drawUp(); return; }
+    postJSON('/api/session/' + S.tid + '/remove', {idx: 1, prompt: $('prompt').value}).then(function(j){
+      S.nImg = j.n;
+      if (typeof j.prompt === 'string') $('prompt').value = j.prompt;
+      step();
+    }).catch(function(e){ toast(e.message, 4000); });
+  })();
+};
+
+var tbs = document.querySelectorAll('.tab');
+for (var i = 0; i < tbs.length; i++){
+  tbs[i].onclick = function(){ setMode(this.getAttribute('data-mode')); };
+}
+
+$('prompt').oninput = function(){
+  S.prompt = this.value;
+  detectAt();
+  drawRefBar();
+};
+$('prompt').onclick = detectAt;
+$('prompt').onkeyup = function(ev){
+  if (ev.key === 'Escape'){ $('atMenu').classList.add('hide'); S.atPos = null; return; }
+  detectAt();
+};
+$('prompt').onblur = function(){
+  setTimeout(function(){ $('atMenu').classList.add('hide'); }, 160);
+};
+
+$('model').onchange = function(){ updModelHint(); };
+$('ratio').onchange = function(){
+  var v = this.value;
+  $('ratioHint').textContent = (v === '不选择')
+    ? '不限制比例：由模型自行构图（上游必须给具体尺寸，实际多按方形出图）'
+    : '出图后按该比例精确校正（补边不拉伸）';
+};
+$('ratio').onchange.call($('ratio'));
+
+$('btnGen').onclick = function(){
+  if (S.running) doStop();
+  else doGenerate();
+};
+$('btnAll').onclick = function(){
+  var done = (S.items || []).filter(function(x){ return x.status === 'done'; })
+                            .map(function(x){ return x.idx; });
+  if (S.picked.length === done.length) S.picked = [];
+  else S.picked = done.slice();
+  drawRes();
+};
+$('btnZip').onclick = function(){
+  var its = S.items || [];
+  var ok = its.filter(function(x){ return x.status === 'done'; }).map(function(x){ return x.idx; });
+  if (!ok.length){ toast('还没有可下载的图', 2800); return; }
+  var sel = S.picked.length ? S.picked : ok;
+  window.open(BASE + '/api/tasks/' + S.tid + '/zip?idxs=' + sel.join(','), '_blank');
+};
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方案 · 同款产品组 7 图关联编辑</title>
+<style>
+:root{--ink:#1c2333;--sub:#5b6478;--line:#e5e9f2;--bg:#f6f8fc;--card:#fff;
+--blue:#2f6df6;--green:#0ea672;--amber:#d98218;--red:#d64550;--purple:#7a5af8}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:15px/1.75 "Microsoft YaHei",system-ui,sans-serif;color:var(--ink);background:var(--bg);padding:28px 16px}
+.wrap{max-width:980px;margin:0 auto}
+h1{font-size:24px;margin-bottom:6px}
+.sub{color:var(--sub);margin-bottom:22px}
+h2{font-size:18px;margin:30px 0 12px;padding-left:10px;border-left:4px solid var(--blue)}
+h3{font-size:15px;margin:16px 0 8px;color:var(--blue)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:12px 0}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#eef2fb}
+code,pre{font-family:Consolas,"Courier New",monospace}
+code{background:#eef2fb;padding:1px 6px;border-radius:4px;font-size:13px}
+pre{background:#12161f;color:#dce4f5;border-radius:10px;padding:14px 16px;font-size:12.5px;line-height:1.65;overflow-x:auto;margin:10px 0}
+pre b{color:#7fd0ff;font-weight:600}
+.tag{display:inline-block;font-size:12px;padding:2px 10px;border-radius:99px;margin-right:6px;vertical-align:2px}
+.t-blue{background:#e5edff;color:var(--blue)}.t-green{background:#dff6ec;color:var(--green)}
+.t-amber{background:#fdf1de;color:var(--amber)}.t-purple{background:#efe9ff;color:var(--purple)}
+.pill{display:inline-block;background:#eef2fb;border-radius:8px;padding:1px 8px;font-size:13px}
+.ok{color:var(--green);font-weight:600}.warn{color:var(--amber);font-weight:600}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:12px 0}
+.flow .st{flex:1;min-width:120px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
+.flow .st b{display:block;color:var(--blue);font-size:14px;margin-bottom:3px}
+.flow .ar{align-self:center;color:var(--sub);font-size:18px}
+ul{margin:6px 0 6px 20px}
+.small{font-size:13px;color:var(--sub)}
+</style>
+</head>
+<body><div class="wrap">
+
+<h1>方案 · 同款产品组：7 图关联编辑</h1>
+<div class="sub">分部位工作台升级 ｜ 2026-10-06 ｜ 待确认后实施</div>
+
+<div class="card">
+<b>需求拆解（5 件事）</b>
+<table>
+<tr><th style="width:36%">需求</th><th>本方案对应</th></tr>
+<tr><td>主图位 2 张 → 7 张</td><td>主图区升级为「产品组」7 宫格（弹性 1~7 张）</td></tr>
+<tr><td>7 张是同一个产品、同一个详情页的不同角度，要<b>关联</b></td><td>组内共享：操作配置 / 参考图 / 提示词 / <b>产品规格卡</b>；独立：各自 bbox / 各自成品</td></tr>
+<tr><td>对每张图各自角度的部位重绘，7 张同时做</td><td>「▶ 对全组执行」串行批量，每张带同一套约束</td></tr>
+<tr><td>批量生成时 材质/款式/图案/细节 7 张完全一致</td><td><b>三层一致性锁定</b>（见第三节）+ 优化后的约束提示词（见第四节）</td></tr>
+<tr><td>哪张不满意单独重做，重做完仍与其余 6 张一致</td><td>「↻ 单独重做这张」：同一规格卡 + 同一参考图 + 兄弟成品当视觉锚点</td></tr>
+</table>
+</div>
+
+<h2>一、总体架构：从「双主图独立」升级为「产品组」</h2>
+<div class="card">
+<p><b>现状</b>：A / B 两个槽完全独立（各自识别、各自操作、各自参考图），互不关联——这正是 7 张图不一致的根源。</p>
+<p><b>升级后</b>：一个「产品组」= 1~7 张同款不同角度的主图。</p>
+<table>
+<tr><th></th><th>组内共享（填一份，全组生效）</th><th>每张独立（各自保存）</th></tr>
+<tr><td>内容</td>
+<td>部位操作选择（换图案 / 换材质 / 去挂绳…）<br>参考图（材质 / 图案 / 外观）<br>自定义提示词、补充描述<br>执行模式（分层 / 融合）<br><b>📋 产品规格卡</b></td>
+<td>主图本身<br>部位识别 bbox（不同角度位置不同）<br>生成成品<br>单独重做入口</td></tr>
+</table>
+<div class="flow">
+<div class="st"><b>① 上传 1~7 张</b>同款不同角度，指定基准图（默认图1 ⭐）</div><div class="ar">→</div>
+<div class="st"><b>② 批量识别部位</b>逐张 bbox（约 10s/张，后台跑）</div><div class="ar">→</div>
+<div class="st"><b>③ 提取规格卡</b>视觉模型看基准图 → 4 行产品定义 → 你可编辑确认</div><div class="ar">→</div>
+<div class="st"><b>④ 对全组执行</b>图1→图7 串行生成，每张带 规格卡+参考图+锚点</div><div class="ar">→</div>
+<div class="st"><b>⑤ 按角度分组出结果</b>哪张不满意 → 单独重做（仍对齐其余 6 张）</div>
+</div>
+</div>
+
+<h2>二、为什么「共享参考图」还不够，需要额外约束</h2>
+<div class="card">
+<p>材质 / 图案参考图全组共用，已经保证了「输入一致」。但 gpt-image-2 在不同角度下会<b>自行脑补</b>：同一句「磨砂奶白」，45° 俯拍和正面平拍出来的光泽、颗粒、图案缩放比例都会有偏差——输入一致 ≠ 输出一致。所以要在「参考图」之上再加两道锁 + 一道程序保证：</p>
+<ul>
+<li><b>文本锁</b>：同一份规格卡逐字注入 7 张的每条提示词 → 产品定义零歧义</li>
+<li><b>视觉锁</b>：生成第 N 张时，把组内已完成的成品作为「兄弟锚点图」一起传入 → AI 照着已定稿的图抄，而不是重新想象</li>
+<li><b>程序锁</b>：分层模式 bbox 外像素程序贴回（已有机制）→ 不改的地方一个像素不动，是硬保证</li>
+</ul>
+</div>
+
+<h2>三、一致性三层锁定（核心机制）</h2>
+
+<div class="card">
+<h3><span class="tag t-blue">第 1 层</span>产品规格卡 · 文本锁定（材质 / 款式 / 细节）</h3>
+<ul>
+<li>视觉模型（gpt-5.4）对<b>基准图</b>提取 4 行结构化英文规格：<code>MATERIAL / FORM / PATTERN / DETAILS</code>（≤120 词）</li>
+<li>这份规格卡<b>一字不差地注入全组每张图的每条生成提示词</b>——7 张图收到的是同一份产品定义，杜绝「同款不同描述」</li>
+<li>提取后先弹给你看，<b>可以手动改</b>（比如 AI 写「哑光」你改成「磨砂」），确认后锁定；重做单张也复用同一份，不会漂移</li>
+</ul>
+</div>
+
+<div class="card">
+<h3><span class="tag t-green">第 2 层</span>兄弟锚点图 · 视觉锁定（跨角度对齐）</h3>
+<ul>
+<li>批量执行：<b>图1 先出 → 图1 成品作为图2~7 的锚点参考图</b>一起传入；若图1 中途失败则用原始基准图兜底</li>
+<li>单张重做：自动取<b>其余 6 张中最新完成的成品</b>当锚点（也可手动指定某张为 ⭐ 基准）</li>
+<li>锚点约束词明确写死：材质/图案/颜色/细节必须与兄弟图完全一致，<b>只允许随第 1 张图的视角调整透视</b></li>
+<li>每张最多带 1~2 张锚点，不撑爆生图模型的输入图数量</li>
+</ul>
+</div>
+
+<div class="card">
+<h3><span class="tag t-amber">第 3 层</span>程序贴回 · 像素锁定（区域外绝对不动）</h3>
+<ul>
+<li>分层模式已有机制全组继承：每张图 bbox 外用原图像素贴回，「不改的地方一个像素都不动」是程序硬保证</li>
+<li>单张重做时其他 6 张<b>根本不重新生成</b>，天然零影响</li>
+</ul>
+<p class="small">可选第 4 层：若 apib 的 gpt-image-2 支持 <code>seed</code> 参数，全组共用同一 seed 再加一档；实测不支持就自动跳过，不阻塞。</p>
+</div>
+
+<h2>四、约束提示词优化（新增模板全文）</h2>
+
+<div class="card">
+<h3>4.1 规格卡提取 SPEC_Q <span class="tag t-blue">新增 · engine/parts.py</span></h3>
+<pre>This is the reference photo of a product (photo 1 of a series of the SAME product).
+Write a compact DESIGN SPEC for it, in English, max 120 words, exactly 4 labeled lines:
+MATERIAL: base color, gloss/matte level, texture, grain
+FORM: overall shape, construction and style of the product
+PATTERN: printed artwork — motif, layout, colors — or write 'none'
+DETAILS: distinctive details — logo, stitching, edges, hardware, attachment points
+This spec will be injected into image-generation prompts to keep a whole photo
+series of this product perfectly consistent. Be precise and visual; no marketing words.</pre>
+
+<h3>4.2 规格卡注入格式 SPEC_BLOCK <span class="tag t-blue">新增 · 注入每条提示词</span></h3>
+<pre>[DESIGN SPEC — SAME PRODUCT SERIES, BINDING]
+{spec}
+This spec is binding for every photo in this series: material, surface finish,
+pattern, colors and construction details must stay IDENTICAL across the whole series.</pre>
+
+<h3>4.3 兄弟锚点约束 SIBLING_REF <span class="tag t-green">新增 · 走 _ref_header 按编号注入</span></h3>
+<pre>CRITICAL: Image {n} is a SIBLING photo of the SAME product shown from another angle.
+It is the BINDING STANDARD for this product series: your output must reproduce
+exactly the same material, surface finish, printed pattern, colors and construction
+details as this sibling photo. Do NOT introduce any variation, redesign or
+re-interpretation — only adapt the perspective to match the FIRST image's viewpoint.</pre>
+
+<h3>4.4 组模式兜底句 SERIES_TAIL <span class="tag t-purple">新增 · 拼在参考图说明之后</span></h3>
+<pre>Follow the reference images STRICTLY as binding specifications. Reproduce what they
+show exactly; never replace, blend or re-imagine it with your own association.
+This photo belongs to a SERIES of the SAME product: keep material, finish, pattern,
+colors and details IDENTICAL across the series; only the camera angle follows the FIRST image.</pre>
+
+<h3>4.5 既有约束全部继承</h3>
+<ul>
+<li><span class="pill">STRICT_REFS</span> 图案 1:1 复刻 / 材质只取表面质感·忽略参考图自带图案（串色修复版）/ 外观严格复刻 —— 原样保留，全组共用</li>
+<li><span class="pill">STRICT_TAIL</span> 单图场景继续用；组场景用 SERIES_TAIL 替换</li>
+<li><span class="pill">TAIL</span> 保护未提及部位不变的原句保留</li>
+</ul>
+</div>
+
+<h2>五、UI 变化（parts.html）</h2>
+<div class="card">
+<table>
+<tr><th style="width:30%">区域</th><th>改动</th></tr>
+<tr><td>主图区</td><td>A/B 双 tab → <b>7 宫格</b>（图1~图7，弹性 1~7 张）；标注「同款产品 · 不同角度」；图1 默认 ⭐ 基准图，可点击换基准；单张可换图/删除</td></tr>
+<tr><td>部位操作区</td><td>改为<b>全组共享</b>填一份；识别结果 / 手动框按「当前选中的那张图」各自显示和保存</td></tr>
+<tr><td>参考图区</td><td>全组共享一份（材质 / 图案 / 外观槽不变）</td></tr>
+<tr><td>新增「📋 产品规格卡」面板</td><td>「提取规格卡」按钮 → 显示 4 行规格 → 可编辑 → 🔒 锁定徽章；组执行前未提取会自动先提</td></tr>
+<tr><td>执行按钮</td><td>「▶ 对全组 N 张执行」为主；保留「只执行当前这张」（单图场景兼容）</td></tr>
+<tr><td>结果区</td><td>按角度 1~7 分组展示成品；每张带「↻ 单独重做这张」；现有逐步重跑 / 🎯 程序重放按钮全保留</td></tr>
+<tr><td>生图记录</td><td>同组任务折叠成一条组记录，展开看 7 张子任务</td></tr>
+</table>
+</div>
+
+<h2>六、服务端改动（server.py + engine/parts.py）</h2>
+<div class="card">
+<table>
+<tr><th style="width:38%">接口</th><th>职责</th></tr>
+<tr><td><code>POST /api/parts/group_detect</code></td><td>批量识别：逐张调现有 detect_parts，进度落盘（约 10s/张）</td></tr>
+<tr><td><code>POST /api/parts/group_spec</code></td><td>规格卡提取：gpt-5.4 对基准图跑 SPEC_Q；支持传回编辑后的文本锁定</td></tr>
+<tr><td><code>POST /api/parts/group_run</code></td><td>组任务：后台线程按图1→图N 串行，每张复用现有 _parts_pipeline，payload 注入 SPEC_BLOCK + 锚点图；子 job 记录带 group_id / img_index</td></tr>
+<tr><td><code>POST /api/parts/group_redo</code></td><td>单张重做：同一规格卡 + 同一参考图 + 锚点=组内最新成品，只重生成这一张</td></tr>
+<tr><td>job 记录结构</td><td>加 <code>group_id / img_index / spec</code> 字段；组执行串行（不并发），锚点链才成立</td></tr>
+</table>
+</div>
+
+<h2>七、耗时与费用预估（按实测基准）</h2>
+<div class="card">
+<table>
+<tr><th>环节</th><th>单次</th><th>7 张合计</th></tr>
+<tr><td>部位识别（gpt-5.4）</td><td>~10s</td><td>~70s（后台批量）</td></tr>
+<tr><td>规格卡提取</td><td colspan="2">1 次 ~10s</td></tr>
+<tr><td>融合模式生成</td><td>~60-90s/张</td><td><b>约 7~10 分钟</b>（串行 + 锚点）</td></tr>
+<tr><td>分层模式生成</td><td>~140s/步/张</td><td>如每张 2 步 ≈ 32 分钟（后台跑，可关页面）</td></tr>
+<tr><td>单张重做</td><td colspan="2">只花 1 张的钱，其余 6 张不动</td></tr>
+</table>
+<p class="small">⚠️ 组执行期间页面可以关（沿用现有后台任务 + 落盘恢复机制）；中途失败已出的图都保得住，可从断点接着跑。</p>
+</div>
+
+<h2>八、实施步骤（确认后执行）</h2>
+<div class="card">
+<ol>
+<li><b>engine/parts.py</b>：加 SPEC_Q / SPEC_BLOCK / SIBLING_REF / SERIES_TAIL 四个模板 + extract_spec()</li>
+<li><b>server.py</b>：4 个组接口 + _ref_header 支持锚点图注入 + job 结构扩展</li>
+<li><b>parts.html</b>：7 宫格主图区 / 共享配置 / 规格卡面板 / 组执行 / 分组结果 / 单张重做</li>
+<li><b>mock 测试</b>：组执行链式锚定、规格卡注入、单张重做复用规格卡与锚点、断点续跑（扩展现有 _test_pattern_block.py，目标全绿）</li>
+<li><b>真实冒烟</b>：本地起服 → 用 2~3 张真实图小规模验证一致性 → 交付试用</li>
+<li>你试用确认后 <code>bash deploy.sh</code> 与之前积累的功能一次全量上线</li>
+</ol>
+</div>
+
+</div></body></html>

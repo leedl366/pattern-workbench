@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · 速图AIGC-专业3C数码配件生图</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="accounts/static/ui.css">
+<style>
+/* 令牌来自 ui.css，本页只留布局 */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:linear-gradient(160deg,var(--pri-050),var(--bg) 55%);color:var(--tx);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{width:380px;max-width:100%;background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:32px 30px;box-shadow:0 12px 40px rgba(13,148,136,.08)}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.brand .logo{width:38px;height:38px;border-radius:var(--r-ctl);background:linear-gradient(145deg,#3b4cf0 0%,#5b3df0 55%,#7b3af5 100%);color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px}
+.brand b{font-size:19px;letter-spacing:-.01em}
+.sub{color:var(--sub);font-size:13px;margin-bottom:22px}
+.tabs{display:flex;background:rgba(255,255,255,.06);border-radius:var(--r-ctl);padding:4px;margin-bottom:20px}
+.tabs div{flex:1;text-align:center;padding:8px 0;border-radius:var(--r-sm);font-size:14px;font-weight:600;color:var(--sub);cursor:pointer}
+.tabs div.on{background:var(--card);color:var(--pri);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+label{display:block;font-size:13px;color:var(--sub);margin:14px 0 6px}
+input{width:100%;padding:11px 12px;border:1px solid var(--bd);border-radius:var(--r-ctl);font-size:14px;outline:none}
+input:focus{border-color:var(--pri2);box-shadow:var(--ring)}
+.btn{width:100%;margin-top:22px;padding:12px;border:none;border-radius:var(--r-ctl);background:var(--grad-pri);color:var(--on-pri);font-size:15px;font-weight:700;cursor:pointer}
+.btn:disabled{opacity:.55;cursor:default}
+.msg{margin-top:14px;font-size:13px;min-height:18px;text-align:center}
+.msg.err{color:var(--err)}.msg.ok{color:var(--ok)}
+.tip{margin-top:18px;text-align:center;font-size:12px;color:var(--faint)}
+/* 邀约：被邀请提示条 + 邀请码输入 */
+.invbar{display:none;margin-bottom:16px;padding:11px 13px;border-radius:var(--r-ctl);
+  background:linear-gradient(135deg,rgba(74,222,128,.10),rgba(255,255,255,.06));border:1px solid rgba(74,222,128,.30);font-size:12.8px;color:#e5e7eb;line-height:1.6}
+.invbar b{color:#4ade80}
+.invbar.err{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.32);color:#f87171}
+.invbar.err b{color:#f87171}
+.invcode{display:none;margin-top:12px}
+.invcode input{letter-spacing:.18em;text-transform:uppercase;font-family:ui-monospace,Consolas,monospace}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><span class="logo">✦</span><b>速图AIGC</b></div>
+  <div class="sub">专业 3C 数码配件生图 · 图案提取 / 批量去水印 / 多图编辑</div>
+  <div class="invbar" id="invBar"></div>
+  <div class="tabs">
+    <div id="tabLogin" class="on">登录</div>
+    <div id="tabReg">注册（送 10 积分）</div>
+  </div>
+  <label>用户名</label>
+  <input id="uname" placeholder="2-24 位，中英文/数字/下划线" autocomplete="username">
+  <label>密码</label>
+  <input id="pw" type="password" placeholder="至少 6 位" autocomplete="current-password">
+  <label id="pw2Label" style="display:none">确认密码</label>
+  <input id="pw2" type="password" placeholder="再输入一次密码" style="display:none" autocomplete="new-password">
+  <div class="invcode" id="invCodeWrap">
+    <label style="margin-top:0">邀请码（选填）</label>
+    <input id="invCode" placeholder="6 位邀请码" maxlength="12" autocomplete="off">
+  </div>
+  <button class="btn" id="go">登 录</button>
+  <div class="msg" id="msg"></div>
+  <div class="tip">新用户注册即送 10 积分体验 · 1 积分 = 0.1 元</div>
+</div>
+<script>
+var BASE = location.pathname.replace(/\/login\/?.*$/, '').replace(/\/+$/, '');
+var mode = 'login';
+var tabL = document.getElementById('tabLogin'), tabR = document.getElementById('tabReg');
+var pw2 = document.getElementById('pw2'), pw2Label = document.getElementById('pw2Label');
+var go = document.getElementById('go'), msg = document.getElementById('msg');
+var invBar = document.getElementById('invBar');
+var invCodeWrap = document.getElementById('invCodeWrap');
+var invCode = document.getElementById('invCode');
+var invOk = false;          /* 邀请码是否已校验通过（决定要不要提交 ref） */
+
+/* ---------- 邀约：从 ?ref= 读邀请码 ---------- */
+function getRefParam(){
+  var m = (location.search || '').match(/[?&]ref=([^&]+)/);
+  return m ? decodeURIComponent(m[1]).trim().toUpperCase() : '';
+}
+function showInvBar(html, isErr){
+  invBar.innerHTML = html;
+  invBar.style.display = 'block';
+  invBar.classList.toggle('err', !!isErr);
+}
+function checkInvite(code){
+  code = (code || '').trim().toUpperCase();
+  if (!code){
+    invOk = false;
+    invBar.style.display = 'none';
+    return;
+  }
+  fetch(BASE + '/accounts/api/invite/check?ref=' + encodeURIComponent(code))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok){
+        invOk = true;
+        invCode.value = code;
+        showInvBar('🎁 <b>' + d.inviter + '</b> 邀请你注册 —— 注册成功双方都有积分奖励', false);
+      } else {
+        invOk = false;
+        showInvBar('邀请码无效：' + ((d && d.error) || '不存在') + '，仍可直接注册（不绑定邀请关系）', true);
+      }
+    })
+    .catch(function(){ invOk = false; });
+}
+
+var REF0 = getRefParam();
+if (REF0){
+  invCode.value = REF0;
+  setMode('reg');           /* 带 ref 进来 → 直接停在注册页 */
+  checkInvite(REF0);
+}
+invCode.addEventListener('input', function(){
+  var v = this.value.trim().toUpperCase();
+  if (v.length >= 6) checkInvite(v); else { invOk = false; invBar.style.display = 'none'; }
+});
+
+function setMode(m){
+  mode = m;
+  tabL.classList.toggle('on', m === 'login');
+  tabR.classList.toggle('on', m === 'reg');
+  pw2.style.display = pw2Label.style.display = (m === 'reg') ? '' : 'none';
+  invCodeWrap.style.display = (m === 'reg') ? '' : 'none';
+  if (m !== 'reg') invBar.style.display = 'none';
+  else if (REF0) checkInvite(invCode.value || REF0);
+  go.textContent = (m === 'reg') ? '注册并登录' : '登 录';
+  msg.textContent = '';
+}
+tabL.onclick = function(){ setMode('login'); };
+tabR.onclick = function(){ setMode('reg'); };
+function say(t, ok){ msg.textContent = t; msg.className = 'msg ' + (ok ? 'ok' : 'err'); }
+go.onclick = function(){
+  var username = document.getElementById('uname').value.trim();
+  var password = document.getElementById('pw').value;
+  if (!username || !password) return say('请填写用户名和密码');
+  if (mode === 'reg' && password !== pw2.value) return say('两次输入的密码不一致');
+  go.disabled = true;
+  var body = { username: username, password: password };
+  if (mode === 'reg'){
+    var rc = (invCode.value || '').trim().toUpperCase();
+    if (rc) body.ref = rc;          /* 有码就带上；无效码后端会静默不绑，不影响注册 */
+  }
+  fetch(BASE + '/accounts/api/' + (mode === 'reg' ? 'register' : 'login'), {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    go.disabled = false;
+    if (d.ok){
+      var t = mode === 'reg' ? '注册成功，已送 10 积分，正在进入…' : '登录成功，正在进入…';
+      if (mode === 'reg' && d.invited) t = '注册成功，邀请关系已绑定，正在进入…';
+      say(t, true);
+      setTimeout(function(){ location.href = BASE + '/'; }, 500);
+    } else {
+      say(d.error || '操作失败');
+    }
+  }).catch(function(){ go.disabled = false; say('网络错误，请重试'); });
+};
+document.addEventListener('keydown', function(e){ if (e.key === 'Enter') go.click(); });
+</script>
+</body>
+</html>

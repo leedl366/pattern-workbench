@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>批量去水印工作台</title>
+<style>
+  @font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:400;font-display:swap;src:url(https://<your-bucket>.cos.ap-guangzhou.myqcloud.com/ui/fonts/plus-jakarta-sans-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:600;font-display:swap;src:url(https://<your-bucket>.cos.ap-guangzhou.myqcloud.com/ui/fonts/plus-jakarta-sans-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:700;font-display:swap;src:url(https://<your-bucket>.cos.ap-guangzhou.myqcloud.com/ui/fonts/plus-jakarta-sans-latin-700-normal.woff2) format('woff2')}
+:root {
+    /* 2026-11-19 与全站统一为深色（能影风） */
+    --bg: #090a0e;
+    --card: #15171d;
+    --border: rgba(255,255,255,.08);
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+    --primary: #ffffff;
+    --primary-h: #d8dade;
+    --ok: #4ade80;
+    --bad: #f87171;
+    --warn: #fbbf24;
+    --radius: 16px;
+    --shadow: 0 0 0 1px rgba(255,255,255,.045);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5;
+  }
+  .topbar {
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 12px 22px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 20;
+  }
+  .topbar .logo {
+    width: 44px; height: 44px; border-radius: 12px; flex: none;
+    background: linear-gradient(135deg, #3b4cf0, #7b3af5);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 22px;
+  }
+  .topbar h1 { font-size: 20px; font-weight: 700; letter-spacing: -.02em; display: flex; align-items: center; }
+  .topbar h1 span.hl { color: var(--primary); }
+  .layout { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; padding: 18px 22px; align-items: stretch; }
+  .panel {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 18px;
+  }
+  .left { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+  .right { width: 100%; min-width: 0; }
+  .panel h3 {
+    font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  .panel h3 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); display: inline-block; flex: none; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; font-weight: 500; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; color: var(--text); background: var(--card); outline: none; transition: border .15s;
+    font-family: inherit;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--primary); }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 14px; border: none; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: all .15s; width: 100%;
+  }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: #111214; }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-h); }
+  .btn-ghost { background: rgba(255,255,255,.06); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-ok { background: var(--ok); color: #111214; }
+  .btn-ok:hover:not(:disabled) { background: #15803d; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  /* 输出放大下拉（2026-11-15）：只改尺寸不改比例，保证成品能贴回原图 */
+  .up-sel{appearance:none;-webkit-appearance:none;height:38px;padding:0 32px 0 11px;font-size:13px;font-weight:600;
+    color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:9px;cursor:pointer;outline:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4.5L6 8.5L10 4.5' fill='none' stroke='%236b7280' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 10px center}
+  .up-sel:hover{border-color:var(--primary)}
+  .up-sel:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(13,148,136,.12)}
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .tag {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+    border-radius: 20px; font-size: 12px; font-weight: 600;
+  }
+  .tag-blue { background: rgba(255,255,255,.06); color: var(--primary); }
+  .tag-green { background: rgba(74,222,128,.12); color: var(--ok); }
+  .canvas-wrap {
+    position: relative; border: 1px dashed var(--border); border-radius: 8px;
+    background: var(--card2); overflow: hidden; min-height: 160px; display: flex; align-items: center; justify-content: center;
+  }
+  .status { padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-top: 10px; display: none; }
+  .status.show { display: block; }
+  .status.ok { background: rgba(74,222,128,.12); color: var(--ok); border: 1px solid rgba(74,222,128,.30); }
+  .status.err { background: rgba(248,113,113,.14); color: var(--bad); border: 1px solid rgba(248,113,113,.32); }
+  .status.info { background: rgba(96,165,250,.14); color: #93c5fd; border: 1px solid rgba(96,165,250,.32); }
+  .result-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .result-head .actions { display: flex; gap: 10px; }
+  .result-head .actions .btn { width: auto; }
+  /* Taste 优化（2026-10-13）：批量核对时「这是第几张」必须一眼可辨 ——
+     每张结果卡头部整条淡主题色带 + 实色数字块，编号是全卡最重的元素；
+     状态做成胶囊（成功=绿 / 失败=红 / 跳过=黄），扫一眼就知道哪些没过。 */
+  .result-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+  .result-item {
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card);
+  }
+  .result-item .rhd {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px; flex-wrap: wrap;
+    background: rgba(255,255,255,.05); border-bottom: 1px solid rgba(255,255,255,.10);
+  }
+  .result-item .rhd .no {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 40px; height: 28px; padding: 0 8px; border-radius: 9px;
+    background: var(--primary); color: #111214; font-size: 15px; font-weight: 800;
+    letter-spacing: 1px; box-shadow: 0 2px 6px rgba(0,0,0,.35); flex: none;
+  }
+  .result-item .rhd .rname { font-weight: 700; font-size: 13px; word-break: break-all; flex: 1; min-width: 120px; }
+  .result-item .rhd .rst { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+  .result-item .rhd .rst.ok { color: #4ade80; background: rgba(74,222,128,.12); border: 1px solid rgba(74,222,128,.30); }
+  .result-item .rhd .rst.bad { color: #f87171; background: rgba(248,113,113,.14); border: 1px solid rgba(248,113,113,.32); }
+  .result-item .rhd .rst.skip { color: #fbbf24; background: rgba(251,191,36,.14); border: 1px solid #fde68a; }
+  .result-item.fail { border-color: rgba(248,113,113,.32); }
+  .result-item.skip { border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.14); }
+  .result-item .skipmsg { color: var(--warn); font-size: 12px; }
+  .result-item .img-row { position: relative; }
+  .result-item img { width: 100%; display: block; }
+  .result-item .meta {
+    display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+    gap: 10px; border-top: 1px solid var(--border);
+  }
+  .result-item .err { color: var(--bad); font-size: 12px; }
+  .check-row { display: flex; align-items: center; gap: 8px; }
+  .check-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--ok); cursor: pointer; }
+  .check-row label { font-size: 12px; cursor: pointer; }
+  /* 「原图 / 成品」并排对比（组件样式由 cmp.js 自注入，这里只做本页贴合）：
+     按钮与「通过」勾选同排；图区展开时容器高度交给组件自身（不再被图片高度锁死）。 */
+  .result-item .meta .cmp-btn { padding: 6px 12px; font-size: 12px; }
+  .result-item .img-row.cmp-open img { height: 100%; }
+  .empty { text-align: center; color: var(--muted); padding: 50px 0; }
+  .model-dd-wrap { position: relative; }
+  .model-dropdown {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: var(--shadow); max-height: 260px; overflow-y: auto; margin-top: 4px; display: none;
+  }
+  .model-dropdown .dd-item {
+    padding: 8px 12px; font-size: 13px; cursor: pointer; word-break: break-all;
+  }
+  .model-dropdown .dd-item:hover { background: rgba(255,255,255,.06); color: var(--primary); }
+  .model-dropdown .dd-item.active { background: rgba(255,255,255,.06); color: var(--primary); font-weight: 600; }
+  .model-dropdown .dd-info {
+    padding: 6px 12px; font-size: 11px; color: var(--muted);
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--card);
+  }
+  /* ── 版块切换 Tab（与图案提取工作台共用同一条） ── */
+  .sectab { display: flex; gap: 4px; background: rgba(255,255,255,.06); padding: 3px; border-radius: 9px; }
+  .sectab a {
+    display: block; padding: 5px 14px; border-radius: 7px; font-size: 13px; font-weight: 600;
+    color: var(--muted); text-decoration: none; white-space: nowrap; transition: .15s;
+  }
+  .sectab a:hover { color: var(--primary); }
+  .sectab a.on { background: rgba(255,255,255,.14); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); }
+  /* ── 问号说明气泡：hover 或点击触发（触屏可点），点空白处关闭 ── */
+  .q{position:relative;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;
+     background:rgba(255,255,255,.12);color:var(--primary);border:1px solid rgba(255,255,255,.20);font-size:11px;font-weight:700;cursor:pointer;
+     flex:none;user-select:none;vertical-align:middle;line-height:1;margin-left:7px;-webkit-tap-highlight-color:transparent}
+  .q:hover{background:rgba(255,255,255,.20)}
+  .q .tip{display:none;position:absolute;z-index:99;top:calc(100% + 9px);left:50%;transform:translateX(-50%);
+     width:max-content;max-width:min(360px,80vw);background:rgba(255,255,255,.06);color:#fff;font-size:12.5px;font-weight:400;
+     line-height:1.75;padding:10px 13px;border-radius:9px;box-shadow:0 10px 28px rgba(0,0,0,.20);text-align:left;
+     white-space:pre-line;letter-spacing:0}
+  .q .tip b{color:#c9ccd2;font-weight:700}
+  .q .tip::before{content:"";position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+     border:6px solid transparent;border-bottom-color:var(--text)}
+  .q:hover .tip,.q.open .tip{display:block}
+  /* 靠右元素用右对齐变体，防气泡溢出屏幕 */
+  .q.r .tip{left:auto;right:0;transform:none}
+  .q.r .tip::before{left:auto;right:12px;transform:none}
+</style>
+<script src="../accounts/static/cmp-20261014e.js"></script>
+</head>
+<body>
+  <div class="topbar">
+    <div class="logo">🖼️</div>
+    <h1>批量<span class="hl">去水印</span>工作台<span class="q">?<span class="tip">上传图片（或整夹上传）→ 云端模型整图去水印 → 逐个核对对比图并勾选「通过」→ 写入输出文件夹（留空则打包 zip 下载）。<br>全程<b>不用圈选水印</b>，模型自动识别并抹除。</span></span></h1>
+    <div id="engineBadge" style="margin-left:auto;display:none"></div>
+  </div>
+
+  <div class="layout">
+    <!-- 左：配置 -->
+    <div class="left">
+      <!-- 「① 模型引擎」配置区：按需求整块隐藏。
+           引擎 / 接口地址 / 密钥 / 模型名 / 提示词一律走服务端内置通道（站点池），
+           界面上不再暴露任何站点名/模型名。
+           ⚠️ 只隐藏不删除 DOM：init() / saveConfig() / doPreview() 仍会读取 #engine、各 *Fields
+           与 4 个 prompt textarea 的值，删掉会直接抛 null.value。 -->
+      <div class="panel" id="enginePanel" style="display:none" aria-hidden="true">
+        <h3><span class="dot"></span>① 模型引擎<span class="q">?<span class="tip">云端模型都是<b>整图处理</b>：自动识别并抹除水印，不用圈选。<br>默认「<b>内置生图通道</b>」（开箱即用，密钥由服务端托管），也可切「魔搭免费 / 万相专能 / 自定义模型」。<br>本地 OpenCV / LaMa 引擎依赖水印样例定位，样例功能已下线，列表不再提供。</span></span></h3>
+        <div class="field">
+          <label>处理引擎</label>
+          <select id="engine" onchange="onEngineChange()"></select>
+        </div>
+
+        <!-- 内置通道（默认） -->
+        <div id="lensapiFields" style="display:none">
+          <div class="field">
+            <label>接口地址<span class="q">?<span class="tip">已预设为内置生图通道；填到 /v1 或不填 /v1 都行，程序会自动补全。</span></span></label>
+            <input id="lsBaseUrl" placeholder="留空 = 用内置通道">
+          </div>
+          <div class="field">
+            <label>密钥<span class="q">?<span class="tip"><b>留空即可用</b>——程序自动读服务端托管密钥。只有临时换 key 时才需要在这里覆盖。</span></span></label>
+            <input id="lsKey" type="password" placeholder="留空 = 用内置密钥">
+          </div>
+          <div class="field">
+            <label>模型名<span class="q">?<span class="tip">留空 = 用内置模型池；模型不可用时会自动轮换，无需手动切换。多个模型可用英文逗号分隔。</span></span></label>
+            <input id="lsModel" placeholder="留空 = 用内置模型池">
+          </div>
+          <div class="field">
+            <label>去水印提示词模板</label>
+            <textarea id="lsPrompt"></textarea>
+          </div>
+        </div>
+
+        <div id="modelscopeFields" style="display:none">
+          <div class="field">
+            <label>魔搭访问令牌（ms-...）<span class="q">?<span class="tip"><b>免费额度</b>：每日 0 点重置，生成类模型约 50 张/天，超额报 429。<br>获取：modelscope.cn → 头像 → 访问令牌 → 新建 → 选「写入权限」。<br>⚠️ 免费通道出图约 1~3 分钟，批量处理请耐心等待，别中途刷新。</span></span></label>
+            <input id="msKey" type="password" placeholder="ms-xxxxxxxx-xxxx-...">
+          </div>
+          <div class="field">
+            <label>接口地址（默认即可）</label>
+            <input id="msBaseUrl" placeholder="https://api-inference.modelscope.cn">
+          </div>
+          <div class="field">
+            <label>模型名（默认即可）</label>
+            <input id="msModel" placeholder="Qwen/Qwen-Image-Edit-2511">
+          </div>
+          <div class="field">
+            <label>参考图路径（可选）<span class="q r">?<span class="tip">填一张水印样例图可提升一致性；<b>留空 = 不用参考图</b>。例：C:\wm_templates\xxx\template.png</span></span></label>
+            <input id="msRef" placeholder="留空 = 不用参考图">
+          </div>
+          <div class="field">
+            <label>去水印提示词模板</label>
+            <textarea id="msPrompt"></textarea>
+          </div>
+        </div>
+
+        <div id="wanxFields" style="display:none">
+          <div class="field">
+            <label>百炼 API Key（与 Qwen 引擎同一把 Key）</label>
+            <input id="wanxKey" type="password" placeholder="sk-...">
+          </div>
+          <div class="field">
+            <label>模型名（默认即可）</label>
+            <input id="wanxModel" placeholder="wanx2.1-imageedit">
+          </div>
+          <div class="field">
+            <label>专能<span class="q">?<span class="tip">万相「去水印专能」：整图发送、不用 mask，模型自动找水印抹除，约 <b>¥0.14/张</b>，处理才计费。默认 remove_watermark。</span></span></label>
+            <input id="wanxFunction" placeholder="remove_watermark">
+          </div>
+        </div>
+
+        <div id="qwenFields" style="display:none">
+          <div class="field">
+            <label>base_url（接口地址）</label>
+            <input id="qwenBaseUrl" placeholder="https://.../generation">
+          </div>
+          <div class="field">
+            <label>API Key（你的自定义凭证）</label>
+            <input id="qwenKey" type="password" placeholder="sk-...">
+          </div>
+          <div class="field">
+            <label>模型名</label>
+            <input id="qwenModel" placeholder="qwen-image-3.0-pro">
+          </div>
+          <div class="field">
+            <label>去水印提示词模板</label>
+            <textarea id="qwenPrompt"></textarea>
+          </div>
+        </div>
+
+        <div id="customFields" style="display:none">
+          <div class="field">
+            <label>Base URL（接口地址，一般以 /v1 结尾）</label>
+            <input id="customBaseUrl" placeholder="https://你的服务地址/v1">
+          </div>
+          <div class="field">
+            <label>API Key</label>
+            <input id="customKey" type="password" placeholder="sk-...">
+          </div>
+          <div class="field model-dd-wrap">
+            <label>模型名<span class="q">?<span class="tip">点「拉取模型」从平台取回列表，再点输入框下拉选择；也可直接手填模型名。<b>选中即自动保存</b>。</span></span></label>
+            <div class="btn-row">
+              <input id="customModel" autocomplete="off" placeholder="点「拉取模型」后下拉选择" style="flex:1">
+              <button class="btn btn-ghost" style="width:auto;white-space:nowrap" onclick="fetchModels(this)">🔄 拉取模型</button>
+            </div>
+            <div id="modelDropdown" class="model-dropdown"></div>
+            <div class="hint" id="modelFetchStatus">💡 填好 Base URL 和 API Key 后，点「拉取模型」即可从平台获取模型列表选择。</div>
+          </div>
+          <div class="field">
+            <label>接口格式</label>
+            <select id="customMode">
+              <option value="images_gen">Images Generations（图像模型，按张计费，推荐）</option>
+              <option value="chat">Chat Completions 多模态（文本/多模态对话模型）</option>
+              <option value="images_edits">Images Edits（图像编辑模型，传 mask）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>去水印提示词模板</label>
+            <textarea id="customPrompt"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3><span class="dot"></span>① 文件夹路径<span class="q">?<span class="tip">一次处理一个文件夹：打开 / 上传新文件夹会<b>替换</b>当前列表（旧的自动清掉）。<br>· 「选择文件夹」= 从电脑里选整个文件夹，<b>里面套多少层子文件夹都会递归读入</b>；处理完按源目录结构镜像输出（跟 ComfyUI 一样，解压 zip 即得同构新文件夹）；<br>· 本机部署时也可直接填路径后点「扫描文件夹」。</span></span></h3>
+        <div class="field">
+          <label>输入文件夹（要处理的图）</label>
+          <input id="inputDir" placeholder="例如 C:\Users\Administrator\Desktop\银饰图片">
+        </div>
+        <div class="field">
+          <label>输出文件夹（确认后写入）<span class="q r">?<span class="tip"><b>留空</b> = 不落盘，改为把勾选通过的成品<b>打包成 zip 下载</b>；整夹上传时 zip 内保留源目录层级，解压即得同构的去水印新文件夹。</span></span></label>
+          <input id="outputDir" placeholder="例如 C:\Users\Administrator\Desktop\去水印成品">
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnScan" onclick="doScan()">📂 扫描文件夹</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">⬆️ 上传图片</button>
+          <button class="btn btn-ghost" onclick="clearFileList()">🗑️ 清空列表</button>
+          <input type="file" id="fileInput" multiple accept="image/*" style="display:none" onchange="doUpload(this.files); this.value=''">
+        </div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn btn-ghost" onclick="document.getElementById('dirInput').click()">📁 点击选择文件夹（整夹上传）</button>
+          <input type="file" id="dirInput" webkitdirectory multiple style="display:none" onchange="doUploadDir(this.files); this.value=''">
+        </div>
+        <div class="canvas-wrap" id="dropZone" style="min-height:56px;cursor:pointer;margin-top:12px">
+          <div style="color:var(--muted);font-size:12px">把多张图片拖到这里批量上传</div>
+        </div>
+        <div class="status info" id="scanStatus"></div>
+        <div class="hint" id="fileSummary" style="display:none"></div>
+
+        <h3 style="margin-top:16px;padding-top:12px"><span class="dot"></span>② 执行<span class="q">?<span class="tip">批量处理会逐张出<b>对比图</b>（左=原图 / 右=去水印），请逐个核对；只有勾选「通过」的才会写入输出文件夹，失败项默认不勾。</span></span></h3>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnProcess" onclick="doPreview()" disabled>⚙️ 批量处理（出对比图）</button>
+        </div>
+        <div class="btn-row" style="margin-top:10px">
+          <select class="up-sel" id="wmUp" title="只放大输出尺寸，不改比例（保证成品能贴回原图）；放大不会增加细节">
+            <option value="1" selected>输出：原图尺寸</option>
+            <option value="2k">输出放大：2K（长边 2048）</option>
+            <option value="4k">输出放大：4K（长边 4096）</option>
+          </select>
+          <button class="btn btn-ok" id="btnCommit" onclick="doCommit()" disabled>✅ 确认无误，写入输出文件夹</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右：结果 -->
+    <div class="right panel">
+      <div class="result-head">
+        <h3 style="border:none;margin:0;padding:0">📋 处理结果与确认</h3>
+        <div class="actions">
+          <button class="btn btn-ghost" onclick="toggleAll(true)">全选通过</button>
+          <button class="btn btn-ghost" onclick="toggleAll(false)">全不选</button>
+        </div>
+      </div>
+      <div id="resultArea" class="empty">还没有结果。先「扫描文件夹 / 上传图片」→「批量处理」。</div>
+    </div>
+  </div>
+
+<script>
+/* ---------- 子应用路径前缀 ----------
+   本页作为「图案提取工作台」的第二个版块，以后端子应用形式挂载在 /wm 下
+   （线上完整地址：https://chule.top/pattern/wm/）。
+   所有接口 / 静态资源路径都必须带上这个前缀；独立运行时 pathname 为 "/"，BASE 为空串。 */
+const BASE = location.pathname.replace(/\/index\.html$/i, '').replace(/\/+$/, '');
+function u(p) {
+  if (!p) return p;
+  if (/^(https?:)?\/\//i.test(p) || p.indexOf('data:') === 0 || p.indexOf('blob:') === 0) return p;
+  return BASE + (p.charAt(0) === '/' ? p : '/' + p);
+}
+
+/* 问号说明：hover 由 CSS 触发；这里补「点击展开 / 再点收起 / 点空白处关闭」 */
+document.addEventListener('click', function (e) {
+  const q = e.target.closest ? e.target.closest('.q') : null;
+  if (q) {
+    e.stopPropagation();
+    const wasOpen = q.classList.contains('open');
+    document.querySelectorAll('.q.open').forEach(x => x.classList.remove('open'));
+    if (!wasOpen) q.classList.add('open');
+    return;
+  }
+  document.querySelectorAll('.q.open').forEach(x => x.classList.remove('open'));
+}, true);
+
+let CFG = null;
+let IMAGE_ITEMS = [];         // [{name, dir, key, label}]：当前批次的图片列表
+let PREVIEW_RESULTS = [];
+
+// 统一响应解析：网关超时/异常时平台返回的是 HTML 错误页，
+// 直接 r.json() 会报 "Unexpected token '<'"，这里转成可读的提示。
+async function getJson(r) {
+  const ct = r.headers.get('content-type') || '';
+  if (ct.indexOf('application/json') === -1) {
+    const t = (await r.text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    let hint = 'HTTP ' + r.status;
+    if (r.status === 504 || r.status === 502 || r.status === 503) {
+      hint += ' 网关超时/繁忙：本次处理超过平台 60 秒上限，请减少单批图片数量或稍后重试';
+    } else {
+      hint += ' 服务返回了非 JSON 内容';
+    }
+    throw new Error(hint + (t ? '（' + t.slice(0, 120) + '）' : ''));
+  }
+  return r.json();
+}
+
+async function api(url, body) {
+  const r = await fetch(url, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body || {})
+  });
+  return getJson(r);
+}
+
+let MODEL_IDS = [];
+// 只有用户「手动打字」才把输入框内容当下拉筛选条件；
+// 拉取后自动填充 / 点开下拉 / 选中某项时，一律展示完整列表并高亮当前项，
+// 避免自动填入的第一个模型名把列表过滤得只剩 1 条的视觉 bug。
+let MODEL_FILTER_ON = false;
+
+function renderModelDropdown() {
+  const dd = document.getElementById('modelDropdown');
+  const input = document.getElementById('customModel');
+  if (!MODEL_IDS.length) { dd.style.display = 'none'; return; }
+  const filter = MODEL_FILTER_ON ? input.value.trim().toLowerCase() : '';
+  const list = MODEL_IDS.filter(m => !filter || m.toLowerCase().indexOf(filter) !== -1);
+  dd.innerHTML = '';
+  const info = document.createElement('div');
+  info.className = 'dd-info';
+  info.textContent = `共 ${MODEL_IDS.length} 个模型` +
+    (filter ? ` · 匹配 ${list.length} 个（清空输入框可看全部）` : ' · 输入文字可筛选，点击选择');
+  dd.appendChild(info);
+  const cur = input.value.trim();
+  list.slice(0, 300).forEach(m => {
+    const o = document.createElement('div');
+    o.className = 'dd-item' + (m === cur ? ' active' : '');
+    o.textContent = m;
+    if (m === cur) { requestAnimationFrame(() => o.scrollIntoView({ block: 'nearest' })); }
+    o.addEventListener('mousedown', ev => { ev.preventDefault(); pickModel(m); });
+    dd.appendChild(o);
+  });
+  if (!list.length) {
+    const e = document.createElement('div');
+    e.className = 'dd-info'; e.style.borderBottom = 'none';
+    e.textContent = '没有匹配的模型：清空输入框查看全部，或直接手填模型名';
+    dd.appendChild(e);
+  }
+  dd.style.display = 'block';
+}
+
+function pickModel(m) {
+  document.getElementById('customModel').value = m;
+  MODEL_FILTER_ON = false;
+  const dd = document.getElementById('modelDropdown');
+  dd.style.display = 'none';
+  saveConfig();
+}
+
+(function bindModelDropdown() {
+  const input = document.getElementById('customModel');
+  const dd = document.getElementById('modelDropdown');
+  input.addEventListener('focus', () => { if (MODEL_IDS.length) { MODEL_FILTER_ON = false; renderModelDropdown(); } });
+  input.addEventListener('click', () => { if (MODEL_IDS.length) { MODEL_FILTER_ON = false; renderModelDropdown(); } });
+  input.addEventListener('input', () => { if (MODEL_IDS.length) { MODEL_FILTER_ON = true; renderModelDropdown(); } });
+  input.addEventListener('blur', () => { setTimeout(() => { dd.style.display = 'none'; }, 150); });
+  document.addEventListener('click', e => {
+    if (e.target.closest && !e.target.closest('.model-dd-wrap')) dd.style.display = 'none';
+  });
+})();
+
+async function fetchModels(btn) {
+  const baseUrl = document.getElementById('customBaseUrl').value.trim();
+  const key = document.getElementById('customKey').value.trim();
+  const st = document.getElementById('modelFetchStatus');
+  if (!baseUrl || !key) {
+    st.textContent = '⚠️ 请先填写 Base URL 和 API Key，再点拉取';
+    st.style.color = '#d97706'; return;
+  }
+  st.textContent = '🔄 正在从平台拉取模型列表…'; st.style.color = '';
+  if (btn) { btn.disabled = true; }
+  const r = await api(u('/api/models'), { base_url: baseUrl, api_key: key });
+  if (btn) { btn.disabled = false; }
+  if (r.ok && r.models && r.models.length) {
+    MODEL_IDS = r.models.slice();
+    const cur = document.getElementById('customModel').value.trim();
+    if (!cur || r.models.indexOf(cur) === -1) {
+      document.getElementById('customModel').value = r.models[0];
+    }
+    // 自动填充不等于用户筛选：重置筛选开关，下拉展示完整列表并自动展开
+    MODEL_FILTER_ON = false;
+    if (r.models.length === 1) {
+      st.textContent = `⚠️ 平台只返回了 1 个模型「${r.models[0]}」（若应有多個，请检查 Base URL 是否填对服务/账号）。点模型名输入框可看列表。`;
+      st.style.color = '#d97706';
+    } else {
+      st.textContent = `✅ 拉取到 ${r.models.length} 个模型，点模型名输入框即可查看全部并选择（也可输入筛选或手填），选中即自动保存`;
+      st.style.color = '#16a34a';
+    }
+    renderModelDropdown();
+  } else {
+    st.textContent = '✗ ' + (r.error || '未拉取到模型，请检查 Base URL / API Key');
+    st.style.color = '#dc2626';
+  }
+}
+
+function showStatus(el, type, msg) {
+  const s = document.getElementById(el);
+  s.className = 'status show ' + type;
+  s.textContent = msg;
+}
+
+async function init() {
+  const [eng, cfg] = await Promise.all([
+    fetch(u('/api/engines')).then(getJson),
+    fetch(u('/api/config')).then(getJson)
+  ]);
+  const sel = document.getElementById('engine');
+  sel.innerHTML = '';
+  eng.engines.forEach(e => {
+    const o = document.createElement('option');
+    o.value = e.name; o.textContent = e.label;
+    sel.appendChild(o);
+  });
+  CFG = cfg;
+  sel.value = cfg.engine || 'lensapi';
+  const ls = cfg.lensapi || {};
+  document.getElementById('lsBaseUrl').value = ls.base_url || '';
+  document.getElementById('lsKey').value = ls.api_key || '';
+  document.getElementById('lsModel').value = ls.model || '';
+  document.getElementById('lsPrompt').value = ls.prompt_template || '';
+  const ms = cfg.modelscope || {};
+  document.getElementById('msKey').value = ms.api_key || '';
+  document.getElementById('msBaseUrl').value = ms.base_url || '';
+  document.getElementById('msModel').value = ms.model || '';
+  document.getElementById('msRef').value = ms.reference_image || '';
+  document.getElementById('msPrompt').value = ms.prompt_template || '';
+  document.getElementById('wanxKey').value = (cfg.wanx || {}).api_key || '';
+  document.getElementById('wanxModel').value = (cfg.wanx || {}).model || '';
+  document.getElementById('wanxFunction').value = (cfg.wanx || {}).function || '';
+  document.getElementById('qwenBaseUrl').value = cfg.qwen.base_url;
+  document.getElementById('qwenKey').value = cfg.qwen.api_key;
+  document.getElementById('qwenModel').value = cfg.qwen.model;
+  document.getElementById('qwenPrompt').value = cfg.qwen.prompt_template;
+  document.getElementById('customBaseUrl').value = (cfg.custom || {}).base_url || '';
+  document.getElementById('customKey').value = (cfg.custom || {}).api_key || '';
+  document.getElementById('customModel').value = (cfg.custom || {}).model || '';
+  document.getElementById('customMode').value = (cfg.custom || {}).mode || 'images_gen';
+  document.getElementById('customPrompt').value = (cfg.custom || {}).prompt_template || '';
+  document.getElementById('inputDir').value = cfg.paths.input || '';
+  document.getElementById('outputDir').value = cfg.paths.output || '';
+  onEngineChange();
+}
+
+function onEngineChange() {
+  const v = document.getElementById('engine').value;
+  document.getElementById('lensapiFields').style.display = v === 'lensapi' ? 'block' : 'none';
+  document.getElementById('modelscopeFields').style.display = v === 'modelscope' ? 'block' : 'none';
+  document.getElementById('wanxFields').style.display = v === 'wanx' ? 'block' : 'none';
+  document.getElementById('qwenFields').style.display = v === 'qwen' ? 'block' : 'none';
+  document.getElementById('customFields').style.display = v === 'custom' ? 'block' : 'none';
+  const badge = document.getElementById('engineBadge');
+  if (v === 'lensapi') badge.innerHTML = '<span class="tag tag-blue">内置通道</span>';
+  else if (v === 'modelscope') badge.innerHTML = '<span class="tag tag-blue">云端·魔搭免费</span>';
+  else if (v === 'wanx') badge.innerHTML = '<span class="tag tag-blue">云端·万相专能</span>';
+  else if (v === 'qwen') badge.innerHTML = '<span class="tag tag-blue">云端 Qwen</span>';
+  else if (v === 'custom') badge.innerHTML = '<span class="tag tag-blue">自定义模型</span>';
+  else badge.innerHTML = '<span class="tag tag-blue">云端引擎</span>';
+}
+
+async function saveConfig() {
+  CFG.engine = document.getElementById('engine').value;
+  CFG.lensapi = CFG.lensapi || {};
+  // 自愈：配置面板已隐藏，DOM 里可能残留历史脏值（无协议头地址/别家平台 key），
+  // 回写前强制校正，避免把服务端正确配置再次覆盖（401 Invalid token 根因）。
+  let _lsBase = document.getElementById('lsBaseUrl').value.trim();
+  if (!/^https?:\/\//i.test(_lsBase)) _lsBase = '';
+  let _lsKey = document.getElementById('lsKey').value.trim();
+  if (_lsKey && _lsKey.indexOf('sk-') !== 0) _lsKey = '';
+  CFG.lensapi.base_url = _lsBase;
+  CFG.lensapi.api_key = _lsKey;
+  CFG.lensapi.model = document.getElementById('lsModel').value.trim();
+  CFG.lensapi.prompt_template = document.getElementById('lsPrompt').value.trim();
+  CFG.modelscope = CFG.modelscope || {};
+  CFG.modelscope.api_key = document.getElementById('msKey').value.trim();
+  CFG.modelscope.base_url = document.getElementById('msBaseUrl').value.trim();
+  CFG.modelscope.model = document.getElementById('msModel').value.trim();
+  CFG.modelscope.reference_image = document.getElementById('msRef').value.trim();
+  CFG.modelscope.prompt_template = document.getElementById('msPrompt').value.trim();
+  CFG.wanx = CFG.wanx || {};
+  CFG.wanx.api_key = document.getElementById('wanxKey').value.trim();
+  CFG.wanx.model = document.getElementById('wanxModel').value.trim();
+  CFG.wanx.function = document.getElementById('wanxFunction').value.trim();
+  CFG.qwen.base_url = document.getElementById('qwenBaseUrl').value.trim();
+  CFG.qwen.api_key = document.getElementById('qwenKey').value.trim();
+  CFG.qwen.model = document.getElementById('qwenModel').value.trim();
+  CFG.qwen.prompt_template = document.getElementById('qwenPrompt').value.trim();
+  CFG.custom = CFG.custom || {};
+  CFG.custom.base_url = document.getElementById('customBaseUrl').value.trim();
+  CFG.custom.api_key = document.getElementById('customKey').value.trim();
+  CFG.custom.model = document.getElementById('customModel').value.trim();
+  CFG.custom.mode = document.getElementById('customMode').value;
+  CFG.custom.prompt_template = document.getElementById('customPrompt').value.trim();
+  CFG.paths.input = document.getElementById('inputDir').value.trim();
+  CFG.paths.output = document.getElementById('outputDir').value.trim();
+  await api(u('/api/config'), CFG);
+}
+
+/* ---------- 图片列表（单文件夹模式：新批次替换旧列表） ---------- */
+
+function folderLabel(dir) {
+  const s = String(dir || '').replace(/[\\/]+$/, '');
+  if (!s) return '上传图片';
+  return s.split(/[\\/]/).pop() || '图片';
+}
+
+function addImages(files, dir, label) {
+  let added = 0, dup = 0;
+  (files || []).forEach(rel => {
+    const name = String(rel).split('/').pop();      // rel=相对路径（可含子目录），name=纯文件名
+    const key = dir + '||' + rel;
+    if (IMAGE_ITEMS.some(x => x.key === key)) { dup++; return; }
+    IMAGE_ITEMS.push({ name, rel, dir, key, label: label || folderLabel(dir) });
+    added++;
+  });
+  return { added, dup };
+}
+
+function renderFileList() {
+  document.getElementById('btnProcess').disabled = !IMAGE_ITEMS.length;
+  const sum = document.getElementById('fileSummary');
+  if (IMAGE_ITEMS.length) {
+    sum.textContent = `📋 当前共 ${IMAGE_ITEMS.length} 张图片（来源：${IMAGE_ITEMS[0].label || '上传图片'}；打开新文件夹会替换这批图）`;
+    sum.style.display = '';
+  } else {
+    sum.textContent = '';
+    sum.style.display = 'none';
+  }
+}
+
+function clearFileList() {
+  if (!IMAGE_ITEMS.length) { alert('列表已经是空的'); return; }
+  IMAGE_ITEMS = [];
+  PREVIEW_RESULTS = [];
+  renderResults();
+  renderFileList();
+  showStatus('scanStatus', 'info', '已清空图片列表；再上传/扫描新文件夹即可');
+}
+
+async function doScan() {
+  try {
+    await saveConfig();
+    const inputDir = document.getElementById('inputDir').value.trim();
+    const r = await api(u('/api/scan'), { input_dir: inputDir });
+    if (r.count > 0) {
+      IMAGE_ITEMS = [];                       // 单文件夹模式：新扫描替换旧列表
+      addImages(r.files || [], r.input_dir, r.label);
+      renderFileList();
+      showStatus('scanStatus', 'ok', `已载入 ${r.count} 张图片（来自：${folderLabel(r.input_dir)}）`);
+    } else {
+      showStatus('scanStatus', 'err', '没有找到图片（请填写输入文件夹，或上传图片）');
+    }
+  } catch (e) {
+    showStatus('scanStatus', 'err', '扫描出错：' + (e && e.message ? e.message : e));
+  }
+}
+
+function doUploadDir(fileList) {
+  if (!fileList || !fileList.length) return;
+  const imgs = Array.from(fileList).filter(f => /\.(jpe?g|png|bmp|webp|tiff?)$/i.test(f.name));
+  if (!imgs.length) { showStatus('scanStatus', 'err', '所选文件夹里没有图片（支持 jpg/png/bmp/webp/tif）'); return; }
+  // webkitdirectory 上传带有完整相对路径（根夹/子夹/…/图.jpg）→ 多层结构全量保留
+  let label = '';
+  try {
+    const rel = (imgs[0].webkitRelativePath || '').split('/')[0];
+    if (rel && rel !== imgs[0].name) label = rel;
+  } catch (e) { }
+  doUpload(imgs, label);
+}
+
+// ---- 上传：与图案提取页（pt.html）完全一致的朴素整包直传 ----
+// 取证：图案提取页就是「一个 FormData 装全部文件、一次 POST」，无分片/无压缩/
+// 无重试花活；同一台服务器、同一个 Caddy 网关、同一个 uvicorn 进程下它能传，
+// 本页就用同一机制。此前加分片+本地压缩反而引入 canvas 解码慢（尤其手机端
+// 大图）与大量小请求，在弱网下表现更差。后端 /api/upload 已是异步版
+// （COS 后台传、不阻塞响应），整包直传是秒回的。
+async function doUpload(fileList, label) {
+  if (!fileList || !fileList.length) return;
+  const files = Array.from(fileList);
+  const lbl = label || '上传图片';
+  try {
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f, f.name);
+    // 每张图的相对路径（整夹上传=webkitRelativePath，散图=文件名），后端按此多层落盘
+    fd.append('paths', JSON.stringify(files.map(f => f.webkitRelativePath || f.name)));
+    fd.append('label', lbl);
+    showStatus('scanStatus', 'info', `正在上传 ${files.length} 张图片…`);
+    const r = await fetch(u('/api/upload'), { method: 'POST', body: fd }).then(getJson);
+    if (r.ok && r.saved && r.saved.length) {
+      // 单文件夹模式：本次上传替换旧列表
+      IMAGE_ITEMS = [];
+      addImages(r.saved, r.input_dir, r.label || lbl);
+      renderFileList();
+      showStatus('scanStatus', 'ok', `已载入 ${r.saved.length} 张图片（来自：${r.label || lbl}）`);
+    } else {
+      showStatus('scanStatus', 'err', (r && r.error) ? ('上传失败：' + r.error) : '上传失败或没有有效图片');
+    }
+  } catch (e) {
+    const msg = e && e.message ? e.message : String(e);
+    const isNet = /failed to fetch|networkerror|load failed|connection reset|abort/i.test(msg);
+    showStatus('scanStatus', 'err', isNet
+      ? '上传出错：网络连接中断。建议：① 换 Wi-Fi 或信号好的位置再试；② 上传时保持本页在前台、勿锁屏；③ 或在电脑浏览器上操作。'
+      : '上传出错：' + msg);
+  }
+}
+
+(function bindDrop() {
+  const dz = document.getElementById('dropZone');
+  const fi = document.getElementById('fileInput');
+  dz.addEventListener('click', () => fi.click());
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.style.borderColor = 'rgba(255,255,255,.45)'; dz.style.background = 'rgba(255,255,255,.07)';
+  }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.style.borderColor = ''; dz.style.background = '';
+  }));
+  dz.addEventListener('drop', e => {
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length) doUpload(files);
+  });
+})();
+
+async function doPreview() {
+  const btn = document.getElementById('btnProcess');
+  try {
+    await saveConfig();
+    const engine = document.getElementById('engine').value;
+    // 云端模型整图处理（无需水印样例）
+    const engineConfig = engine === 'lensapi' ? {
+      base_url: document.getElementById('lsBaseUrl').value.trim(),
+      api_key: document.getElementById('lsKey').value.trim(),
+      model: document.getElementById('lsModel').value.trim(),
+      prompt_template: document.getElementById('lsPrompt').value.trim(),
+    } : engine === 'modelscope' ? {
+      api_key: document.getElementById('msKey').value.trim(),
+      base_url: document.getElementById('msBaseUrl').value.trim(),
+      model: document.getElementById('msModel').value.trim(),
+      reference_image: document.getElementById('msRef').value.trim(),
+      prompt_template: document.getElementById('msPrompt').value.trim(),
+    } : engine === 'wanx' ? {
+      api_key: document.getElementById('wanxKey').value.trim(),
+      model: document.getElementById('wanxModel').value.trim(),
+      function: document.getElementById('wanxFunction').value.trim(),
+    } : engine === 'qwen' ? {
+      base_url: document.getElementById('qwenBaseUrl').value.trim(),
+      api_key: document.getElementById('qwenKey').value.trim(),
+      model: document.getElementById('qwenModel').value.trim(),
+      prompt_template: document.getElementById('qwenPrompt').value.trim(),
+    } : engine === 'custom' ? {
+      base_url: document.getElementById('customBaseUrl').value.trim(),
+      api_key: document.getElementById('customKey').value.trim(),
+      model: document.getElementById('customModel').value.trim(),
+      mode: document.getElementById('customMode').value,
+      prompt_template: document.getElementById('customPrompt').value.trim(),
+    } : {};
+    // 校验：lensapi 默认走服务端 .apib_key，无需填 Key；
+    // 魔搭 / 百炼系需 API Key（端点、模型有默认值）；custom 需 Key + Base URL + 模型名
+    if (engine === 'modelscope') {
+      if (!engineConfig.api_key) {
+        showStatus('scanStatus', 'err', '请先在「模型引擎」里填魔搭访问令牌（ms-...）：modelscope.cn/my/access/token → 新建 → 选「写入权限」');
+        return;
+      }
+    } else if (engine === 'wanx' || engine === 'qwen') {
+      if (!engineConfig.api_key) {
+        showStatus('scanStatus', 'err', '请先在「模型引擎」里填百炼 API Key（sk-...）');
+        return;
+      }
+    } else if (engine === 'custom') {
+      if (!engineConfig.api_key || !engineConfig.base_url || !engineConfig.model) {
+        showStatus('scanStatus', 'err', '请先在「模型引擎」里填好 Base URL / API Key / 模型名');
+        return;
+      }
+    }
+    // 逐张处理，实时反馈进度（远程模型单张耗时较长，避免"看似没反应"）
+    const list = IMAGE_ITEMS.slice();
+    if (!list.length) {
+      showStatus('scanStatus', 'err', '没有待处理的图片：请先「扫描文件夹」或上传图片');
+      return;
+    }
+    btn.disabled = true;
+    PREVIEW_RESULTS = [];
+    renderResults();
+    for (let i = 0; i < list.length; i++) {
+      btn.textContent = `处理中 ${i + 1}/${list.length}：${list[i].rel || list[i].name}`;
+      showStatus('scanStatus', 'info', `正在处理第 ${i + 1}/${list.length} 张（来自「${list[i].label}」，模型处理通常 30~60 秒${engine === 'modelscope' ? '；免费通道约 1~3 分钟' : ''}）…`);
+      let r;
+      try {
+        const body = { input_dir: list[i].dir, region: { type: 'full' }, engine, engine_config: engineConfig, files: [list[i].rel || list[i].name] };
+        r = await api(u('/api/preview'), body);
+      } catch (e) {
+        r = { results: [{ name: list[i].name, rel: list[i].rel, ok: false, error: '请求失败: ' + (e && e.message ? e.message : e) }] };
+      }
+      if (r && r.error && !(r.results || []).length) {
+        r = { results: [{ name: list[i].name, rel: list[i].rel, ok: false, error: r.error }] };
+      }
+      (r.results || []).forEach(x => { x.folder = list[i].label; if (!x.rel) x.rel = list[i].rel; });
+      PREVIEW_RESULTS = PREVIEW_RESULTS.concat(r.results || []);
+      renderResults();
+    }
+    const okCount = PREVIEW_RESULTS.filter(x => x.ok).length;
+    showStatus('scanStatus', okCount ? 'ok' : 'err',
+      `批量处理完成：成功 ${okCount} 张 / 失败 ${PREVIEW_RESULTS.length - okCount} 张，请在下方对比图核对`);
+  } catch (e) {
+    showStatus('scanStatus', 'err', '批量处理出错：' + (e && e.message ? e.message : e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚙️ 批量处理（出对比图）';
+    document.getElementById('btnCommit').disabled = !PREVIEW_RESULTS.some(x => x.ok);
+  }
+}
+
+function nameTag(it) {
+  // 多层结构：显示所在子目录（根夹/子夹/…），一眼看出每张图来自哪一层；散图退回来源标签
+  const dirPart = (it.rel && it.rel.indexOf('/') >= 0) ? it.rel.split('/').slice(0, -1).join('/') : '';
+  const tag = dirPart || it.folder || '';
+  return it.name + (tag ? ' <span class="tag">📁 ' + tag + '</span>' : '');
+}
+
+function renderResults() {
+  const area = document.getElementById('resultArea');
+  if (!PREVIEW_RESULTS.length) { area.className = 'empty'; area.textContent = '没有结果'; return; }
+  area.className = 'result-grid';
+  area.innerHTML = '';
+  const pad2 = n => String(n).padStart(2, '0');
+  PREVIEW_RESULTS.forEach((it, i) => {
+    const div = document.createElement('div');
+    // 头部色带：编号 + 文件名 + 状态胶囊（编号是全卡最重视觉元素）
+    const hd = '<div class="rhd"><span class="no">' + pad2(i + 1) + '</span>'
+      + '<span class="rname">' + nameTag(it) + '</span>'
+      + (it.ok ? '<span class="rst ok">✓ 成功</span>'
+        : it.skipped ? '<span class="rst skip">⚠️ 跳过</span>'
+        : '<span class="rst bad">✗ 失败</span>')
+      + '</div>';
+    if (it.ok) {
+      div.className = 'result-item';
+      // 「原图 ⇄ 成品」并排对比（cmp.js）：需 src_url（原图缩略）+ result_url（成品图）齐备才给按钮；
+      // 老记录缺字段 → 退回原「原图|成品」左右拼接图，不报错、不裂图。
+      const cmpOn = !!(it.src_url && it.result_url);
+      div.innerHTML = hd
+        + `<div class="img-row cmp-host"><img src="${u(it.compare_url)}" loading="lazy" alt="${it.name}"></div>
+         <div class="meta">
+           <div class="hint">只有勾「通过」的才会写入输出文件夹</div>
+           <div class="check-row">
+             <input type="checkbox" id="ck${i}" checked>
+             <label for="ck${i}">通过</label>
+             ${cmpOn ? `<button type="button" class="cmp-btn" data-cmp data-src="${u(it.src_url)}" data-out="${u(it.result_url)}" data-lab-src="原图">⇄ 对比原图</button>` : ''}
+           </div>
+         </div>`;
+    } else if (it.skipped) {
+      div.className = 'result-item skip';
+      div.innerHTML = hd
+        + `<div class="meta"><div class="skipmsg">⚠️ ${it.error || '已跳过'}</div></div>`;
+    } else {
+      div.className = 'result-item fail';
+      div.innerHTML = hd
+        + `<div class="meta"><div class="err">✗ ${it.error || it.err || '失败'}</div></div>`;
+    }
+    area.appendChild(div);
+  });
+}
+
+function toggleAll(on) {
+  PREVIEW_RESULTS.forEach((it, i) => {
+    if (!it.ok) return;
+    const ck = document.getElementById('ck' + i);
+    if (ck) ck.checked = on;
+  });
+}
+
+async function doCommit() {
+  await saveConfig();
+  const outputDir = document.getElementById('outputDir').value.trim();
+  const items = [];
+  const seen = {};
+  PREVIEW_RESULTS.forEach((it, i) => {
+    if (!it.ok) return;
+    const ck = document.getElementById('ck' + i);
+    if (ck && ck.checked) {
+      // 多层结构：按源相对路径镜像输出，目录天然隔离同名文件；
+      // 无目录的散图保留旧逻辑——重名时自动加「文件夹名__」前缀防互相覆盖
+      let out = it.rel || it.name;
+      if (!it.rel) {
+        if (seen[out]) out = (it.folder || '图片') + '__' + it.name;
+        let n = 2;
+        while (seen[out]) { out = (it.folder || '图片') + '__' + it.name.replace(/(\.[^.]+)?$/, '_' + n + '$1'); n++; }
+      }
+      seen[out] = true;
+      items.push({ name: it.name, rel: out, result_key: it.result_key, src_url: it.src_url || '' });
+    }
+  });
+  if (!items.length) { alert('没有勾选任何图片'); return; }
+  const btn = document.getElementById('btnCommit');
+  btn.disabled = true; btn.textContent = '写入中…';
+  const upSel = document.getElementById('wmUp');
+  const up = (upSel && upSel.value) || '1';
+  const r = await api(u('/api/commit'), { output_dir: outputDir, items, up });
+  btn.disabled = false; btn.textContent = '✅ 确认无误，写入输出文件夹';
+  const names = r.written || [];
+  if (outputDir) {
+    alert(`已写入 ${names.length} 张图片到：\n${outputDir}`);
+  } else {
+    const z = await fetch(u('/api/download'), {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ output_dir: '', names })
+    });
+    if (z.ok) {
+      const blob = await z.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'watermark_clean.zip';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      alert(`已打包下载 ${names.length} 张成品图`);
+    } else {
+      alert('下载失败，请重试');
+    }
+  }
+}
+
+init();
+</script>
+</body>
+</html>

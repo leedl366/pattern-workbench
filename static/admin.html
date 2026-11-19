@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 · 速图AIGC</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../accounts/static/ui.css">
+<style>
+/* 令牌来自 ui.css，本页只留布局 */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);padding:26px 30px}
+h1{font-size:20px;margin-bottom:4px}
+.sub{color:var(--sub);font-size:13px;margin-bottom:20px}
+.sect{font-size:15px;font-weight:700;margin:26px 0 12px;display:flex;align-items:center;gap:8px}
+.sect::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--pri)}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:16px 18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input,select{padding:9px 11px;border:1px solid var(--bd);border-radius:var(--r-ctl);font-size:13px;outline:none}
+input:focus{border-color:var(--pri2);box-shadow:var(--ring)}
+.btn{padding:9px 18px;border:none;border-radius:var(--r-ctl);background:var(--grad-pri);color:var(--on-pri);font-size:13px;font-weight:700;cursor:pointer}
+.btn.gray{background:var(--sub)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}
+th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--bd)}
+th{background:var(--fill);color:var(--sub)}
+.msg{font-size:13px;min-height:18px;margin-top:8px}
+.msg.err{color:var(--err)}.msg.ok{color:var(--ok)}
+.codes{margin-top:12px;font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.9;word-break:break-all;background:var(--fill);border-radius:var(--r-ctl);padding:12px;max-height:220px;overflow:auto}
+.delta-pos{color:var(--ok)}.delta-neg{color:var(--err)}
+.tag{display:inline-block;padding:1px 8px;border-radius:var(--r-sm);font-size:11px;background:rgba(255,255,255,.10);color:var(--sub)}
+.tag.admin{background:var(--warn-bg);color:#fbbf24}
+/* 顶部横幅：所有操作结果都在这里显形（不再用 alert 打断） */
+.banner{display:none;position:sticky;top:0;z-index:30;margin:0 0 14px;padding:11px 14px;border-radius:var(--r-ctl);font-size:13px;font-weight:600}
+.banner.ok{display:block;background:rgba(74,222,128,.10);border:1px solid rgba(74,222,128,.30);color:#4ade80}
+.banner.err{display:block;background:rgba(248,113,113,.14);border:1px solid rgba(248,113,113,.32);color:#f87171}
+/* 调积分弹窗 */
+.modal{display:none;position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.45);align-items:center;justify-content:center;padding:18px}
+.modal.on{display:flex}
+.mbox{width:100%;max-width:420px;background:var(--card);border-radius:var(--r-card);padding:20px 22px;box-shadow:0 18px 50px rgba(0,0,0,.22)}
+.mbox h3{font-size:16px;margin-bottom:14px}
+.mline{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.mline>label{flex:none;width:52px;font-size:13px;color:var(--sub);font-weight:600}
+.mline input{flex:1;min-width:0}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 14px 62px}
+.chips button{padding:6px 12px;border:1px solid var(--bd);background:var(--card);border-radius:999px;font-size:13px;font-weight:700;color:var(--pri-dark);cursor:pointer;font-variant-numeric:tabular-nums}
+.chips button:hover{background:var(--pri-bg);border-color:var(--pri2)}
+.chips button.minus{color:#f87171}
+.who{font-weight:800;font-size:14px}
+.cur{font-size:12px;color:var(--sub);margin-left:6px}
+.mact{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+</style>
+</head>
+<body>
+<h1>管理后台</h1>
+<div class="sub">用户管理 · 积分调整 · 充值码生成 · 积分流水</div>
+<div class="banner" id="topMsg"></div>
+
+<div class="sect">用户列表</div>
+<div class="panel">
+  <div class="row">
+    <button class="btn gray" onclick="loadUsers()">刷新</button>
+    <span style="font-size:12px;color:var(--sub)" id="userCount"></span>
+  </div>
+  <table>
+    <tr><th>ID</th><th>用户名</th><th>积分</th><th>组</th><th>邀请码</th><th>邀请人</th><th>已邀请</th><th>累计返利</th><th>本月返利</th><th>注册时间</th><th>最近登录</th><th>操作</th></tr>
+    <tbody id="userRows"></tbody>
+  </table>
+</div>
+
+<div class="sect">人工调整积分（收款后加分 / 扣减）</div>
+<div class="panel">
+  <div class="row">
+    <input id="adjUser" list="userList" placeholder="用户名（可从下拉选）">
+    <datalist id="userList"></datalist>
+    <input id="adjDelta" type="number" placeholder="积分（正加负减）" style="width:140px">
+    <input id="adjReason" placeholder="备注，如：微信收款 30 元" style="width:220px">
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#fbbf24;cursor:pointer;white-space:nowrap">
+      <input type="checkbox" id="adjRecharge" style="width:auto"> 记为充值（触发 30% 邀请返利）
+    </label>
+    <button class="btn" onclick="adjust()">执行</button>
+  </div>
+  <div class="msg" id="adjMsg"></div>
+  <div style="font-size:12px;color:var(--sub);margin-top:8px">
+    ⚠️ 只有「用户真的付了钱」才勾选。补偿出图失败、纠错、退款回冲 <b>不要勾</b> —— 勾了会给该用户的邀请人返 30%，白送钱。
+  </div>
+</div>
+
+<div class="sect">生成充值码</div>
+<div class="panel">
+  <div class="row">
+    <select id="gcPoints">
+      <option value="50">50 积分（5 元）</option>
+      <option value="110">110 积分（10 元）</option>
+      <option value="340">340 积分（30 元）</option>
+      <option value="580">580 积分（50 元）</option>
+      <option value="1200">1200 积分（100 元）</option>
+    </select>
+    <input id="gcCount" type="number" value="1" min="1" max="200" style="width:80px"> 张
+    <input id="gcBatch" placeholder="批次备注（可选）" style="width:160px">
+    <button class="btn" onclick="genCodes()">生成</button>
+  </div>
+  <div class="codes" id="codeOut" style="display:none"></div>
+</div>
+
+<div class="sect">积分流水（最近 100 条）</div>
+<div class="panel">
+  <div class="row">
+    <input id="ledUser" placeholder="按用户名过滤（可选）">
+    <button class="btn gray" onclick="loadLedger()">查询</button>
+  </div>
+  <table>
+    <tr><th>时间</th><th>用户</th><th>变动</th><th>余额</th><th>原因</th><th>单号/引用</th></tr>
+    <tbody id="ledRows"></tbody>
+  </table>
+</div>
+
+<div class="sect">邀请返利（谁拉了谁 / 拿了多少）</div>
+<div class="panel">
+  <div class="row">
+    <input id="invUser" placeholder="按邀请人用户名过滤（可选）">
+    <button class="btn gray" onclick="loadInvites()">查询</button>
+    <span style="font-size:12px;color:var(--sub)" id="invRuleTip">
+      <b style="color:#fbbf24">🔒 以下风控参数仅管理员可见，客户页面不显示</b> —— 加载中…
+    </span>
+  </div>
+  <div style="font-size:13px;font-weight:700;margin:12px 0 6px">邀请人排行</div>
+  <table>
+    <tr><th>邀请人</th><th>已邀请人数</th><th>累计返利（积分）</th></tr>
+    <tbody id="invTopRows"></tbody>
+  </table>
+  <div style="font-size:13px;font-weight:700;margin:16px 0 6px">返利明细（最近 100 条）</div>
+  <table>
+    <tr><th>时间</th><th>邀请人</th><th>被邀请人</th><th>类型</th><th>基数</th><th>返利</th><th>单号/引用</th></tr>
+    <tbody id="invRows"></tbody>
+  </table>
+</div>
+
+<!-- 调积分弹窗：点用户行「调积分」直接在这里改（不再需要滚回上面的表单） -->
+<div class="modal" id="adjModal">
+  <div class="mbox">
+    <h3>调整积分</h3>
+    <div class="mline"><label>用户</label>
+      <span class="who" id="mWho">—</span><span class="cur" id="mCur"></span></div>
+    <div class="mline"><label>变动</label>
+      <input id="mDelta" type="number" placeholder="正数加分 / 负数扣分" autocomplete="off"></div>
+    <div class="chips">
+      <button type="button" data-d="10">+10</button>
+      <button type="button" data-d="50">+50</button>
+      <button type="button" data-d="100">+100</button>
+      <button type="button" data-d="300">+300</button>
+      <button type="button" class="minus" data-d="-10">-10</button>
+      <button type="button" class="minus" data-d="-50">-50</button>
+    </div>
+    <div class="mline"><label>备注</label>
+      <input id="mReason" placeholder="如：微信收款 30 元" autocomplete="off"></div>
+    <div class="mline" style="align-items:center">
+      <label style="color:#fbbf24">充值</label>
+      <label style="display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="mRecharge" style="width:auto">
+        这笔是真实充值（给该用户的邀请人返 30%）
+      </label>
+    </div>
+    <div class="msg" id="mMsg"></div>
+    <div class="mact">
+      <button class="btn gray" type="button" id="mCancel">取消</button>
+      <button class="btn" type="button" id="mOk">确认执行</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var BASE = location.pathname.replace(/\/admin\/?.*$/, '').replace(/\/+$/, '');
+function $(id){ return document.getElementById(id); }
+function ts(t){ return t ? new Date(t * 1000).toLocaleString('zh-CN', {hour12: false}) : '-'; }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+/* 统一反馈：一切结果都打在顶部横幅，不再用 alert 打断操作；
+   出错时把 URL / 状态码一并写出来，便于截图定位（旧版弹窗一闪而过看不到原因）。 */
+var _bt = null;
+function flash(text, ok, ms){
+  var b = $('topMsg');
+  b.textContent = text;
+  b.className = 'banner ' + (ok ? 'ok' : 'err');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+  if (_bt) clearTimeout(_bt);
+  if (ms !== 0) _bt = setTimeout(function(){ b.className = 'banner'; }, ms || 5000);
+}
+/* 脚本级异常也显形（旧版点击无反应、页面却毫无提示，排查全靠猜） */
+window.addEventListener('error', function(e){
+  flash('页面脚本错误：' + (e.message || e.error || '未知') + '（' + (e.filename || '') + ':' + (e.lineno || 0) + '）', false, 0);
+});
+
+/* 统一请求：非 2xx / ok:false 都抛出带状态码的错误，交给调用处显示 */
+function api(p, opt){
+  var url = BASE + '/accounts/api/admin/' + p;
+  return fetch(url, opt).then(function(r){
+    return r.text().then(function(t){
+      var d = null;
+      try { d = JSON.parse(t); } catch (e) {}
+      if (!r.ok || !d || !d.ok){
+        throw new Error((d && d.error) || ('HTTP ' + r.status + '（' + url + '）'));
+      }
+      return d;
+    });
+  });
+}
+
+var USERS = [];
+function loadUsers(){
+  api('users').then(function(d){
+    USERS = d.users;
+    $('userCount').textContent = '共 ' + d.users.length + ' 人';
+    /* 风控参数只在后台显示（客户页不出现这些阈值） */
+    if (d.invite_rule){
+      var r = d.invite_rule;
+      $('invRuleTip').innerHTML = '<b style="color:#fbbf24">🔒 以下风控参数仅管理员可见，客户页面不显示</b> —— ' +
+        '邀请注册 +' + r.register_reward + ' 分/人；被邀请人真实充值返 ' + r.recharge_rate + '%；' +
+        '同 IP 24h 最多 ' + r.ip_limit + ' 个有效邀请；单人 30 天返利上限 ' + r.month_cap + ' 分';
+    }
+    var html = '', dl = '';
+    d.users.forEach(function(u){
+      dl += '<option value="' + esc(u.username) + '"></option>';
+      /* 用户名走 data 属性 + 事件代理：含引号/特殊字符也不会把 onclick 拼断 */
+      html += '<tr><td>' + u.id + '</td><td><b>' + esc(u.username) + '</b></td><td>' + u.points +
+        '</td><td><span class="tag' + (u.grp === 'admin' ? ' admin' : '') + '">' + esc(u.grp) + '</span></td><td>' +
+        '<span style="font-family:ui-monospace,Consolas,monospace;font-size:12px">' + esc(u.invite_code || '—') + '</span></td><td>' +
+        (u.inviter_name ? esc(u.inviter_name) : '<span style="color:#9ca3af">—</span>') + '</td><td>' +
+        (u.invited_count || 0) + '</td><td>' + (u.invite_reward || 0) + '</td><td>' +
+        (u.invite_reward_month || 0) + '</td><td>' +
+        ts(u.created_ts) + '</td><td>' + ts(u.last_login_ts) +
+        '</td><td><button class="btn gray" style="padding:4px 10px" data-u="' + esc(u.username) +
+        '" data-p="' + u.points + '">调积分</button></td></tr>';
+    });
+    $('userRows').innerHTML = html;
+    $('userList').innerHTML = dl;
+  }).catch(function(e){ flash('用户列表加载失败：' + e.message, false); });
+}
+
+$('userRows').addEventListener('click', function(ev){
+  var b = ev.target.closest ? ev.target.closest('button[data-u]') : null;
+  if (!b) return;
+  openAdj(b.getAttribute('data-u'), parseInt(b.getAttribute('data-p') || '0', 10));
+});
+
+/* ---------------- 弹窗调积分 ---------------- */
+var MUSER = '';
+function openAdj(name, points){
+  MUSER = name;
+  $('mWho').textContent = name;
+  $('mCur').textContent = '当前 ' + points + ' 积分';
+  $('mDelta').value = '';
+  $('mReason').value = '';
+  if ($('mRecharge')) $('mRecharge').checked = false;   /* 每次打开都从「不返利」开始，防手滑白送钱 */
+  $('mMsg').textContent = '';
+  $('mMsg').className = 'msg';
+  $('mOk').disabled = false;
+  $('adjModal').classList.add('on');
+  setTimeout(function(){ $('mDelta').focus(); }, 30);
+}
+function closeAdj(){ $('adjModal').classList.remove('on'); }
+
+document.querySelectorAll('#adjModal .chips button').forEach(function(b){
+  b.addEventListener('click', function(){
+    var d = parseInt(b.getAttribute('data-d'), 10);
+    var cur = parseInt($('mDelta').value || '0', 10);
+    $('mDelta').value = String((isNaN(cur) ? 0 : cur) + d);
+    $('mDelta').focus();
+  });
+});
+$('mCancel').addEventListener('click', closeAdj);
+$('adjModal').addEventListener('click', function(ev){ if (ev.target === $('adjModal')) closeAdj(); });
+document.addEventListener('keydown', function(ev){
+  if (ev.key === 'Escape' && $('adjModal').classList.contains('on')) closeAdj();
+});
+
+function submitAdj(username, delta, reason, msgEl, isRecharge){
+  var setMsg = function(t, ok){ if (msgEl){ msgEl.textContent = t; msgEl.className = 'msg ' + (ok ? 'ok' : 'err'); } };
+  var body = {username: username, delta: delta, reason: reason};
+  if (isRecharge && delta > 0) body.is_recharge = true;   /* 只有「加」分才谈得上返利 */
+  api('adjust', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)}
+  ).then(function(d){
+    var sign = delta > 0 ? '+' : '';
+    var extra = d.invite_reward ? ('；已给邀请人返 ' + d.invite_reward + ' 积分') : '';
+    flash('已调整：' + username + ' ' + sign + delta + ' 积分，当前余额 ' + d.balance + ' 积分' + extra, true);
+    setMsg('已调整，余额 ' + d.balance + extra, true);
+    loadUsers();
+    loadLedger();
+    loadInvites();
+    setTimeout(closeAdj, 900);
+  }).catch(function(e){
+    flash('调整失败：' + e.message, false);
+    setMsg('失败：' + e.message, false);
+    $('mOk').disabled = false;
+  });
+}
+
+$('mOk').addEventListener('click', function(){
+  var delta = parseInt($('mDelta').value || '0', 10);
+  if (!MUSER){ flash('请先选择用户', false); return; }
+  if (!delta || isNaN(delta)){ $('mMsg').textContent = '请填写变动积分（正数加分 / 负数扣分）'; $('mMsg').className = 'msg err'; return; }
+  var cur = 0;
+  for (var i = 0; i < USERS.length; i++){ if (USERS[i].username === MUSER){ cur = USERS[i].points; } }
+  if (delta < 0 && cur + delta < 0 &&
+      !confirm('扣减后余额为 ' + (cur + delta) + '（负数），确定继续？')) return;
+  $('mOk').disabled = true;
+  $('mMsg').textContent = '提交中…'; $('mMsg').className = 'msg';
+  submitAdj(MUSER, delta, ($('mReason').value || '').trim() || '人工调整', $('mMsg'), $('mRecharge').checked);
+});
+
+/* ---------------- 上方表单（沿用，保留批量/任意用户场景） ---------------- */
+function adjust(){
+  var msg = $('adjMsg');
+  var username = $('adjUser').value.trim();
+  var delta = parseInt($('adjDelta').value || '0', 10);
+  if (!username){ msg.textContent = '请填写用户名'; msg.className = 'msg err'; return; }
+  if (!delta || isNaN(delta)){ msg.textContent = '请填写积分（正加负减）'; msg.className = 'msg err'; return; }
+  msg.textContent = '提交中…'; msg.className = 'msg';
+  submitAdj(username, delta, $('adjReason').value.trim() || '人工调整', msg, $('adjRecharge').checked);
+}
+
+function genCodes(){
+  api('gen_codes', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+    points: parseInt($('gcPoints').value, 10),
+    count: parseInt($('gcCount').value || '1', 10),
+    batch: $('gcBatch').value.trim()
+  })}).then(function(d){
+    var out = $('codeOut');
+    out.style.display = '';
+    out.textContent = '批次 ' + d.batch + ' · 每张 ' + d.points + ' 积分：\n' + d.codes.join('\n');
+    flash('已生成 ' + d.codes.length + ' 张充值码（每张 ' + d.points + ' 积分）', true);
+  }).catch(function(e){ flash('生成充值码失败：' + e.message, false); });
+}
+
+function loadLedger(){
+  var u = $('ledUser').value.trim();
+  api('ledger?limit=100' + (u ? '&username=' + encodeURIComponent(u) : '')).then(function(d){
+    var html = '';
+    d.ledger.forEach(function(l){
+      var cls = l.delta >= 0 ? 'delta-pos' : 'delta-neg';
+      html += '<tr><td>' + ts(l.ts) + '</td><td>' + esc(l.username || l.uid) +
+        '</td><td class="' + cls + '">' + (l.delta >= 0 ? '+' : '') + l.delta +
+        '</td><td>' + l.balance + '</td><td>' + esc(l.reason || '') + '</td><td>' + esc(l.ref || '') + '</td></tr>';
+    });
+    $('ledRows').innerHTML = html;
+  }).catch(function(e){ flash('流水加载失败：' + e.message, false); });
+}
+
+/* ---------------- 邀请返利 ---------------- */
+function loadInvites(){
+  var u = $('invUser').value.trim();
+  api('invites?limit=100' + (u ? '&username=' + encodeURIComponent(u) : '')).then(function(d){
+    var top = '';
+    (d.top || []).forEach(function(t){
+      top += '<tr><td><b>' + esc(t.username || ('uid ' + t.id)) + '</b></td><td>' + t.invited +
+        '</td><td class="delta-pos">+' + t.reward + '</td></tr>';
+    });
+    $('invTopRows').innerHTML = top || '<tr><td colspan="3" style="color:#9ca3af">还没有人成功邀请</td></tr>';
+
+    var html = '';
+    (d.rewards || []).forEach(function(r){
+      var isReg = r.kind === 'register';
+      html += '<tr><td>' + ts(r.ts) + '</td><td>' + esc(r.inviter || ('uid ' + r.inviter_uid)) +
+        '</td><td>' + esc(r.invitee || ('uid ' + r.invitee_uid)) +
+        '</td><td>' + (isReg ? '注册奖励' : '充值返利') +
+        '</td><td>' + (isReg ? '—' : r.base_points + ' 分') +
+        '</td><td class="delta-pos">+' + r.reward + '</td><td>' + esc(r.ref || '') + '</td></tr>';
+    });
+    $('invRows').innerHTML = html || '<tr><td colspan="7" style="color:#9ca3af">暂无返利记录</td></tr>';
+  }).catch(function(e){ flash('邀请返利加载失败：' + e.message, false); });
+}
+
+fetch(BASE + '/accounts/api/me').then(function(r){ return r.json(); }).then(function(d){
+  if (!d.ok || d.user.grp !== 'admin'){
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;color:var(--sub)">无权限：仅管理员可访问本页</div>';
+    return;
+  }
+  loadUsers();
+  loadLedger();
+  loadInvites();
+}).catch(function(e){ flash('登录态检查失败：' + e.message, false); });
+</script>
+</body>
+</html>

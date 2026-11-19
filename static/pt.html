@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图案提取工作台</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../accounts/static/ui.css">
+<script src="../accounts/static/cmp-20261014e.js"></script>
+<style>
+/* 令牌与问号气泡来自 ui.css（全站统一），本页只留布局与业务组件 */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);min-height:100vh;font-variant-numeric:tabular-nums}
+.topbar{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--bd);padding:12px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{width:44px;height:44px;border-radius:var(--r-ctl);background:linear-gradient(145deg,#3b4cf0 0%,#5b3df0 55%,#7b3af5 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;flex:none}
+h1{font-size:20px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center}
+.layout{max-width:1200px;margin:0 auto;padding:20px 22px 80px;display:flex;gap:22px;align-items:flex-start}
+.sidenav{width:216px;flex:none;position:sticky;top:76px;display:flex;flex-direction:column;gap:6px}
+.step{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:var(--r-ctl);cursor:pointer;font-size:14px;font-weight:600;color:var(--sub);border:1px solid transparent;transition:.15s;user-select:none}
+.step .sn{width:26px;height:26px;border-radius:50%;border:2px solid #d1d5db;color:var(--faint);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;transition:.15s}
+.step:hover{background:var(--pri-bg);color:var(--pri-dark)}
+.step.on{background:var(--pri-050);color:var(--pri-dark);border-color:var(--pri-200)}
+.step.on .sn{background:var(--pri);border-color:var(--pri);color:var(--on-pri)}
+.step.done .sn{background:var(--pri-100);border-color:var(--pri);color:var(--pri-dark)}
+.step.locked{cursor:not-allowed;opacity:.55}
+.step.locked:hover{background:transparent;color:var(--sub)}
+.content{flex:1;min-width:0}
+@media(max-width:820px){.layout{flex-direction:column}.sidenav{position:static;width:100%;flex-direction:row;flex-wrap:wrap}.step{flex:1;min-width:120px;justify-content:center}}
+.badge{background:var(--pri-100);color:var(--pri-dark);border:1px solid var(--pri-200);font-size:12px;padding:3px 10px;border-radius:var(--r-pill)}
+.badge b{font-weight:600}
+.hint{color:var(--sub);font-size:13px;width:100%}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-card);padding:22px;margin-bottom:18px;box-shadow:var(--shadow-card)}
+.card h2{font-size:16px;margin-bottom:14px;display:flex;align-items:center;gap:8px;font-weight:600;letter-spacing:-.01em}
+.num{width:22px;height:22px;border-radius:50%;background:var(--pri);color:var(--on-pri);font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+label{font-size:13px;color:var(--sub);display:block;margin-bottom:6px}
+.row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.fld{flex:1;min-width:200px}
+input[type=text]{width:100%;padding:9px 12px;border:1px solid var(--bd);border-radius:var(--r-ctl);font-size:14px;outline:none}
+input[type=text]:focus{border-color:var(--pri2);box-shadow:var(--ring)}
+/* 下拉选择（2026-10-21「输出尺寸」从 8 个平铺按钮改下拉框：一次只露一个，
+   选项多时平铺会占掉整行、把后面的表单挤下去）。appearance:none + 自绘箭头，
+   高度/圆角/字号与旁边 input[type=text] 完全一致，视觉上不突兀。 */
+.rsel{width:100%;padding:9px 34px 9px 12px;border:1px solid var(--bd);border-radius:var(--r-ctl);
+  font-size:14px;outline:none;background:var(--card);color:var(--tx);cursor:pointer;
+  appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%236b7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center}
+.rsel:hover{border-color:var(--pri2)}
+.rsel:focus{border-color:var(--pri2);box-shadow:var(--ring)}
+.segs{display:flex;gap:8px;flex-wrap:wrap}
+.seg{padding:8px 16px;border:1px solid var(--bd);border-radius:var(--r-ctl);background:var(--card);cursor:pointer;font-size:14px;user-select:none}
+.seg.on{background:var(--pri);border-color:var(--pri);color:var(--on-pri)}
+/* ---- 输出尺寸双区域（2026-11-15）：比例区管形状、分辨率区管清晰度 ---- */
+.szlab{font-size:12.8px;font-weight:700;color:var(--tx);margin:0 0 8px;display:flex;align-items:center;gap:8px}
+/* 尺寸区必须能换行、不许撑破表单容器（9 个比例 chip 一行放不下） */
+.fld{min-width:0}
+.szlab+.segs{width:100%}
+.szlab .dim{font-weight:400;font-size:11.8px;color:var(--faint)}
+.seg.sm{padding:7px 13px;font-size:13px}
+/* 自定义宽高模式下分辨率区整块置灰：两个都生效会让用户以为能叠加，其实宽高已定死 */
+.seg.off{opacity:.4;cursor:not-allowed;background:rgba(255,255,255,.05);border-style:dashed}
+.seg.off.on{background:rgba(255,255,255,.05);border-color:var(--bd);color:var(--sub);opacity:.4}
+.stepper{display:inline-flex;align-items:center;gap:0;border:1px solid var(--bd);border-radius:var(--r-ctl);overflow:hidden}
+.stepper button{width:38px;height:38px;border:none;background:var(--fill);font-size:18px;cursor:pointer}
+.stepper span{width:56px;text-align:center;font-size:15px}
+.drop{border:2px dashed #d1d5db;border-radius:var(--r-card);padding:30px 16px;text-align:center;color:var(--sub);cursor:pointer;transition:.15s}
+.drop.over{border-color:var(--pri);background:var(--pri-050)}
+.thumbs{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.thumb{position:relative;width:88px;height:88px;border-radius:var(--r-ctl);overflow:hidden;border:1px solid var(--bd)}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb .x{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;border:none;font-size:11px;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 26px;border:none;border-radius:var(--r-ctl);font-size:15px;cursor:pointer;font-weight:600}
+.btn.pri{background:var(--pri);color:var(--on-pri)}.btn.pri:hover{background:var(--pri-dark)}
+.btn.pri:disabled{background:rgba(255,255,255,.09);color:var(--faint);border:1px solid rgba(255,255,255,.10);cursor:not-allowed;opacity:1}
+.btn.ghost{background:var(--card);border:1px solid var(--bd);color:var(--tx)}
+.btn.blk{width:100%}
+.spin{width:18px;height:18px;border:3px solid #ddd;border-top-color:var(--pri);border-radius:50%;animation:sp 1s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+.stepbox{display:flex;align-items:center;gap:12px;padding:14px;border:var(--pri-100) 1px solid;background:var(--pri-bg);border-radius:var(--r-ctl)}
+.stepbox .t{font-size:14.5px;font-weight:600}
+.stepbox .s{font-size:13px;color:var(--sub);margin-top:2px}
+.vergrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.ver{border:2px solid var(--bd);border-radius:var(--r-card);overflow:hidden;cursor:pointer;position:relative;background:var(--card);transition:.12s}
+.ver:hover{border-color:var(--pri2)}
+.ver.on{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-100)}
+.ver img{width:100%;max-height:460px;object-fit:contain;background:repeating-conic-gradient(#f3f4f6 0 25%,#fff 0 50%) 0 0/16px 16px}
+.ver .cap{padding:8px 10px;font-size:13px;text-align:center;font-weight:600}
+.ver .tick{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:var(--pri);color:var(--on-pri);display:none;align-items:center;justify-content:center;font-size:13px}
+.ver.on .tick{display:flex}
+/* 「看原图」角标：版本卡默认只加载 640px 缩略图，点角标才开全尺寸原图 */
+.ver .zoom{position:absolute;top:8px;left:8px;padding:3px 9px;border-radius:var(--r-pill);background:rgba(17,24,39,.74);color:#fff;font-size:11.5px;font-weight:600;text-decoration:none;opacity:0;transition:.15s;z-index:2}
+.ver:hover .zoom{opacity:1}
+.ver .ver-tag{position:absolute;top:8px;left:50%;transform:translateX(-50%);padding:2px 9px;border-radius:var(--r-pill);background:var(--pri-100);color:var(--pri-dark);border:1px solid var(--pri-200);font-size:11px;font-weight:700;z-index:2}
+/* ---- 「原图 / 成品」并排对比（组件样式在 cmp.js，这里只做本页贴合） ---- */
+.ver .vcmp{display:flex;width:calc(100% - 16px);margin:0 8px 9px;justify-content:center;padding:6px 8px;font-size:12px}
+#viewDone .cmp-btn{padding:6px 14px;font-size:13px;border-radius:var(--r-sm)}
+#viewDone .cmp-host.cmp-open{max-width:100%}   /* 并排对比：占满正文列（原 600px 是单图滑块时代留的） */
+/* 历史版本条（重新生成自动归档，可继续对比/下载） */
+.histwrap{margin-top:16px;border-top:1px dashed var(--bd);padding-top:12px}
+.histwrap .ht{font-size:13px;font-weight:700;margin-bottom:9px;color:var(--tx)}
+.hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.hcard{border:1px dashed var(--bd);border-radius:var(--r-ctl);overflow:hidden;background:var(--card)}
+.hcard img{width:100%;height:106px;object-fit:contain;display:block;background:repeating-conic-gradient(#f3f4f6 0 25%,#fff 0 50%) 0 0/16px 16px}
+.hcard .hc{padding:5px 7px;font-size:11.5px;text-align:center;color:var(--sub);line-height:1.4}
+.hcard .hc a{color:var(--pri);text-decoration:none;font-weight:700}
+.regen{margin-top:12px;padding:12px 14px;background:var(--pri-bg);border:1px solid var(--pri-100);border-radius:var(--r-ctl);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.regen .rt{font-size:13.5px;font-weight:700}
+.regen .rs{font-size:12.5px;color:var(--sub);flex:1;min-width:180px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+td,th{border:1px solid var(--bd);padding:8px 10px;text-align:left}
+th{background:var(--fill);font-weight:600}
+.dl{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--r-sm);font-size:13px;text-decoration:none;font-weight:600}
+.dl.f{background:var(--pri-100);color:var(--pri-dark)}.dl.f:hover{background:var(--pri-200)}
+.ok{color:var(--ok);font-weight:600}.err{color:var(--err);font-weight:600}
+.warn{background:var(--warn-bg);border:1px solid var(--warn-bd);color:#fbbf24;padding:10px 14px;border-radius:var(--r-ctl);font-size:13px;margin-top:12px}
+.hist{display:flex;flex-direction:column;gap:8px}
+.hitem{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border:1px solid var(--bd);border-radius:var(--r-ctl);background:var(--card);cursor:pointer}
+.hitem:hover{border-color:var(--pri2)}
+.hitem .n{font-weight:600;font-size:14px}
+.hitem .m{color:var(--sub);font-size:12px}
+.st{font-size:12px;padding:2px 10px;border-radius:var(--r-pill);flex:none}
+.st.done{background:var(--ok-bg);color:var(--ok)}.st.err{background:var(--err-bg);color:var(--err)}
+.st.run{background:var(--pri-100);color:var(--pri-dark)}.st.sel{background:var(--warn-bg);color:var(--warn)}.st.cre{background:rgba(255,255,255,.06);color:var(--sub)}
+.center{text-align:center;padding:40px 0;color:var(--sub)}
+.hide{display:none!important}
+.small{font-size:12.5px;color:var(--sub)}
+#viewDone img.prev{max-width:100%;border-radius:var(--r-ctl);border:1px solid var(--bd)}
+.layers{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.layers span{background:var(--pri-050);border:1px solid var(--pri-200);color:var(--pri-dark);font-size:12px;padding:2px 10px;border-radius:var(--r-pill)}
+/* 部件确认舞台 */
+.pstage{position:relative;display:inline-block;max-width:100%;line-height:0;touch-action:none}
+.pstage img{max-width:100%;max-height:62vh;border-radius:var(--r-ctl);border:1px solid var(--bd);user-select:none;-webkit-user-drag:none}
+.pbox,.pcircle{position:absolute;border:2px solid var(--err);background:rgba(220,38,38,.10);cursor:move;box-sizing:border-box}
+.pcircle{border-color:var(--ok);background:rgba(22,163,74,.10);border-radius:50%}
+.pbox .tag,.pcircle .tag{position:absolute;top:-1px;left:-1px;transform:translateY(-100%);background:var(--err);color:#fff;font-size:11px;line-height:1.6;padding:1px 7px;border-radius:5px 5px 0 0;white-space:nowrap}
+.pcircle .tag{background:var(--ok)}
+.pbox .h,.pcircle .h{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid currentColor;cursor:nwse-resize;box-sizing:border-box}
+.pbox .h{color:var(--err)}.pcircle .h{color:var(--ok)}
+.pbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.prt{background:var(--pri-050);border:1px solid var(--pri-200);color:var(--pri-dark);font-size:12.5px;padding:4px 12px;border-radius:var(--r-pill);display:inline-flex;gap:6px;align-items:center}
+.prt b{font-weight:700}
+.ptable td{padding:6px 10px;font-size:13px}
+.pcard{border:1px solid var(--bd);border-radius:var(--r-ctl);padding:12px;margin-bottom:10px;background:var(--card)}
+.pcard .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.pcard .hd .nm{font-weight:700;font-size:14px}
+.pcard img{max-width:100%;max-height:260px;border-radius:var(--r-sm);background:repeating-conic-gradient(#f3f4f6 0 25%,#fff 0 50%) 0 0/16px 16px;border:1px solid var(--bd)}
+/* 涂抹抓取画布（叠在定位图上） */
+.ppaint{position:absolute;border-radius:var(--r-ctl);cursor:crosshair;touch-action:none;z-index:3}
+.ppaint.hide{display:none!important}
+.mini{background:var(--card);border:1px solid var(--pri-200);color:var(--pri-dark);border-radius:var(--r-sm);font-size:11.5px;padding:2px 8px;cursor:pointer;margin-left:4px;font-family:inherit}
+.mini:hover{background:var(--pri-050)}
+#brushBox{gap:4px}
+#brushBox b{font-weight:700}
+/* 历史任务 · 删除 / 批量删除 */
+.hbar{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.pickall{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);cursor:pointer;margin:0;user-select:none}
+.pickall input{width:15px;height:15px;cursor:pointer}
+.hdelbtn{padding:7px 16px;font-size:13.5px}
+.hdelbtn:disabled{opacity:.5;cursor:not-allowed}
+.hitem{gap:10px}
+.hitem .chk{display:flex;align-items:center;flex:none}
+.hitem .chk input{width:16px;height:16px;cursor:pointer}
+.hitem .hbody{flex:1;min-width:0}
+.hitem .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hitem .hdel{flex:none;font-size:13px;line-height:1;padding:6px 9px;border-radius:var(--r-sm);border:1px solid var(--err-bd);background:var(--err-bg);color:var(--err);cursor:pointer}
+.hitem .hdel:hover{background:rgba(248,113,113,.24)}
+/* 删除确认气泡：替代原生 confirm()（居中弹窗打断视线），改为贴着触发按钮弹出 */
+.cfp{position:fixed;z-index:9999;max-width:288px;padding:12px 14px;border-radius:10px;background:var(--card,#fff);
+  border:1px solid var(--bd,#e5e7eb);box-shadow:0 14px 36px rgba(0,0,0,.18);color:var(--tx,#1f2937);font-size:13px;line-height:1.55}
+.cfp .cfpm{margin-bottom:10px;word-break:break-word}
+.cfp .cfpa{display:flex;gap:8px;justify-content:flex-end}
+.cfp .cfpa button{font-family:inherit;font-size:13px;padding:6px 14px;border-radius:8px;cursor:pointer;transition:.15s;
+  border:1px solid var(--bd,#e5e7eb);background:var(--card,#fff);color:var(--tx,#1f2937)}
+.cfp .cfpa button:hover{background:var(--fill,#f3f4f6)}
+.cfp .cfpa button.ok{border-color:transparent;background:#dc2626;color:#fff}
+.cfp .cfpa button.ok:hover{background:#f87171}
+.hitem.sel{border-color:var(--pri);background:var(--pri-bg)}
+/* 版块切换 Tab（与「批量去水印工作台」共用同一条） */
+.sectab{display:flex;gap:4px;background:rgba(255,255,255,.06);padding:3px;border-radius:var(--r-ctl);margin-left:auto}
+.sectab a{display:block;padding:5px 14px;border-radius:7px;font-size:13px;font-weight:600;color:var(--sub);text-decoration:none;white-space:nowrap;transition:.15s}
+.sectab a:hover{color:var(--pri)}
+.sectab a.on{background:var(--card);color:var(--pri);box-shadow:0 1px 3px rgba(0,0,0,.10)}
+/* ---------- 批量看板（多张独立 · 批量提取） ---------- */
+.seg.dis{opacity:.42;cursor:not-allowed}
+.bhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.bbarwrap{flex:1;min-width:180px;height:10px;border-radius:var(--r-pill);background:var(--fill);overflow:hidden}
+.bbar{height:100%;width:0;background:var(--grad-pri);border-radius:var(--r-pill);transition:width .35s}
+.bacts{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.bacts .btn{padding:9px 16px;font-size:13.5px}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(214px,1fr));gap:14px}
+.bcard{border:1px solid var(--bd);border-radius:var(--r-card);background:var(--card);overflow:hidden;display:flex;flex-direction:column;transition:.15s}
+.bcard:hover{border-color:var(--pri2)}
+.bcard.now{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-100)}
+.bcard .bimg{position:relative;width:100%;height:196px;display:flex;align-items:center;justify-content:center;background:repeating-conic-gradient(#f3f4f6 0 25%,#fff 0 50%) 0 0/16px 16px;border-bottom:1px solid var(--bd)}
+.bcard .bimg img{width:100%;height:100%;object-fit:contain;display:block}
+.bcard .bimg .ph{font-size:12.5px;color:var(--faint);text-align:center;padding:0 14px;line-height:1.8}
+.bcard .idx{position:absolute;top:8px;left:8px;background:#111827;color:#fff;font-size:13px;font-weight:800;padding:3px 11px;border-radius:9px;letter-spacing:1px;box-shadow:0 1px 4px rgba(0,0,0,.28)}
+.bcard .idx2{position:absolute;top:8px;right:8px}
+.bcard .bmeta{padding:9px 11px 4px;flex:1;min-width:0}
+.bcard .bmeta .nm{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bcard .bmeta .ms{font-size:12px;color:var(--sub);margin-top:3px;line-height:1.55}
+.bcard .bvers{display:flex;gap:5px;flex-wrap:wrap;padding:6px 11px 0}
+.bcard .bvers img{width:40px;height:40px;object-fit:cover;border-radius:var(--r-sm);border:2px solid var(--bd);cursor:pointer;background:var(--card2)}
+.bcard .bvers img.on{border-color:var(--pri)}
+.bcard .bbtns{display:flex;gap:6px;flex-wrap:wrap;padding:9px 11px 11px}
+.bcard .bbtns button{flex:1 1 62px;font-size:12.5px;padding:7px 6px;border-radius:var(--r-sm);border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer;font-family:inherit;font-weight:600}
+.bcard .bbtns button:hover{border-color:var(--pri2);color:var(--pri-dark)}
+.bcard .bbtns button.pri{background:var(--pri);border-color:var(--pri);color:var(--on-pri)}
+.bcard .bbtns button.pri:hover{background:var(--pri-dark);color:#fff}
+.bcard .bbtns button:disabled{opacity:.5;cursor:not-allowed}
+/* 对比并排：批量卡（图区展开时容器高度交给组件自身，否则被 196px 固定高裁掉） */
+.bcard .bimg.cmp-open{height:auto}
+.bcard .bbtns button.bcmp{flex:1 1 100%}
+.bcard .bbtns button.bcmp.on{background:var(--pri);border-color:var(--pri);color:var(--on-pri)}
+.bq{font-size:11.5px;color:#fbbf24;background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:var(--r-sm);padding:4px 9px;margin:0 11px 8px;line-height:1.5}
+.berr{font-size:11.5px;color:var(--err);background:var(--err-bg);border-radius:var(--r-sm);padding:4px 9px;margin:0 11px 8px;line-height:1.5}
+.bok{font-size:11.5px;color:var(--ok);background:var(--ok-bd);border-radius:var(--r-sm);padding:4px 9px;margin:0 11px 8px;line-height:1.5}
+#btnBatchBack{display:none;margin-left:auto;padding:7px 15px;font-size:13px}
+/* ---------- 板块 Tab：① 单图案抓取 / ② 多图案批量抓取（2026-10-13 v2） ---------- */
+.tabs{display:flex;gap:6px;background:rgba(255,255,255,.06);padding:5px;border-radius:var(--r-ctl);margin-bottom:18px}
+.tabs .tab{flex:1;text-align:center;padding:10px 14px;border-radius:9px;font-size:14.5px;font-weight:700;color:var(--sub);cursor:pointer;transition:.15s;user-select:none}
+.tabs .tab:hover{color:var(--pri)}
+.tabs .tab.on{background:rgba(255,255,255,.13);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+.tabs .tab.on small{color:var(--sub)}
+.tabs .tab small{display:block;font-size:11.5px;font-weight:500;color:var(--faint);margin-top:3px;letter-spacing:0}
+/* ---------- 批量草稿区：每个图案一个完整配置版块 ----------
+   2026-10-13 v3（Taste 优化）：多任务堆叠时「这是第几个图案」必须一眼可辨 ——
+   · 头部整条淡主题色带 + 大号实色数字块，编号是全卡最重的元素；
+   · 卡间距 14→18px，任务边界靠留白而非花哨描边；
+   · 传图状态做成状态胶囊（有图=绿、无图=灰），扫一眼就知道哪些还没传。 */
+.dcard{border:1px solid var(--bd);border-radius:var(--r-card);background:var(--card);padding:0;margin-bottom:18px;box-shadow:var(--shadow-card);overflow:hidden}
+.dcard .dhd{display:flex;align-items:center;gap:12px;margin-bottom:0;padding:11px 16px;background:var(--pri-050);border-bottom:1px solid var(--pri-100);flex-wrap:wrap}
+.dcard .dhd .dn{display:inline-flex;align-items:center;gap:10px;font-weight:800;font-size:14.5px;color:var(--pri-dark);background:none;border:none;padding:0;letter-spacing:.5px}
+.dcard .dhd .dn b{display:inline-flex;align-items:center;justify-content:center;min-width:46px;height:34px;padding:0 8px;border-radius:10px;background:var(--pri);color:var(--on-pri);font-size:18px;font-weight:800;letter-spacing:1px;box-shadow:0 2px 5px var(--pri-100)}
+.dcard .dhd .dn2{font-size:12.5px;font-weight:600;color:var(--sub);background:var(--card);border:1px solid var(--bd);padding:3px 11px;border-radius:var(--r-pill);white-space:nowrap}
+.dcard .dhd .dn2.ok{color:#4ade80;background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.30)}
+.dcard .dhd .dtools{margin-left:auto;display:flex;gap:8px}
+.dcard .dhd button{width:32px;height:32px;border-radius:var(--r-ctl);border:1px solid var(--bd);background:var(--card);cursor:pointer;font-size:15px;line-height:1;color:var(--tx);font-family:inherit;display:inline-flex;align-items:center;justify-content:center}
+.dcard .dhd button:hover{border-color:var(--pri2);color:var(--pri-dark)}
+.dcard .dhd button.dx:hover{border-color:var(--err-bd);color:var(--err);background:var(--err-bg)}
+.dcard .dhd button:disabled{opacity:.4;cursor:not-allowed}
+.dcard .dhd button.dplus{background:var(--pri);border-color:var(--pri);color:var(--on-pri);font-size:17px}
+.dcard .dhd button.dplus:hover{background:var(--pri-dark);border-color:var(--pri-dark);color:#fff}
+.dgrid{display:grid;grid-template-columns:minmax(170px,1fr) minmax(200px,1.15fr);gap:16px;padding:16px}
+@media(max-width:700px){.dgrid{grid-template-columns:1fr}}
+.dpick{border:2px dashed #d1d5db;border-radius:var(--r-ctl);padding:15px 10px;text-align:center;color:var(--sub);cursor:pointer;font-size:13px;transition:.15s}
+.dpick.over{border-color:var(--pri);background:var(--pri-050)}
+.dthumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.dthumbs .thumb{width:62px;height:62px;border-radius:var(--r-sm)}
+.dthumbs .thumb .x{width:18px;height:18px;font-size:10px}
+.dnameRow{display:flex;align-items:center;gap:8px}
+.dnameRow input[type=text]{flex:1}
+.dauto{font-size:12px;color:var(--pri);margin-top:6px;min-height:16px}
+.dsq{width:34px;height:34px;border-radius:var(--r-sm);border:1px solid var(--bd);background:var(--card);cursor:pointer;font-size:15px;color:var(--sub);flex:none;font-family:inherit}
+.dsq:hover{border-color:var(--pri2);color:var(--pri-dark)}
+#btnBatchGo{margin-top:4px}
+.dsum{font-size:13px;color:var(--sub);margin-top:10px}
+.dsum b{color:var(--pri-dark);font-weight:700}
+.dcard label{display:block;font-size:12.5px;font-weight:600;color:var(--sub);margin-bottom:6px}
+.dcard select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radius:var(--r-ctl);background:var(--card);color:var(--tx);font-family:inherit;font-size:13.5px}
+.dcard select:focus{outline:none;border-color:var(--pri2)}
+.dcard .f2{margin-top:12px}
+.dsug{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.dsug button{padding:3px 10px;border:1px solid var(--bd);background:var(--card);border-radius:var(--r-pill);font-size:12px;color:var(--sub);cursor:pointer;font-family:inherit}
+.dsug button:hover{border-color:var(--pri2);color:var(--pri-dark)}
+#btnBatchGo:disabled{opacity:.5;cursor:not-allowed}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo">✦</div>
+  <h1>图案提取工作台<span class="q">?<span class="tip">分两个版块（上方切换）：<br>· <b>① 单图案抓取</b> —— 1-5 张<b>同一图案</b>的不同角度原图（被手 / 水印遮挡处自动互补）→ 合并出 <b>1 张</b>成品 → 自动生成分层 PSD。任务类型三选一：<b>手机壳图案</b>（满幅 · 元素与原图 1:1 锁定）／<b>支架图案</b>（原图直抠 · 可拖拽定位框）／<b>摄像头图案</b>（满幅重绘 + 区域比例抠选）。<br>· <b>② 多图案批量抓取</b> —— 最多 <b>10 个图案</b>，每个图案一个独立配置版块（各自命名 + 各自传图），点「开始批量抓取」后各自独立成任务、各出各的成品；同时最多跑 3 个，其余排队；哪张不行单独重做。</span></span></h1>
+  <button class="btn ghost" id="btnBatchBack">📦 返回批量看板 <span id="bbBackN"></span></button>
+</div>
+
+<div class="layout">
+<aside class="sidenav" id="stepNav">
+  <div class="step on" data-step="0" data-view="new"><span class="sn">1</span>上传配置</div>
+  <div class="step locked" data-step="1" data-view="prog"><span class="sn">2</span>生成图案</div>
+  <div class="step locked" data-step="2" data-view="sel"><span class="sn">3</span>选择版本</div>
+  <div class="step locked" data-step="3" data-view="psd"><span class="sn">4</span>生成 PSD</div>
+  <div class="step locked" data-step="4" data-view="done"><span class="sn">5</span>下载交付</div>
+</aside>
+<aside class="sidenav hide" id="stepNavBatch">
+  <div class="step on" data-bstep="0" data-view="draft"><span class="sn">1</span>添加图案任务</div>
+  <div class="step locked" data-bstep="1" data-view="batch"><span class="sn">2</span>批量生成</div>
+  <div class="step locked" data-bstep="2" data-view="batch"><span class="sn">3</span>打包下载</div>
+</aside>
+<main class="content">
+
+<!-- 板块切换：两个独立版块（单图案抓取 / 多图案批量抓取） -->
+<div class="tabs" id="tabBar">
+  <div class="tab on" data-tab="single">① 单图案抓取<small>1-5 张同一图案的不同角度 → 互相补全 → 合并出 1 张成品</small></div>
+  <div class="tab" data-tab="batch">② 多图案批量抓取<small>最多 10 个图案 · 每个图案独立配置 · 各自出成品 · 哪张不行单独重做</small></div>
+</div>
+
+<div id="paneSingle">
+
+<!-- ① 上传配置 -->
+<div class="card" id="cardNew">
+  <h2><span class="num">1</span>上传原图 · 配置任务<span class="q">?<span class="tip">三步走：① 填任务名称；② 选任务类型（三选一 · 每个类型独立成一个任务，互不干扰）；③ 上传 1-5 张原图，点「开始生图」。<b>手机壳图案</b>走两步（先出干净图 → 再提取图案，约 2-5 分钟）；<b>支架 / 摄像头图案</b>用原图直抠，会先让你确认定位框。</span></span></h2>
+  <div class="row">
+    <div class="fld"><label>任务名称</label><input type="text" id="fName" placeholder="如：手机壳-花朵款"></div>
+  </div>
+  <div class="row">
+    <div class="fld" style="flex:1"><label>输出尺寸<span class="q">?<span class="tip">两个区域各管一件事：<b>比例决定形状，分辨率决定清晰度</b>，下面实时显示最终像素。<br>· 比例选<b>「自动」</b>= 按壳身实际长宽比出图（历史行为），此时分辨率只改清晰度、不改构图。<br>· 比例选固定档时，AI 会<b>按该比例重新排布整幅图案</b>（选 1:1，波点就排成正方形网格），<b>不是把原图裁一刀</b>，也不拉伸变形。<br>· 分辨率「标准」= 长边 1024px（历史行为）；2K / 4K 是精确像素，<b>选多少出多少</b>。<br>⚠ 4K 总像素超 8.29MP，apib 出不了会自动切 lensapi（同价 ¥0.01，但慢约 10 秒）。<br>⚠ 比例与原图差很大时（3:4 选 1:1），元素之间的疏密会跟着变 —— 这是「换构图」的必然结果。</span></span></label>
+      <div class="szlab">① 输出比例<span class="dim">决定形状</span></div>
+      <div class="segs" id="fRatioR">
+        <div class="seg sm on" data-v="auto" title="按壳身实际长宽比出图（历史行为，不重排构图）">自动（按壳身）</div>
+        <div class="seg sm" data-v="1:1" title="1:1 方版 · 淘宝主图">1:1</div>
+        <div class="seg sm" data-v="3:4" title="3:4 竖版 · 详情页主力尺寸">3:4</div>
+        <div class="seg sm" data-v="9:16" title="9:16 竖屏 · 手机全屏 / 短视频封面">9:16</div>
+        <div class="seg sm" data-v="2:3" title="2:3 竖版 · 偏窄竖图">2:3</div>
+        <div class="seg sm" data-v="4:3" title="4:3 横版">4:3</div>
+        <div class="seg sm" data-v="3:2" title="3:2 横版 · 相机经典比例">3:2</div>
+        <div class="seg sm" data-v="16:9" title="16:9 横屏 · 视频封面">16:9</div>
+        <div class="seg sm" data-v="custom" title="自定义宽 × 高（256~4096）">自定义…</div>
+      </div>
+      <input type="text" id="fRatioCustom" class="hide" style="margin-top:8px" placeholder="宽 × 高，如 1280x720（256~4096）">
+      <div class="szlab" style="margin-top:14px">② 输出分辨率<span class="dim">决定清晰度</span></div>
+      <div class="segs" id="fRes">
+        <div class="seg sm on" data-v="std">标准（长边 1024）</div>
+        <div class="seg sm" data-v="2k">高清 2K</div>
+        <div class="seg sm" data-v="4k">超清 4K</div>
+        <div class="seg sm" data-v="custom">自定义长边…</div>
+      </div>
+      <input type="text" id="fResCustom" class="hide" style="margin-top:8px" placeholder="长边像素，如 3000（256~4096）">
+      <div class="small" id="ratioHint" style="margin-top:9px"></div>
+
+    </div>
+  </div>
+  <div class="row">
+    <div class="fld" style="flex:1"><label>任务类型<span class="q">?<span class="tip">三选一 · 每个类型独立成一个任务，互不干扰：<br>· <b>手机壳图案</b> = 满幅 · 元素与原图 1:1 锁定<br>· <b>支架图案</b> = 原图直抠 · 可拖拽定位框<br>· <b>摄像头图案</b> = 满幅重绘 + 区域比例抠选，自动抠出镜头周边图案</span></span></label>
+      <div class="segs" id="fTask">
+        <div class="seg on" data-v="shell">手机壳图案</div>
+        <div class="seg" data-v="stand">支架图案</div>
+        <div class="seg" data-v="lens">摄像头图案</div>
+      </div>
+    </div>
+  </div>
+  <!-- 「遮挡区处理」已收进后台：固定 AI 同风格补全，前端不再展示（见 syncTask / server.py 强制 inpaint=1） -->
+  <div class="row" id="rowFB">
+    <div class="fld" style="flex:1"><label>成品底色<span class="q">?<span class="tip">仅手机壳图案任务：<br>· <b>镂空图案（白底）</b> = 只要图案本身，图案以外填纯白（默认，适合做分层 / 贴图）<br>· <b>整幅底图（保留原底色）</b> = 识别原图壳面底色，铺满整张画布当背景，图案画在底色上（适合满幅印花效果）。元素版式两种模式都 1:1 锁定。</span></span></label>
+      <div class="segs" id="fFB">
+        <div class="seg on" data-v="0">镂空图案（白底）</div>
+        <div class="seg" data-v="1">整幅底图（保留原底色）</div>
+      </div>
+    </div>
+  </div>
+  <div class="row" id="rowTip" style="display:none">
+    <div class="fld" style="flex:1"><label>下一步</label><div class="small" id="taskTip"></div></div>
+  </div>
+  <label>原图<span class="q">?<span class="tip" id="fTip">1-5 张同一产品的不同角度原图，多角度会互相补全被挡住的图案。支持 jpg / png / webp。</span></span></label>
+  <div class="drop" id="drop">点击或拖拽图片到此处</div>
+  <input type="file" id="file" multiple accept=".jpg,.jpeg,.png,.webp" class="hide">
+  <div class="thumbs" id="thumbs"></div>
+  <div class="small" id="modeHint" style="margin-top:10px"></div>
+  <div style="margin-top:14px"><button class="btn pri blk" id="btnGo" disabled>开始生图</button></div>
+</div>
+
+<!-- ② 进度 -->
+<div class="card hide" id="cardProg">
+  <h2><span class="num">2</span>生图进行中<span class="q">?<span class="tip">版式锁定模式约 2-5 分钟：AI 只做去手 / 水印 / 多角度互补，图案提取由程序完成（瞬时）——<b>元素位置与原图 1:1 锁定，不会被重排</b>。完成后自动进入下一步。</span></span></h2>
+  <div class="stepbox" id="progBox"><div class="spin"></div><div><div class="t" id="progT">准备中…</div><div class="s" id="progS">约 2-5 分钟，完成自动进入下一步</div></div></div>
+  <div id="progErr"></div>
+  <div id="progWarn"></div>
+</div>
+
+<!-- ②b 部件定位（独立任务） -->
+<div class="card hide" id="cardParts">
+  <h2><span class="num">2</span>定位「<span id="partsTitle">部件</span>」<span class="q">?<span class="tip">已自动给出建议框：可拖动移动、拖右下角圆点改大小；不准就点「<b>手动框选</b>」拖出范围。支架等<b>异形</b>部件可点「<b>🖌 涂抹抓取</b>」，直接在图上涂出要抓的区域。确认后只提取该部件图案。</span></span></h2>
+  <div class="small hide" style="margin-bottom:10px" id="partsHelp">已自动给出建议框：可拖动移动、拖右下角圆点改大小；不准就点「手动框选」，直接在图上拖出范围。</div>
+  <div class="pstage" id="partsStage"><img id="partsImg" alt="定位图"><canvas class="ppaint hide" id="partsPaint"></canvas></div>
+  <div class="pbar">
+    <button class="btn ghost" id="btnManual">✎ 手动框选</button>
+    <button class="btn ghost" id="btnBrush">🖌 涂抹抓取（异形）</button>
+    <span class="prt hide" id="brushBox">笔刷 <b id="brushVal">40</b>px
+      <button class="mini" id="brushMinus">−</button><button class="mini" id="brushPlus">＋</button>
+      <button class="mini" id="brushUndo">↶ 撤销</button><button class="mini" id="brushClear">✕ 清空</button>
+    </span>
+    <span class="prt" id="partsCount">0 个框</span>
+  </div>
+  <div id="partsTip" style="margin-top:10px"></div>
+  <button class="btn pri blk" id="btnPartsOk" style="margin-top:16px">确认定位框 · 开始提取图案</button>
+</div>
+
+<!-- ③ 选版 -->
+<div class="card hide" id="cardSel">
+  <h2><span class="num">3</span>选择满意的图案版本<span class="q">?<span class="tip">点版本卡选定一版（出现 ✓ 打勾）再往下生成 PSD。<br><b>分层策略</b>：自动判别 / 白底元素型 / 满幅图案型。<br><b>分层粒度</b>：极简两层（底纹层 + 主体层，体积最小）／三层／精细（每元素一层）／连通域精细。<br>归并规则：动物 · 人物 · 植物等主体 → <b>主体层</b>；波点 · 小物件 · 纯色底 · 纹理 → <b>底纹层</b>。图层越少、文件越小。</span></span></h2>
+  <div class="row">
+    <div style="flex:1;min-width:220px"><label>干净产品图</label>
+      <img id="selClean" style="max-width:100%;border-radius:10px;border:1px solid var(--bd)"></div>
+    <div style="flex:2;min-width:300px"><label>图案版本（点击选定一版）</label><div class="vergrid" id="verGrid"></div></div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <div class="fld"><label>分层策略<span class="q">?<span class="tip">不确定就用「自动判别」：白底＋独立元素 → 白底元素型；纯色底＋满铺小图标＋主图 → 满幅图案型。</span></span></label>
+      <div class="segs" id="fStrat">
+        <div class="seg on" data-v="auto">自动判别（推荐）</div>
+        <div class="seg" data-v="white_bg">白底元素型</div>
+        <div class="seg" data-v="full_bleed">满幅图案型</div>
+      </div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <div class="fld" style="flex:1"><label>分层粒度<span class="q">?<span class="tip">决定图层数与文件体积：<br>· <b>极简两层</b> = 底纹层 + 主体层（推荐，文件最小）<br>· <b>三层</b> = 底色层 + 底纹层 + 主体层<br>· <b>精细</b> = 每个元素一层（图层多、文件大）<br>· <b>连通域精细</b> = 大元素各一层 + 小元素合并（适合支架 / 镜头）</span></span></label>
+      <div class="segs" id="fLmode">
+        <div class="seg on" data-v="merge2">极简两层 · 底纹层 + 主体层（推荐）</div>
+        <div class="seg" data-v="merge3">三层 · 底色层 + 底纹层 + 主体层</div>
+        <div class="seg" data-v="fine">精细 · 每个元素一层</div>
+        <div class="seg" data-v="connected">连通域精细 · 大元素各一层 + 小元素合并（支架/镜头）</div>
+      </div>
+    </div>
+  </div>
+  <div class="small hide" id="selTipoMode" style="margin:-4px 0 10px">归并说明：动物/人物/植物等主体图案 → 主体层；波点 · 小物件 · 纯色底 · 纹理 → 底纹层。图层越少、文件越小。</div>
+  <div class="small" id="selTip" style="margin-bottom:12px"></div>
+  <button class="btn pri blk" id="btnPsd" disabled>生成分层 PSD</button>
+</div>
+
+<!-- ④ PSD 进度 -->
+<div class="card hide" id="cardPsd">
+  <h2><span class="num">4</span>PSD 生成中<span class="q">?<span class="tip">把选定的图案超分到短边 2048（150dpi）→ 按分层粒度拆图层 → 组装分层 PSD 并压缩，约 1-3 分钟。</span></span></h2>
+  <div class="stepbox"><div class="spin"></div><div><div class="t" id="psdT">准备中…</div><div class="s">超分 + 分层 + 组装约需 1-3 分钟</div></div></div>
+  <div id="psdWarn"></div>
+</div>
+
+<!-- ⑤ 交付 -->
+<div class="card hide" id="cardDone">
+  <h2><span class="num">5</span>完成 · 下载交付<span class="q">?<span class="tip">下方是成品预览与下载按钮：<b>分层 PSD</b>（可进 Photoshop 编辑，每层独立）／<b>图案 2048 高清 PNG</b>／<b>图案 PNG（透明底）</b>／原图或干净产品图／分层预览图。对结果不满意可点「重新生成」重跑一版，旧图自动保留为历史版本（不覆盖）。</span></span></h2>
+  <div id="doneInfo"></div>
+  <div id="doneDl" style="margin-top:14px"></div>
+  <div style="margin-top:18px"><button class="btn ghost blk" id="btnNew">开始新任务</button></div>
+</div>
+
+</div><!-- /#paneSingle -->
+
+<div id="paneBatch" class="hide">
+
+<!-- ① 批量草稿区：每个图案一个完整配置版块 -->
+<div class="card" id="cardDraft">
+  <h2><span class="num">1</span>添加图案任务 <span class="badge"><b id="dCount">1</b> / 10</span><span class="q">?<span class="tip">每个图案一个配置版块（跟单图案第一步一样）：<br>· <b>名称</b> 留空 → 自动识别图案命名（本地算主色 + 形态，不消耗 AI 额度），填了就用自己的；<br>· <b>原图</b> 每个图案可传 1-5 张<b>同一图案的不同角度</b>（互相补全被手 / 水印遮挡处，依旧只出 1 张成品）；<br>· 点标题右侧 <b>＋</b> 再加一个图案（最多 10 个），点 <b>✕</b> 删掉这个图案。<br>每个图案各自独立成一个任务、各出各的成品，互不参照；同时最多跑 3 个，其余排队。</span></span></h2>
+  <div class="row">
+    <div class="fld"><label>批次名称<span class="q">?<span class="tip">只当分组标签（如「9月上新-花卉」），方便在任务历史里认出这是同一批。留空用「未命名批次」。</span></span></label><input type="text" id="fBatchName" placeholder="如：9月上新-花卉（可留空）"></div>
+    <div class="fld"><label>输出尺寸（本批统一）<span class="q">?<span class="tip">与单图案板块同一套档位：选固定比例时 AI 按该比例重新排布整幅图案；自定义像素会精确落地。本批所有图案用同一个尺寸。</span></span></label>
+      <div class="szlab">① 输出比例<span class="dim">决定形状</span></div>
+      <div class="segs" id="fRatioBR">
+        <div class="seg sm on" data-v="auto" title="按壳身实际长宽比出图（历史行为，不重排构图）">自动（按壳身）</div>
+        <div class="seg sm" data-v="1:1" title="1:1 方版 · 淘宝主图">1:1</div>
+        <div class="seg sm" data-v="3:4" title="3:4 竖版 · 详情页主力尺寸">3:4</div>
+        <div class="seg sm" data-v="9:16" title="9:16 竖屏 · 手机全屏 / 短视频封面">9:16</div>
+        <div class="seg sm" data-v="2:3" title="2:3 竖版 · 偏窄竖图">2:3</div>
+        <div class="seg sm" data-v="4:3" title="4:3 横版">4:3</div>
+        <div class="seg sm" data-v="3:2" title="3:2 横版 · 相机经典比例">3:2</div>
+        <div class="seg sm" data-v="16:9" title="16:9 横屏 · 视频封面">16:9</div>
+        <div class="seg sm" data-v="custom" title="自定义宽 × 高（256~4096）">自定义…</div>
+      </div>
+      <input type="text" id="fRatioBCustom" class="hide" style="margin-top:8px" placeholder="宽 × 高，如 1280x720（256~4096）">
+      <div class="szlab" style="margin-top:14px">② 输出分辨率<span class="dim">决定清晰度</span></div>
+      <div class="segs" id="fResB">
+        <div class="seg sm on" data-v="std">标准（长边 1024）</div>
+        <div class="seg sm" data-v="2k">高清 2K</div>
+        <div class="seg sm" data-v="4k">超清 4K</div>
+        <div class="seg sm" data-v="custom">自定义长边…</div>
+      </div>
+      <input type="text" id="fResBCustom" class="hide" style="margin-top:8px" placeholder="长边像素，如 3000（256~4096）">
+      <div class="small" id="ratioHintB" style="margin-top:9px"></div>
+
+    </div>
+  </div>
+  <div id="draftList"></div>
+  <div style="margin-top:4px"><button class="btn ghost" id="btnAddLast">＋ 再加一个图案任务</button></div>
+  <div class="dsum" id="draftSum"></div>
+  <div style="margin-top:14px"><button class="btn pri blk" id="btnBatchGo">开始批量抓取</button></div>
+</div>
+
+<!-- ② 批量看板（多图案 · 各自独立） -->
+<div class="card hide" id="cardBatch">
+  <h2><span class="num">2</span>批量看板 · <span id="bTitle">…</span><span class="q">?<span class="tip">每个图案一个独立任务，各自抠出各自的图案。<br>· 同时最多跑 <b>3 个</b>，其余排队等位；<br>· 哪个跑完就能单独<b>选版 / 生成 PSD / 重做</b>，互不干扰 —— 哪张不行就针对哪张重做；<br>· 全部选好版后点「一键全部生成 PSD」，或直接「打包下载 ZIP」拿走成品。<br>· 产物在服务器只保留 <b>72 小时</b>，记得及时下载。</span></span></h2>
+  <div class="bhead">
+    <div class="bbarwrap"><div class="bbar" id="bBar"></div></div>
+    <div class="small" id="bStat">加载中…</div>
+  </div>
+  <div class="bacts">
+    <button class="btn ghost" id="bEdit">✎ 返回修改 / 追加任务</button>
+    <button class="btn ghost" id="bRefresh">↻ 刷新</button>
+    <button class="btn ghost" id="bSelAll">✓ 一键全部生成 PSD（用第 1 版）</button>
+    <button class="btn pri" id="bZip">⬇ 打包下载 ZIP（PNG + PSD）</button>
+    <button class="btn ghost" id="bZipPng">⬇ 只打包 PNG</button>
+    <button class="btn ghost" id="bDel" style="border-color:var(--err-bd);color:var(--err);background:var(--err-bg)">🗑 取消整批</button>
+  </div>
+  <div class="bgrid" id="bGrid"></div>
+</div>
+
+</div><!-- /#paneBatch -->
+
+<!-- 历史 -->
+<div class="card">
+  <h2>历史任务 <span class="badge" id="histCount">0</span><span class="q">?<span class="tip">素材只保留 72 小时，到期自动清理，请及时下载。</span></span></h2>
+  <div class="hbar">
+    <label class="pickall"><input type="checkbox" id="histAll"> 全选</label>
+    <span class="small" id="histSelInfo">未选中</span>
+    <button class="btn ghost hdelbtn" id="btnDelSel" disabled>🗑 删除选中</button>
+  </div>
+  <div class="hist" id="histList"><div class="center">加载中…</div></div>
+</div>
+</main>
+</div>
+
+<script>
+/* inpaint 固定 "1"（AI 同风格补全）：前端已撤掉「留透明不补」开关，后端也会强制归一 */
+var API="../api", ratio="auto", longEdge=0, taskType="shell", inpaint="1", fullBg="0", files=[], curTask=null, pollTimer=null, selVer=null, strategy="auto", layerMode="merge2";
+/* 双板块（页内 Tab）：tab=single（单图案抓取）| batch（多图案批量抓取）。
+   v2 批量 = 每个图案一个完整配置版块（草稿卡）→ 建批时组装成 items 数组发给后端；
+   batchId 指向当前批次，batchTimer 是看板轮询定时器。 */
+var tab="single", batchId=null, batchTimer=null, BATCH_MAX_TASKS=10, BATCH_COST=3;
+var bSig="";   /* 批量看板「状态指纹」：仅当指纹变化才重建 DOM，避免 3s 轮询把展开的对比滑块冲掉 */
+var drafts=[], draftSeq=0;   /* 批量草稿卡：[{id,name,files:[],inpaint,auto}] 最多 BATCH_MAX_TASKS 个 */
+var curView="new";           /* 单图案板块当前视图名（供左侧步骤导航回显） */
+var parts=[], pW=0, pH=0, drag=null, partsWant="", rcDownExt=0.5;
+var strokes=[], brushOn=false, brushW=40, painting=false;
+var $=function(id){return document.getElementById(id)};
+
+/* 任务 id 持久化到 localStorage：刷新页面后自动恢复当前任务（否则刷新=任务丢失） */
+function setCur(t){curTask=t;try{t?localStorage.setItem("pw_tid",t):localStorage.removeItem("pw_tid")}catch(e){}}
+/* 产物相对路径归一：去掉前导 "/"，并兼容旧的裸文件名（部件产物实际在 parts/ 下） */
+function relNorm(fn){return String(fn==null?"":fn).replace(/^\/+/,"")}
+/* ---------- 产物链接（三条通道，按优先级降级） ----------
+   ① st.cdn[rel]  → 腾讯云 COS 外链（最快，走 CDN 边缘节点）
+   ② 本地 /file/  → 带 ?v=<mtime>，命中服务端长缓存 + If-None-Match 304
+   ③ 都没有       → 裸本地路径（老任务/未回填时行为不变，不会裂图） */
+function flink(st,fn){
+  var rel=relNorm(fn), cdn=(st&&st.cdn)||{}, fver=(st&&st.fver)||{};
+  if(cdn[rel])return cdn[rel];
+  var v=fver[rel];
+  return API+"/tasks/"+st.id+"/file/"+rel.split("/").map(encodeURIComponent).join("/")+(v?("?v="+v):"");
+}
+/* 缩略图（宽 480 WebP ~20-60KB）：首屏/版本卡/预览统一用它，点「看原图」才加载全尺寸。
+   ⚠️ 性能：历史任务卡顿的主因是「缩略图全量走工作台服务器」—— 服务器公网出口带宽被同机
+   其它服务共享争抢（实测同一张 1.1MB 图：工作台 58~328KB/s 剧烈波动，COS 2.7MB/s 稳定）。
+   所以缩略图也走 COS（st.cdn_thumb），本地 /thumb/ 仅作未回填任务的降级兜底。 */
+function tlink(st,fn){
+  var rel=relNorm(fn), ct=(st&&st.cdn_thumb)||{}, fver=(st&&st.fver)||{};
+  if(ct[rel])return ct[rel];
+  var v=fver[rel];
+  return API+"/tasks/"+st.id+"/thumb/"+rel.split("/").map(encodeURIComponent).join("/")+(v?("?v="+v):"");
+}
+/* ---------- COS 直链失效自动降级（兜底） ----------
+   COS 账号欠费 / 403 / 网络抖动时，直链会裂图（如 451 UnavailableForLegalReasons）。
+   给产物 <img> 挂 data-fn(相对路径)+data-kind(thumb|file)，全局捕获 error 后自动切本地
+   /thumb/ 或 /file/ 接口 —— 只要 72h TTL 内本地文件还在，图就照常显示，不再裂。 */
+function _locLink(fn, kind, tid){
+  return API+"/tasks/"+(tid||curTask)+"/"+(kind==="file"?"file":"thumb")+"/"
+    +relNorm(fn).split("/").map(encodeURIComponent).join("/");
+}
+document.addEventListener("error", function(e){
+  var el=e.target;
+  if(!el||el.tagName!=="IMG")return;
+  if(el.getAttribute("data-fb"))return;
+  var fn=el.getAttribute("data-fn");if(!fn)return;
+  var src=el.getAttribute("src")||"";
+  if(src.indexOf("myqcloud.com")<0)return;   /* 只兜 COS 直链失效，本地/对象存储之外不动 */
+  el.setAttribute("data-fb","1");
+  /* 批量看板里的图属于别的任务 → data-tid 优先，避免降级到当前打开任务的目录 */
+  el.src=_locLink(fn, el.getAttribute("data-kind")||"thumb", el.getAttribute("data-tid")||curTask);
+}, true);
+/* 历史版本（重新生成时自动归档的 `<名字>_vN.<ext>`）；从 fver 反扫，部件/整幅都适用 */
+function histVers(st){
+  var fver=(st&&st.fver)||{}, out=[];
+  Object.keys(fver).forEach(function(rel){
+    if(/_v\d+\.(png|jpe?g|webp)$/i.test(rel))out.push(rel);
+  });
+  out.sort();return out;
+}
+function baseName(fn){return String(fn).split("/").pop()}
+function stopPoll(){if(pollTimer){clearTimeout(pollTimer);pollTimer=null}}
+/* 重置进度卡（只改内容，不销毁 #progT/#progS —— 旧代码用 innerHTML 整体覆盖会把 #progT 干掉，
+   后续 render 里 $("progT").textContent 直接抛异常 → 轮询静默失败、页面卡死） */
+function resetProg(){
+  $("progBox").innerHTML='<div class="spin"></div><div><div class="t" id="progT">准备中…</div><div class="s" id="progS">约 2-5 分钟，完成自动进入下一步</div></div>';
+  $("progErr").innerHTML=""; $("progWarn").innerHTML="";
+}
+
+/* 任务类型联动：手机壳图案→显示遮挡区处理；支架/摄像头→提示将进入定位 */
+function syncTask(){
+  var isShell=(taskType==="shell");
+  /* 「遮挡区处理」已收进后台（固定 AI 同风格补全），不再有前端开关 */
+  $("rowFB").style.display=isShell?"":"none";
+  $("rowTip").style.display=isShell?"none":"";
+  if(!isShell){
+    $("taskTip").innerHTML=(taskType==="stand"
+      ? "下一步：自动给出支架圆框，可拖拽 / 缩放；异形可点「🖌 涂抹抓取」。"
+      : "下一步：先出干净壳 + 满幅重绘版，再自动抠出摄像头周边图案（进选版可调延伸系数）。");
+  }
+}
+
+/* 表单交互 */
+$("fStrat").addEventListener("click",function(e){var s=e.target.closest(".seg");if(!s)return;
+  this.querySelectorAll(".seg").forEach(function(x){x.classList.remove("on")});s.classList.add("on");strategy=s.dataset.v});
+$("fLmode").addEventListener("click",function(e){var s=e.target.closest(".seg");if(!s)return;
+  this.querySelectorAll(".seg").forEach(function(x){x.classList.remove("on")});s.classList.add("on");layerMode=s.dataset.v;
+  $("selTipoMode").innerHTML=({merge2:"归并说明：动物/人物/植物等主体图案 → <b>主体层</b>；波点 · 小物件 · 纯色底 · 纹理 → <b>底纹层</b>。共 2 层，文件最小。",
+    merge3:"归并说明：底色单独成 <b>底色层</b>（纯色，几乎不占体积），小元素/纹理 → <b>底纹层</b>，主体图案 → <b>主体层</b>。共 3 层。",
+    fine:"精细模式：面积最大的 12 个元素各占一层，其余小元素合并为「小图标底图」。图层多，文件明显更大。",
+    connected:"连通域精细：面积 ≥ 阈值（1800px）的大元素各占一层（最多 12 个），其余小元素合并为「小图标底图」。适合支架/镜头等部件，逐像素保真。"})[layerMode]});
+$("fTask").addEventListener("click",function(e){var s=e.target.closest(".seg");if(!s)return;
+  this.querySelectorAll(".seg").forEach(function(x){x.classList.remove("on")});s.classList.add("on");taskType=s.dataset.v;syncTask()});
+$("fFB").addEventListener("click",function(e){var s=e.target.closest(".seg");if(!s)return;
+  this.querySelectorAll(".seg").forEach(function(x){x.classList.remove("on")});s.classList.add("on");fullBg=s.dataset.v});
+
+/* ---------- 输出尺寸（2026-10-21 新增）---------- */
+/* 与后端 pipeline._ratio_px 同规则：**长边**固定 1024，短边按比例取偶数（>=256，<=4096）
+   （2026-11-15 更正：旧注释写「短边 1024」是错的，实际 3:4 → 768x1024） */
+/* ⚠️ 必须与后端 Python round() 完全一致：**.5 时取偶数**（Python 是银行家舍入，
+   JS 的 Math.round 是四舍五入向上）。不统一会出现「页面显示 342x1024、实际出 340x1024」
+   这种静默不一致 —— 已用 4800 条穷举交叉验证过。 */
+function roundEven(v){
+  var f=Math.floor(v), d=v-f;
+  if(d>0.5)return f+1;
+  if(d<0.5)return f;
+  return (f%2===0)?f:(f+1);
+}
+function ratioPx(rw,rh,short){
+  short=short||1024;rw=Math.max(1,rw|0);rh=Math.max(1,rh|0);
+  var w,h;
+  if(rw>=rh){w=short;h=roundEven(short*rh/rw);}else{h=short;w=roundEven(short*rw/rh);}
+  w=Math.max(256,Math.min(4096,roundEven(w/2)*2));
+  h=Math.max(256,Math.min(4096,roundEven(h/2)*2));
+  return w+"x"+h;
+}
+function parseCustom(s){
+  s=String(s||"").trim().replace(/[×*]/g,"x").replace(/X/g,"x").replace(/：/g,":");
+  var m=s.match(/^(\d{2,5})\s*[x:]\s*(\d{2,5})$/);
+  if(!m)return null;
+  var w=+m[1],h=+m[2];
+  if(w<256||w>4096||h<256||h>4096)return null;
+  return {w:w,h:h,px:(w-(w%2))+"x"+(h-(h%2))};
+}
+/* ===== 输出尺寸：双区域（比例 × 分辨率）· 2026-11-15 =====
+   设计：比例区决定「形状」、分辨率区决定「清晰度」，两区合成一个 ratio 串 + long_edge。
+     · 比例固定 + 标准(1024)   → 传比例串（如 "3:4"），后端按长边 1024 算 = 历史行为
+     · 比例固定 + 2K/4K/自定义 → 前端算成精确像素（如 "1536x2048"），后端原样落地
+     · 比例自动 + 标准(1024)   → 传 "auto"（历史行为）
+     · 比例自动 + 2K/4K/自定义 → 传 "auto" + long_edge（壳身真实比例只有后端裁完才知道）
+   抽成工厂：单图案 / 批量各一个实例，逻辑只有一份，两边不会漂移。 */
+var RATIO_WH={"1:1":[1,1],"3:4":[3,4],"9:16":[9,16],"2:3":[2,3],"4:3":[4,3],"3:2":[3,2],"16:9":[16,9]};
+var RES_LONG={std:0,"2k":2048,"4k":4096};
+function parseLongEdge(s){
+  var v=String(s||"").replace(/[^\d]/g,"");
+  if(!v)return 0;
+  var n=+v;
+  if(n<256||n>4096)return 0;
+  /* 向下取偶：填 3001 出 3000 而不是 3002 —— 绝不超过用户填的值（与 parseCustom 一致） */
+  return Math.floor(n/2)*2;
+}
+function bindSizePicker(cfg){
+  var R={ratio:"auto",longEdge:0};
+  function segs(box){var el=$(box);return el?el.querySelectorAll(".seg"):[];}
+  function curV(box){var el=$(box),on=el?el.querySelector(".seg.on"):null;return on?on.dataset.v:"";}
+  function pick(box,v){var a=segs(box);for(var i=0;i<a.length;i++)a[i].classList.toggle("on",a[i].dataset.v===v);}
+  /* 自定义宽高时分辨率无意义 → 整块置灰（保留原选中态，切回来不丢档位） */
+  function grayRes(off){var a=segs(cfg.res);for(var i=0;i<a.length;i++)a[i].classList.toggle("off",!!off);}
+  function sync(){
+    var rv=curV(cfg.ratio)||"auto", sv=curV(cfg.res)||"std";
+    var cu=$(cfg.cwh), lu=$(cfg.cle), hint=$(cfg.hint);
+    var whMode=(rv==="custom");
+    cu.classList.toggle("hide", !whMode);
+    lu.classList.toggle("hide", whMode || sv!=="custom");
+    grayRes(whMode);
+    var ratio="auto", le=0, msg="", warn="";
+    if(whMode){
+      var c=parseCustom(cu.value);
+      if(!c){
+        R.ratio="auto";R.longEdge=0;
+        hint.innerHTML=cu.value.trim()
+          ?'<span style="color:#f87171">宽高格式不对或超出 256~4096 —— 本次按「自动 + 标准」出图</span>'
+          :'<span style="color:var(--faint)">填「宽 × 高」，如 1280x720（256~4096）</span>';
+        if(cfg.onChange)cfg.onChange(R);
+        return R;
+      }
+      ratio=c.px;
+      msg="本次输出 <b>"+c.px+"</b>（自定义宽高 · "+(c.w*c.h/1e6).toFixed(1)+"MP）";
+    }else{
+      var wh=RATIO_WH[rv]||null;
+      var L=(sv==="custom")?parseLongEdge(lu.value):(RES_LONG[sv]||0);
+      if(sv==="custom"&&!L){
+        var rawLE=String(lu.value||"").trim();
+        if(!rawLE){
+          /* 刚点「自定义长边」还没填 → **保持选中不降级**（否则用户根本填不进去），
+             只在下面提示；提交时按「标准」兜底，绝不传脏值。 */
+          hint.innerHTML='<span style="color:var(--faint)">填长边像素，如 3000（256~4096）；不填则按「标准」出图</span>';
+          R.ratio=wh?rv:"auto"; R.longEdge=0;
+          if(cfg.onChange)cfg.onChange(R);
+          return R;
+        }
+        /* 填了但非法/越界 → 降级到标准，并把原因带到结果行（原来这条红字会被 msg 覆盖） */
+        warn='<br><span style="color:#f87171">长边需 256~4096 —— 本次按「标准」出图</span>';
+        pick(cfg.res,"std");sv="std";L=0;
+      }
+      var tag=(L>=4096)?"4K":((L>=2048)?"2K":"");
+      if(!wh){
+        ratio="auto";le=L;
+        msg=L?('按<b>壳身实际比例</b>出图，长边 <b>'+L+'</b>px'+(tag?'（'+tag+'）':'')+' · 比例由原图决定')
+             :'按<b>壳身实际比例</b>出图（长边 1024 · 历史行为）';
+      }else if(!L){
+        ratio=rv;
+        msg="本次输出 <b>"+ratioPx(wh[0],wh[1])+"</b>（"+rv+" · 长边 1024）";
+      }else{
+        ratio=ratioPx(wh[0],wh[1],L);
+        msg="本次输出 <b>"+ratio+"</b>（"+rv+" · 长边 "+L+(tag?" · "+tag:"")+"）";
+      }
+    }
+    /* 超过上游 8.29MP 上限时提示会切站点（lensapi 无此限制，同价） */
+    var m=String(ratio).match(/^(\d+)x(\d+)$/);
+    if(m){
+      var mp=(+m[1])*(+m[2])/1e6;
+      if(mp>8.2944)msg+='<br><span style="color:#fbbf24">'+mp.toFixed(1)+'MP 超过 8.29MP，会自动走 lensapi（apib 上限 8.29MP，同价但慢约 10 秒）</span>';
+    }
+    hint.innerHTML=msg+warn;
+    R.ratio=ratio;R.longEdge=le;
+    if(cfg.onChange)cfg.onChange(R);
+    return R;
+  }
+  $(cfg.ratio).addEventListener("click",function(e){
+    var t=e.target.closest?e.target.closest(".seg"):null;if(!t)return;
+    pick(cfg.ratio,t.dataset.v);
+    sync();
+    if(t.dataset.v==="custom")$(cfg.cwh).focus();
+  });
+  $(cfg.cwh).addEventListener("input",sync);
+  $(cfg.res).addEventListener("click",function(e){
+    var t=e.target.closest?e.target.closest(".seg"):null;if(!t||t.classList.contains("off"))return;
+    pick(cfg.res,t.dataset.v);
+    sync();
+    if(t.dataset.v==="custom")$(cfg.cle).focus();
+  });
+  $(cfg.cle).addEventListener("input",sync);
+  return {sync:sync,get:function(){return R;}};
+}
+/* 单图案板块：结果写全局 ratio / longEdge（历史逻辑仍读这两个变量） */
+var sizeP=bindSizePicker({ratio:"fRatioR",res:"fRes",cwh:"fRatioCustom",cle:"fResCustom",
+  hint:"ratioHint",onChange:function(R){ratio=R.ratio;longEdge=R.longEdge;}});
+/* 批量板块：提交时单独取 sizeB.get()，不与单图案串味 */
+var sizeB=bindSizePicker({ratio:"fRatioBR",res:"fResB",cwh:"fRatioBCustom",cle:"fResBCustom",
+  hint:"ratioHintB",onChange:function(){}});
+sizeP.sync();sizeB.sync();
+/* 板块切换（页内 Tab：① 单图案抓取 / ② 多图案批量抓取） */
+$("tabBar").addEventListener("click",function(e){
+  var t=e.target.closest?e.target.closest(".tab"):null;if(!t)return;
+  setTab(t.getAttribute("data-tab"));
+});
+
+var drop=$("drop"),fileIn=$("file");
+drop.onclick=function(){fileIn.click()};
+drop.ondragover=function(e){e.preventDefault();this.classList.add("over")};
+drop.ondragleave=function(){this.classList.remove("over")};
+drop.ondrop=function(e){e.preventDefault();this.classList.remove("over");addFiles(e.dataTransfer.files)};
+fileIn.onchange=function(){addFiles(this.files);this.value=""};
+function addFiles(fl){
+  var cap=5;                                   /* 单图案板块：1-5 张同一图案的不同角度 */
+  for(var i=0;i<fl.length;i++){
+    if(files.length>=cap){alert("最多 "+cap+" 张");break}
+    var f=fl[i];if(!/\.(jpe?g|png|webp)$/i.test(f.name)){alert("仅支持 jpg/png/webp："+f.name);continue}
+    files.push(f);
+  }
+  renderThumbs();
+}
+function renderThumbs(){
+  var t=$("thumbs");t.innerHTML="";
+  files.forEach(function(f,i){
+    var d=document.createElement("div");d.className="thumb";
+    d.innerHTML='<img src="'+URL.createObjectURL(f)+'"><button class="x">✕</button>';
+    d.querySelector(".x").onclick=function(){files.splice(i,1);renderThumbs()};
+    t.appendChild(d);
+  });
+  var cap=5, n=files.length;
+  $("btnGo").disabled=n<1;
+  $("modeHint").innerHTML=n
+    ?('已选 <b>'+n+'</b> 张（同一图案的多角度）→ 合并出 <b>1</b> 张成品 · 预计消耗 <b>'+BATCH_COST+'</b> 积分')
+    :'';
+  drop.textContent=n?("已选 "+n+" 张（还可加 "+(cap-n)+" 张）"):"点击或拖拽图片到此处";
+}
+
+/* ---------- 板块切换（① 单图案抓取 / ② 多图案批量抓取） ----------
+   两个板块完全独立：单图案 = 1-5 张同一图案多角度 → 合并出 1 张成品；
+   批量 = 每个图案一个完整配置版块（草稿卡）→ 建批时组装成 N 个独立任务。 */
+function setTab(t){
+  tab=(t==="batch")?"batch":"single";
+  document.querySelectorAll("#tabBar .tab").forEach(function(x){
+    x.classList.toggle("on",x.getAttribute("data-tab")===tab);
+  });
+  $("paneSingle").classList.toggle("hide",tab!=="single");
+  $("paneBatch").classList.toggle("hide",tab!=="batch");
+  $("stepNav").classList.toggle("hide",tab!=="single");
+  $("stepNavBatch").classList.toggle("hide",tab!=="batch");
+  try{localStorage.setItem("pw_tab",tab)}catch(e){}
+  if(tab==="batch"){renderDrafts();syncBSteps()}
+  else{renderThumbs();syncSteps(stepMap[curView]!=null?stepMap[curView]:0)}
+}
+/* 批量板块左侧 3 步：0 添加图案任务 → 1 批量生成 → 2 打包下载 */
+function syncBSteps(){
+  var cur=0;
+  if(batchId){
+    var ks=Object.keys(bItems), busy=false;
+    ks.forEach(function(k){if(BUSY.indexOf(bItems[k].stage)>=0)busy=true});
+    cur=(ks.length&&!busy)?2:1;
+  }
+  var nodes=document.querySelectorAll("#stepNavBatch .step");
+  Array.prototype.forEach.call(nodes,function(s){
+    var i=parseInt(s.getAttribute("data-bstep"),10);
+    s.classList.toggle("on",i===cur);
+    s.classList.toggle("done",i<cur);
+  });
+}
+
+/* 跳到充值页。子路径安全：线上 pt 在 /pattern/pt/ 下，若直接用 "../recharge"
+   由「顶层窗口」去跳会解析成 /recharge（丢掉 /pattern 前缀）→ 404。这里从当前
+   路径反推前缀再拼绝对路径；在外壳 iframe 内则让顶层窗口跳，避免充值页只嵌在小框里。 */
+function goRecharge(){
+  var p=location.pathname,i=p.lastIndexOf("/pt/");
+  var url=(i>=0?p.slice(0,i+1):p.replace(/[^/]*$/,""))+"recharge";
+  try{ if(window.top&&window.top!==window){ window.top.location.href=url; return; } }catch(e){}
+  location.href=url;
+}
+/* 统一失败提示。后端有两类错误体：FastAPI 的 {detail:"…"} 与鉴权/计费中间件的
+   {error:"…"}（402 积分不足即属后者，此前前端只读 detail → 只剩一个裸状态码）。 */
+function showFail(prefix,e){
+  var m=String((e&&e.message)||e||"未知错误");
+  alert(prefix+m);
+  if(m.indexOf("积分不足")>=0){
+    try{ if(confirm(m+"\n\n是否现在去充值？")) goRecharge(); }catch(err){}
+  }
+}
+
+/* 创建任务（单图案板块）：1-5 张同一图案多角度 → 1 个任务 */
+$("btnGo").onclick=function(){
+  var fd=new FormData();
+  var _sz=sizeP.get();
+  fd.append("name",$("fName").value||"未命名任务");fd.append("ratio",_sz.ratio);
+  if(_sz.longEdge)fd.append("long_edge",String(_sz.longEdge));   /* 自动比例 + 2K/4K 才需要 */
+  fd.append("task_type",taskType);fd.append("inpaint",inpaint);fd.append("full_bg",fullBg);
+  files.forEach(function(f){fd.append("images",f,f.name)});
+  $("btnGo").disabled=true;$("btnGo").textContent="上传中…";
+  fetch(API+"/tasks",{method:"POST",body:fd}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.detail||j.error||r.status));return j})})
+  .then(function(j){setCur(j.id);selVer=null;resetProg();maxStep=0;showView("prog");poll(true)})
+  .catch(function(e){showFail("创建失败：",e)})
+  .finally(function(){$("btnGo").disabled=files.length<1;$("btnGo").textContent="开始生图"});
+};
+
+/* ==================== 批量看板（多图案 · 各自独立） ====================
+   一批 = M 个图案（每个图案各自 1-5 张原图）→ 后端建 M 个标准 task（同 batch_id），
+   受 BoundedSemaphore(3) 并发闸门约束（其余排队）。每个成员仍是标准任务 → 选版 / 生成 PSD /
+   重做 / 删除全部复用既有接口，只是把入口搬到看板里。产物 72h TTL 与单图案一致。 */
+function setBatchId(b){
+  batchId=b;
+  try{b?localStorage.setItem("pw_bid",b):localStorage.removeItem("pw_bid")}catch(e){}
+  syncBatchBack();
+}
+/* 顶栏「返回批量看板」入口：从看板点进单张详情后还能一键回来 */
+function syncBatchBack(){
+  var b=$("btnBatchBack");if(!b)return;
+  b.style.display=batchId?"":"none";
+}
+/* ==================== 批量草稿区（每个图案一个完整配置版块） ====================
+   2026-10-13 v2：每个图案一个版块（名称 + 遮挡区处理 + 原图 1-5 张，跟单图案第一步一样），
+   标题右侧 ＋ 追加（最多 10 个）、✕ 删除（至少留 1 个）；名称留空 → 本地 CV 自动识别命名。
+   这里只维护前端草稿，点「开始批量抓取」才组装成 items（每项 name/task_type/inpaint/count）
+   + images 平铺列表一次提交给 /api/tasks/batch。 */
+function pad2(n){return (n<10?"0":"")+n}
+function draftNew(){draftSeq++;return {id:"d"+draftSeq,name:"",files:[],inpaint:"1",fullBg:"0",auto:false}}
+function draftCard(d){return document.querySelector('#draftList .dcard[data-did="'+d.id+'"]')}
+function renderDrafts(){
+  var box=$("draftList");if(!box)return;
+  if(!drafts.length)drafts.push(draftNew());
+  box.innerHTML="";
+  drafts.forEach(function(d,i){
+    var el=document.createElement("div");
+    el.className="dcard";el.setAttribute("data-did",d.id);
+    el.innerHTML=
+      '<div class="dhd"><span class="dn"><b>'+pad2(i+1)+'</b>图案任务</span>'
+      +'<span class="dn2'+(d.files.length?' ok':'')+'">'+(d.files.length?('原图 '+d.files.length+' 张'):'待上传原图')+'</span>'
+      +'<div class="dtools">'
+      +'<button class="dplus" type="button" title="再加一个图案任务（最多 '+BATCH_MAX_TASKS+' 个）">＋</button>'
+      +'<button class="dx" type="button" title="删掉这个图案任务">✕</button>'
+      +'</div></div>'
+      +'<div class="dgrid"><div>'
+      +'<label>图案名称<span class="q">?<span class="tip">留空 → 自动识别图案命名（本地算主色 + 形态：如「红主图案」「浅蓝纯色底」「黄波点」，不消耗 AI 额度）。填了就用自己的。</span></span></label>'
+      +'<div class="dnameRow"><input type="text" placeholder="留空 → 自动识别图案命名" value="'+esc(d.name)+'">'
+      +'<button class="dsq" type="button" title="按这个图案的原图重新自动识别命名">✨</button></div>'
+      +'<div class="dauto'+(d.auto?" on":"")+'">'+(d.auto?"✨ 已自动识别（可直接改）":"")+'</div>'
+      +'<div class="f2 hide"><label>遮挡区处理<span class="q">?<span class="tip">被支架 / 摄像头挡住的那块怎么处理：<b>AI 同风格补全</b> 按周围图案风格补上（推荐）／<b>留透明不补</b> 保持透明。</span></span></label>'
+      +'<select><option value="1" selected>AI 同风格补全（推荐）</option></select></div>'
+      +'<div class="f2"><label>成品底色<span class="q">?<span class="tip"><b>镂空图案（白底）</b>＝只要图案，空白填白（默认）／<b>整幅底图（保留原底色）</b>＝识别壳面底色铺满画布当背景。</span></span></label>'
+      +'<select class="sfb"><option value="0"'+(d.fullBg!=="1"?" selected":"")+'>镂空图案（白底）</option>'
+      +'<option value="1"'+(d.fullBg==="1"?" selected":"")+'>整幅底图（保留原底色）</option></select></div>'
+      +'</div><div>'
+      +'<label>原图（1-5 张同一图案的不同角度）</label>'
+      +'<div class="dpick">'+(d.files.length?('已选 '+d.files.length+' 张 · 点此再加'):'点击或拖拽 1-5 张')+'</div>'
+      +'<input type="file" multiple accept=".jpg,.jpeg,.png,.webp" class="hide">'
+      +'<div class="dthumbs"></div>'
+      +'</div></div>';
+    box.appendChild(el);
+    /* 名称（手填即关掉「自动识别」标记，避免回填覆盖用户输入） */
+    var inp=el.querySelector('input[type=text]');
+    inp.oninput=function(){d.name=this.value;d.auto=false;
+      var tg=el.querySelector(".dauto");tg.textContent="";tg.classList.remove("on");draftSum()};
+    /* 遮挡区处理 */
+    el.querySelector("select").onchange=function(){d.inpaint=this.value};
+    /* 成品底色（整幅底图 ⇄ 镂空图案） */
+    el.querySelector("select.sfb").onchange=function(){d.fullBg=this.value};
+    /* 原图：点击 / 拖拽 / 选择 */
+    var pick=el.querySelector(".dpick"), fi=el.querySelector('input[type=file]');
+    pick.onclick=function(){fi.click()};
+    pick.ondragover=function(e){e.preventDefault();this.classList.add("over")};
+    pick.ondragleave=function(){this.classList.remove("over")};
+    pick.ondrop=function(e){e.preventDefault();this.classList.remove("over");draftFiles(d,e.dataTransfer.files)};
+    fi.onchange=function(){draftFiles(d,this.files);this.value=""};
+    /* 缩略图 + 单张删除 */
+    var th=el.querySelector(".dthumbs");
+    d.files.forEach(function(f,j){
+      var t=document.createElement("div");t.className="thumb";
+      t.innerHTML='<img src="'+URL.createObjectURL(f)+'"><button class="x">✕</button>';
+      t.querySelector(".x").onclick=function(){d.files.splice(j,1);draftNameGone(d);renderDrafts()};
+      th.appendChild(t);
+    });
+    /* ＋ 追加 / ✕ 删除 */
+    var plus=el.querySelector(".dplus"), del=el.querySelector(".dx");
+    if(drafts.length>=BATCH_MAX_TASKS)plus.disabled=true;
+    plus.onclick=function(){addDraft(i+1)};
+    if(drafts.length<=1)del.disabled=true;
+    del.onclick=function(){
+      if(drafts.length<=1)return;
+      var self=this;
+      var drop=function(){drafts=drafts.filter(function(x){return x!==d});renderDrafts()};
+      /* 没上传过原图 → 没什么可丢的，直接删；有原图才确认（气泡贴在 ✕ 键旁） */
+      if(!d.files.length){drop();return}
+      askConfirm(self,"删掉「"+(d.name||("图案 "+pad2(i+1)))+"」这个图案任务？",drop,"确定删除");
+    };
+    /* ✨ 重新自动识别命名 */
+    el.querySelector(".dsq").onclick=function(){autonameDraft(d,true)};
+  });
+  draftSum();
+}
+/* 原图被删光后，之前自动识别出来的名字没意义 → 清掉（用户手填的不动） */
+function draftNameGone(d){
+  if(d.auto&&!d.files.length){d.name="";d.auto=false}
+}
+function draftFiles(d,fl){
+  for(var i=0;i<fl.length;i++){
+    if(d.files.length>=5){alert("每个图案最多 5 张原图（同一图案的不同角度）");break}
+    var f=fl[i];if(!/\.(jpe?g|png|webp)$/i.test(f.name)){alert("仅支持 jpg/png/webp："+f.name);continue}
+    d.files.push(f);
+  }
+  var empty=!(d.name||"").trim();
+  renderDrafts();
+  /* 还没命名过 → 传完自动识别一次（本地 CV，零 AI 消耗、不计费） */
+  if(empty&&d.files.length)autonameDraft(d,false);
+}
+function autonameDraft(d,force){
+  if(!d.files.length)return;
+  if(d.busy)return;
+  d.busy=true;
+  var card=draftCard(d), sq=card?card.querySelector(".dsq"):null;
+  if(card&&sq){sq.disabled=true;card.querySelector(".dauto").textContent="✨ 正在识别图案…"}
+  var taken=drafts.filter(function(x){return x!==d})
+    .map(function(x){return (x.name||"").trim()}).filter(Boolean);
+  var fd=new FormData();
+  fd.append("taken",JSON.stringify(taken));
+  fd.append("images",d.files[0],d.files[0].name);
+  fetch(API+"/tasks/autoname",{method:"POST",body:fd})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.detail||j.error||r.status);return j})})
+    .then(function(j){
+      d.busy=false;
+      if(card&&sq)sq.disabled=false;
+      if(!j.name)return;
+      /* 用户已经自己命名过（且不是自动命名）→ 不覆盖 */
+      if(!force&&(d.name||"").trim()&&!d.auto){cardRun(card,"");return}
+      d.name=j.name;d.auto=true;
+      cardRun(card,"✨ 已自动识别（可直接改）");
+      if(card){
+        var inp=card.querySelector('input[type=text]');
+        if(inp&&document.activeElement!==inp)inp.value=j.name;
+      }
+      draftSum();
+    })
+    .catch(function(e){
+      d.busy=false;if(card&&sq)sq.disabled=false;
+      cardRun(card,"⚠ 识别失败，可手动填名称");
+      console.warn("自动命名失败",e&&e.message);
+    });
+}
+function cardRun(card,txt){
+  if(!card)return;
+  var tg=card.querySelector(".dauto");
+  if(!tg)return;
+  tg.textContent=txt;
+  tg.classList.toggle("on",!!txt&&txt.indexOf("✨")===0);
+}
+function draftSum(){
+  var ready=drafts.filter(function(d){return d.files.length}).length;
+  var imgs=drafts.reduce(function(a,d){return a+d.files.length},0);
+  var dc=$("dCount");if(dc)dc.textContent=drafts.length;
+  var ds=$("draftSum");
+  if(ds)ds.innerHTML='共 <b>'+drafts.length+'</b> 个图案任务'
+    +(ready<drafts.length?('（其中 <b>'+(drafts.length-ready)+'</b> 个还没传原图）'):'')
+    +' · 原图 <b>'+imgs+'</b> 张 · 预计消耗 <b>'+(BATCH_COST*ready)+'</b> 积分（'+BATCH_COST+' 积分/图案）· 同时最多跑 3 个';
+  var go=$("btnBatchGo");
+  if(go){
+    go.disabled=(ready===0);
+    go.textContent=ready?('开始批量抓取（'+ready+' 个图案 · '+(BATCH_COST*ready)+' 积分）'):'开始批量抓取（请先给图案传原图）';
+  }
+}
+function addDraft(at){
+  if(drafts.length>=BATCH_MAX_TASKS){alert("最多 "+BATCH_MAX_TASKS+" 个图案任务（如已有 10 个，请先删掉一个）");return}
+  var d=draftNew();
+  if(at==null||at>drafts.length)drafts.push(d);else drafts.splice(at,0,d);
+  renderDrafts();
+  try{var c=draftCard(d);if(c)c.scrollIntoView({behavior:"smooth",block:"center"})}catch(e){}
+}
+/* 开始批量抓取：草稿 → items（每项一个图案）+ images 平铺列表 → 建批 */
+function startBatch(){
+  var list=drafts.filter(function(d){return d.files.length});
+  if(!list.length){alert("还没有可提交的图案 —— 请至少给一个图案上传 1 张原图。");return}
+  if(list.length>BATCH_MAX_TASKS){alert("最多 "+BATCH_MAX_TASKS+" 个图案任务");return}
+  for(var i=0;i<list.length;i++){
+    if(list[i].files.length>5){alert("「"+(list[i].name||("图案 "+pad2(i+1)))+"」最多 5 张原图");return}
+  }
+  var fd=new FormData(), items=[];
+  fd.append("n",String(list.length));   /* 计费中间件扫这个纯文本字段算 3N；items 更准，以后者为准 */
+  fd.append("name",$("fBatchName").value||"未命名批次");
+  var _szb=sizeB.get();                 /* 批量板块自己那一套，不与单图案串味 */
+  fd.append("ratio",_szb.ratio);
+  if(_szb.longEdge)fd.append("long_edge",String(_szb.longEdge));
+  fd.append("task_type","shell");fd.append("inpaint","1");fd.append("full_bg","0");
+  list.forEach(function(d){
+    items.push({name:(d.name||"").trim(),task_type:"shell",inpaint:d.inpaint||"1",full_bg:d.fullBg||"0",count:d.files.length});
+    d.files.forEach(function(f){fd.append("images",f,f.name)});
+  });
+  fd.append("items",JSON.stringify(items));
+  var b=$("btnBatchGo");b.disabled=true;b.textContent="上传中（"+list.length+" 个图案 / "+items.reduce(function(a,x){return a+x.count},0)+" 张原图）…";
+  fetch(API+"/tasks/batch",{method:"POST",body:fd})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.detail||j.error||r.status));return j})})
+    .then(function(j){
+      setBatchId(j.batch_id);
+      $("bTitle").textContent=$("fBatchName").value||"未命名批次";
+      $("bGrid").innerHTML="";$("bBar").style.width="0%";
+      $("bStat").textContent="已创建 "+j.count+" 个图案任务，正在启动…";
+      showView("batch");setTab("batch");syncBSteps();pollBatch(true);
+    })
+    .catch(function(e){showFail("批量创建失败：",e)})
+    .finally(function(){draftSum()});
+}
+$("btnAddLast").onclick=function(){addDraft()};
+$("btnBatchGo").onclick=startBatch;
+/* 「✎ 返回修改 / 追加任务」：回到草稿区（已建批任务不受影响，可继续追加新图案再建一批） */
+$("bEdit").onclick=function(){
+  showView("draft");setTab("batch");syncBSteps();
+  try{$("cardDraft").scrollIntoView({behavior:"smooth",block:"start"})}catch(e){}
+};
+
+var bStageMap={queued:["cre","排队中"],created:["cre","已创建"],gen_running:["run","生成中"],
+  psd_running:["run","PSD中"],parts_review:["sel","待定位"],selecting:["sel","待选版"],
+  done:["done","已完成"],error:["err","失败"]};
+var BUSY=["queued","created","gen_running","psd_running"];
+var bPick={};    /* tid -> 看板里选中的版本文件（仅本地，点「生成 PSD」时才提交） */
+var bItems={};   /* tid -> 最近一次轮询拿到的成员 state（供「一键全部生成 PSD」取 versions[0]） */
+
+function stopBatchPoll(){if(batchTimer){clearTimeout(batchTimer);batchTimer=null}}
+function pollBatch(first){
+  if(!batchId)return;
+  if(!first)stopBatchPoll();
+  var bid=batchId;
+  fetch(API+"/tasks/batch/"+encodeURIComponent(bid)).then(function(r){
+    if(r.status===404)throw new Error("__404__");
+    return r.json();
+  }).then(function(j){
+    if(bid!==batchId)return;
+    renderBatch(j);
+    var busy=false;for(var i=0;i<j.items.length;i++){if(BUSY.indexOf(j.items[i].stage)>=0){busy=true;break}}
+    if(busy&&!batchTimer)batchTimer=setTimeout(function(){batchTimer=null;pollBatch()},3000);
+  }).catch(function(e){
+    if(bid!==batchId)return;
+    if(e&&e.message==="__404__"){
+      $("bStat").textContent="批次不存在或已过期（产物只保留 72 小时）。";return;
+    }
+    $("bStat").textContent="读取批次状态失败，稍后自动重试…";
+    if(!batchTimer)batchTimer=setTimeout(function(){batchTimer=null;pollBatch()},5000);
+  });
+}
+function bThumbFor(st){
+  if(st.selected)return relNorm(st.selected);
+  var vs=st.versions||[];
+  if(vs.length)return relNorm(vs[0]);
+  if(st.clean)return relNorm(st.clean);
+  return "";
+}
+function bImg(st,fn,cls){
+  return '<img class="'+(cls||"")+'" src="'+tlink(st,fn)+'" data-fn="'+esc(relNorm(fn))+'" data-kind="thumb" data-tid="'+esc(st.id)+'" alt="">';
+}
+function renderBatch(j){
+  var items=j.items||[];
+  /* 状态指纹未变 → 直接跳过重建（否则每 3 秒轮询会把用户已展开的对比滑块/换版选择冲掉）。 */
+  var _sig=JSON.stringify(items.map(function(s){return [s.id,s.stage,s.step||"",s.queue_pos||0,
+    (s.versions||[]).join(","),s.selected||"",s.psd||"",s.error||""]}));
+  if(_sig===bSig&&$("bGrid").children.length)return;
+  bSig=_sig;
+  bItems={};
+  items.forEach(function(s){bItems[s.id]=s});
+  if(items[0]&&items[0].batch_name)$("bTitle").textContent=items[0].batch_name;
+  var n=items.length;
+  var done=0,err=0,psd=0,q=0,sel=0;
+  items.forEach(function(s){
+    if(s.stage==="done")done++;else if(s.stage==="error")err++;
+    if(s.psd)psd++;
+    if(s.stage==="queued")q++;
+    if(s.stage==="selecting")sel++;
+  });
+  $("bBar").style.width=(n?Math.round((done+err)/n*100):0)+"%";
+  $("bStat").innerHTML='共 <b>'+n+'</b> 张 · 已完成 <b>'+done+'</b> · 失败 <b>'+err+'</b>'
+    +(psd?(' · 已出 PSD <b>'+psd+'</b>'):'')
+    +(sel?(' · 待选版 <b>'+sel+'</b>'):'')
+    +(q?(' · 排队 <b>'+q+'</b>'):'')
+    +' · 同时最多跑 3 张';
+  var g=$("bGrid");
+  if(!n){g.innerHTML='<div class="center">批次里还没有任务</div>';return}
+  g.innerHTML="";
+  items.forEach(function(st){
+    var m=bStageMap[st.stage]||["cre",st.stage];
+    var vs=(st.versions||[]).slice(0,4);
+    if(vs.length&&!bPick[st.id])bPick[st.id]=relNorm(vs[0]);
+    var cur=bPick[st.id]||"";
+    var ph=bThumbFor(st);
+    var d=document.createElement("div");d.className="bcard";
+    d.setAttribute("data-tid",st.id);
+    if(st.id===curTask)d.classList.add("now");
+    var img=ph?bImg(st,ph):'<div class="ph">'+(st.stage==="error"?esc((st.error||"生成失败").slice(0,60)):"暂无预览")+'</div>';
+    var extra="";
+    if(st.stage==="queued")extra='<div class="bq">⏳ 排队中'+(st.queue_pos?(' · 队列第 '+st.queue_pos+' 位'):'')+'（前面还有 '+(st.queue_pos?st.queue_pos-1:0)+' 张）</div>';
+    else if(st.stage==="gen_running"||st.stage==="psd_running")extra='<div class="bq">⚙ '+esc(st.step||"处理中…")+'</div>';
+    else if(st.stage==="error")extra='<div class="berr">✕ '+esc((st.error||"生成失败").slice(0,90))+'</div>';
+    else if(st.stage==="done")extra='<div class="bok">✓ 已完成'+(st.psd?(' · PSD '+(st.psd_mb||"?")+'MB'):'')+'</div>';
+    else if(st.stage==="selecting")extra='<div class="bq">👀 选一版 → 生成 PSD</div>';
+    var vth=vs.length?'<div class="bvers">'+vs.map(function(v){
+      return bImg(st,v,relNorm(v)===cur?"on":"") .replace("<img ","<img data-v=\""+esc(v)+"\" title=\"用这一版生成 PSD\" ");
+    }).join("")+'</div>':'';
+    var bs=[];
+    if(st.stage==="selecting"&&vs.length)bs.push('<button class="pri" data-act="psd">⚙ 生成 PSD</button>');
+    if(st.stage==="done")bs.push('<button class="pri" data-act="open">↗ 查看 / 下载</button>');
+    if(st.stage==="error")bs.push('<button class="pri" data-act="redo">↻ 重试这一张</button>');
+    if(BUSY.indexOf(st.stage)>=0)bs.push('<button data-act="open">↗ 查看进度</button>');
+    if(st.stage==="selecting")bs.push('<button data-act="open">↗ 详情 / 换版</button>');
+    if(st.stage==="selecting"||st.stage==="done")bs.push('<button data-act="redo">↻ 重做</button>');
+    /* 对比滑块：成品层不写 data-out → 由组件取图区当前那张图，换版即跟随（无需同步维护） */
+    if(ph&&(st.locate_src||st.clean))bs.push(cmpBtn(st,"","bcmp","⇄ 对比原图"));
+    bs.push('<button data-act="del" style="border-color:var(--err-bd);color:var(--err);background:var(--err-bg)">🗑 删除</button>');
+    d.innerHTML='<div class="bimg cmp-host">'+img+'<span class="idx">'+(st.batch_index?pad2(st.batch_index):"?")+' / '+(st.batch_total?pad2(st.batch_total):"??")+'</span>'
+      +'<span class="st '+m[0]+' idx2">'+m[1]+'</span></div>'
+      +'<div class="bmeta"><div class="nm">'+esc(st.name||st.id)+'</div>'
+      +'<div class="ms">'+(st.expire_in_h!=null?('⏳ 保留 '+Math.max(0,Math.floor(st.expire_in_h))+' 小时'):'')+'</div></div>'
+      +extra+vth+'<div class="bbtns">'+bs.join("")+'</div>';
+    d.querySelectorAll(".bvers img").forEach(function(im){
+      im.onclick=function(){bPick[st.id]=im.getAttribute("data-v");
+        d.querySelectorAll(".bvers img").forEach(function(o){o.classList.remove("on")});
+        im.classList.add("on");};
+    });
+    d.querySelectorAll(".bbtns button").forEach(function(bn){
+      if(bn.hasAttribute("data-cmp"))return;   /* 对比按钮由 cmp.js 统一接管 */
+      bn.onclick=function(){batchAct(st.id,bn.getAttribute("data-act"),bn)};
+    });
+    g.appendChild(d);
+  });
+  syncBatchBack();syncBSteps();
+}
+function batchAct(tid,act,anchor){
+  if(act==="open"){
+    stopBatchPoll();setTab("single");setCur(tid);selVer=null;maxStep=0;showView("prog");poll(true);return;
+  }
+  if(act==="del"){
+    askConfirm(anchor,"删除这一张？该张的原图与产物一起删除，不可恢复。",function(){
+      fetch(API+"/tasks/delete",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ids:[tid]})})
+        .then(function(){delete bPick[tid];pollBatch(true)});
+    });
+    return;
+  }
+  if(act==="redo"){
+    askConfirm(anchor,"重做这一张？会重新跑一版 AI（旧结果自动归档为历史版本，不覆盖）。",function(){
+      fetch(API+"/tasks/"+tid+"/regenerate",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({target:"full"})})
+        .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.detail||j.error||r.status));return j})})
+        .then(function(){pollBatch(true)})
+        .catch(function(e){showFail("重做失败：",e)});
+    },"确定重做");
+    return;
+  }
+  if(act==="psd"){
+    var v=bPick[tid];
+    if(!v){alert("这一张还没有可用的图案版本");return}
+    batchPsd([tid],v);
+    return;
+  }
+}
+/* 生成 PSD：复用 /select（内部起线程跑 PSD）；批量时按 1.2s 间隔**串行**提交，
+   避免 N 个 EDSR 超分线程一起抢 CPU 把机器打满。 */
+function batchPsd(ids,ver){
+  var i=0;
+  (function next(){
+    if(i>=ids.length){pollBatch(true);return}
+    var tid=ids[i++];
+    fetch(API+"/tasks/"+tid+"/select",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({version:bPick[tid]||ver||null,strategy:"auto",layer_mode:"merge2"})})
+      .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.detail||j.error||r.status));return j})})
+      .then(function(){setTimeout(next,1200)})
+      .catch(function(e){
+        /* 单张失败不阻断整批：记下来继续下一张 */
+        console.warn("生成 PSD 失败", tid, e.message);
+        setTimeout(next,600);
+      });
+  })();
+}
+function bSelAllPsd(){
+  var ids=[];
+  document.querySelectorAll("#bGrid .bcard").forEach(function(c){
+    var btn=c.querySelector('.bbtns button[data-act="psd"]');
+    if(btn)ids.push(c.getAttribute("data-tid"));
+  });
+  if(!ids.length){alert("当前没有「待选版」的图 —— 已经出过 PSD 或还在生成中。\n可以点「↻ 刷新」看最新状态。");return}
+  if(!confirm("对本批 "+ids.length+" 张各用「第 1 版」生成分层 PSD？\n（PSD 下载时才扣积分：3 积分/张，已下载过的不重复扣）"))return;
+  /* 明确用第 1 版：写进 bPick（后端 select 要求 version 必须在 versions 里，不能传 null） */
+  var list=[];
+  ids.forEach(function(t){
+    var st=bItems[t];
+    if(st&&(st.versions||[]).length){bPick[t]=relNorm(st.versions[0]);list.push(t)}
+  });
+  if(!list.length){alert("拿不到版本列表，请点「↻ 刷新」后重试");return}
+  batchPsd(list);
+}
+/* 打包下载：POST 拿 ZIP Blob → 浏览器下载；PSD 未付过则后端回 402（提示积分不足） */
+function bZip(wantPsd){
+  if(!batchId)return;
+  var ids=[];
+  document.querySelectorAll("#bGrid .bcard").forEach(function(c){ids.push(c.getAttribute("data-tid"))});
+  if(!ids.length){alert("看板里还没有任务");return}
+  var b=wantPsd?$("bZip"):$("bZipPng");
+  var old=b.textContent;b.disabled=true;b.textContent="打包中…";
+  fetch(API+"/tasks/batch/zip",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ids:ids,psd:wantPsd})})
+    .then(function(r){
+      if(r.status===402)return r.json().then(function(j){throw new Error(j.error||"积分不足")});
+      if(!r.ok)return r.json().then(function(j){throw new Error(j.detail||j.error||("HTTP "+r.status))}).catch(function(e){throw (e.message?e:new Error("HTTP "+r.status))});
+      var sum=r.headers.get("X-Zip-Summary")||"";
+      return r.blob().then(function(bl){return {bl:bl,sum:sum}});
+    })
+    .then(function(o){
+      var a=document.createElement("a");
+      a.href=URL.createObjectURL(o.bl);a.download="批量图案.zip";
+      document.body.appendChild(a);a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},4000);
+      if(o.sum)$("bStat").textContent="已打包下载（"+o.sum.replace(";"," · ")+"）";
+    })
+    .catch(function(e){showFail("打包失败：",e)})
+    .finally(function(){b.disabled=false;b.textContent=old});
+}
+$("bRefresh").onclick=function(){pollBatch(true)};
+$("bSelAll").onclick=bSelAllPsd;
+$("bZip").onclick=function(){bZip(true)};
+$("bZipPng").onclick=function(){bZip(false)};
+$("bDel").onclick=function(){
+  if(!batchId)return;
+  var self=this;
+  var ids=[];document.querySelectorAll("#bGrid .bcard").forEach(function(c){ids.push(c.getAttribute("data-tid"))});
+  if(!ids.length)return;
+  askConfirm(self,"取消整批：删除本批全部 "+ids.length+" 张任务及其原图 / 产物，不可恢复。",function(){
+    stopBatchPoll();
+    fetch(API+"/tasks/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids:ids})})
+      .then(function(){setBatchId(null);bPick={};bItems={};loadHist();showView("draft");renderDrafts();syncBSteps()});
+  },"确定取消整批");
+};
+$("btnBatchBack").onclick=function(){
+  if(!batchId)return;
+  stopPoll();showView("batch");setTab("batch");syncBSteps();pollBatch(true);
+};
+
+/* 视图切换 + 左侧步骤导航联动 */
+var stepMap={new:0,draft:0,prog:1,parts:1,both:1,batch:1,sel:2,psd:3,done:4};
+var maxStep=0, curStage=null;
+function syncSteps(cur){
+  var nodes=document.querySelectorAll("#stepNav .step");
+  Array.prototype.forEach.call(nodes,function(s){
+    var i=parseInt(s.getAttribute("data-step"),10);
+    s.classList.toggle("on",i===cur);
+    s.classList.toggle("done",i<cur);
+    s.classList.toggle("locked",i>maxStep);
+  });
+}
+function showView(v){
+  curView=v;
+  $("cardProg").classList.toggle("hide",v!=="prog"&&v!=="both");
+  $("cardParts").classList.toggle("hide",v!=="parts");
+  $("cardSel").classList.toggle("hide",v!=="sel");
+  $("cardPsd").classList.toggle("hide",v!=="psd");
+  $("cardDone").classList.toggle("hide",v!=="done");
+  $("cardBatch").classList.toggle("hide",v!=="batch");
+  if(v==="new"){$("cardProg").classList.add("hide");maxStep=0}
+  if(v==="prog"){$("cardSel").classList.add("hide")}
+  var cur=(stepMap[v]!=null)?stepMap[v]:0;
+  if(cur>maxStep)maxStep=cur;
+  syncSteps(cur);
+}
+/* 步骤导航点击：仅允许回到「已达步骤」回顾；生图/PSD 运行中不响应，避免与轮询抢视图 */
+$("stepNav").addEventListener("click",function(e){
+  var s=e.target.closest?e.target.closest(".step"):null;
+  if(!s)return;
+  var i=parseInt(s.getAttribute("data-step"),10);
+  if(i>maxStep)return;
+  if(curStage==="gen_running"||curStage==="created"||curStage==="psd_running")return;
+  showView(s.getAttribute("data-view"));
+});
+/* 批量板块步骤：0 回到草稿区（可改配置 / 追加图案）；1、2 回看板 */
+$("stepNavBatch").addEventListener("click",function(e){
+  var s=e.target.closest?e.target.closest(".step"):null;
+  if(!s)return;
+  var i=parseInt(s.getAttribute("data-bstep"),10);
+  if(i===0){showView("draft");
+    try{$("cardDraft").scrollIntoView({behavior:"smooth",block:"start"})}catch(err){}
+    return;}
+  if(!batchId){alert("还没有批次 —— 先给图案传原图，再点最下面的「开始批量抓取」。");return}
+  showView("batch");pollBatch(true);
+  try{$("cardBatch").scrollIntoView({behavior:"smooth",block:"start"})}catch(err){}
+});
+
+/* ---------- 部件确认（大镜头框 / 支架） ---------- */
+function layoutEl(el,p){
+  var x,y,w,h;
+  if(p.shape==="circle"){ x=p.center[0]-p.r; y=p.center[1]-p.r; w=2*p.r; h=2*p.r; }
+  else { x=p.box[0]; y=p.box[1]; w=p.box[2]; h=p.box[3]; }
+  el.style.left=(x/pW*100)+"%"; el.style.top=(y/pH*100)+"%";
+  el.style.width=(w/pW*100)+"%"; el.style.height=(h/pH*100)+"%";
+}
+function drawParts(){
+  var stage=$("partsStage");
+  Array.prototype.slice.call(stage.querySelectorAll(".pbox,.pcircle")).forEach(function(n){n.parentNode.removeChild(n)});
+  parts.forEach(function(p,idx){
+    var el=document.createElement("div");
+    el.className=(p.shape==="circle")?"pcircle":"pbox";
+    el.innerHTML='<span class="tag">'+esc(p.kind)+' <b style="cursor:pointer;font-weight:400">✕</b></span><span class="h"></span>';
+    el.querySelector(".tag b").addEventListener("pointerdown",function(ev){ev.stopPropagation()});
+    el.querySelector(".tag b").onclick=function(ev){ev.stopPropagation();parts.splice(idx,1);drawParts()};
+    bindDrag(el,p);
+    bindResize(el,p);
+    layoutEl(el,p);
+    stage.appendChild(el);
+  });
+  $("partsCount").textContent=parts.length+" 个框";
+}
+function stageK(){
+  var st=$("partsStage"), r=st.getBoundingClientRect();
+  return {kx:pW/Math.max(1,r.width), ky:pH/Math.max(1,r.height)};
+}
+function bindDrag(el,p){
+  el.addEventListener("pointerdown",function(e){
+    if(e.target.classList.contains("h"))return;
+    e.preventDefault();e.stopPropagation();
+    var sx=e.clientX,sy=e.clientY,k=stageK(),o0;
+    o0=(p.shape==="circle")?[p.center[0],p.center[1]]:[p.box[0],p.box[1]];
+    function mv(ev){
+      var dx=(ev.clientX-sx)*k.kx, dy=(ev.clientY-sy)*k.ky;
+      if(p.shape==="circle"){p.center=[Math.round(o0[0]+dx),Math.round(o0[1]+dy)];}
+      else{p.box[0]=Math.round(o0[0]+dx);p.box[1]=Math.round(o0[1]+dy);}
+      layoutEl(el,p);
+    }
+    function up(){document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);}
+    document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);
+  });
+}
+function bindResize(el,p){
+  el.querySelector(".h").addEventListener("pointerdown",function(e){
+    e.preventDefault();e.stopPropagation();
+    var sx=e.clientX,sy=e.clientY,k=stageK(),o0;
+    o0=(p.shape==="circle")?p.r:null;
+    var w0=p.box?p.box[2]:0,h0=p.box?p.box[3]:0;
+    function mv(ev){
+      var dx=(ev.clientX-sx)*k.kx, dy=(ev.clientY-sy)*k.ky;
+      if(p.shape==="circle"){p.r=Math.max(15,Math.round(o0+dx));}
+      else{p.box[2]=Math.max(15,Math.round(w0+dx));p.box[3]=Math.max(15,Math.round(h0+dy));}
+      layoutEl(el,p);
+    }
+    function up(){document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);}
+    document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);
+  });
+}
+function renderParts(st){
+  var img=$("partsImg");
+  partsWant=st.parts_want||"大镜头框";
+  var isStand=(partsWant==="支架");
+  /* 切换任务时把涂抹状态归零 */
+  strokes=[];brushOn=false;painting=false;
+  $("btnBrush").textContent="🖌 涂抹抓取（异形）";$("btnBrush").classList.remove("pri");
+  $("partsPaint").classList.add("hide");$("brushBox").classList.add("hide");
+  $("partsTitle").textContent=partsWant;
+  $("partsHelp").innerHTML=(isStand
+    ? "已自动给出<b>支架圆框</b>建议：可拖动移动、拖右下角圆点改大小。支架是<b>多边形/异形</b>时圆框圈不全 → 点「<b>🖌 涂抹抓取（异形）</b>」，直接在图上涂要抓的区域。确认后<b>只提取支架图案</b>。"
+    : "已自动给出<b>大镜头框</b>建议：可拖动移动、拖右下角圆点改大小；不准就点「手动框选」，直接在图上拖出范围。多边形区域可改用「<b>🖌 涂抹抓取（异形）</b>」。确认后<b>只提取镜头框图案</b>。");
+  img.onload=function(){
+    pW=img.naturalWidth||1; pH=img.naturalHeight||1;
+    parts=(st.parts_detected||[]).map(function(p){
+      if(p.shape==="circle")return{kind:p.kind,shape:"circle",center:[p.center[0],p.center[1]],
+        r:p.r,r_inner:p.r_inner||Math.round(p.r*0.9),detected:true};
+      return{kind:p.kind,shape:"rect",box:[p.box[0],p.box[1],p.box[2],p.box[3]],detected:true};
+    });
+    drawParts();
+    $("partsTip").innerHTML=parts.length
+      ? '<div class="warn">'+(isStand?'绿圈':'红框')+' = 本次要提取的范围。位置/大小不对就拖；完全不准点「手动框选」重画，异形请用「🖌 涂抹抓取」。</div>'
+      : '<div class="warn">未自动定位到「'+partsWant+'」。请点「<b>手动框选</b>」拖出范围，或点「<b>🖌 涂抹抓取</b>」直接涂出异形区域。</div>';
+    $("btnPartsOk").disabled=false;
+    $("btnPartsOk").textContent="确认定位框 · 开始提取"+partsWant+"图案";
+    drawPaint();syncBrushUI();
+  };
+  var _lv=st.locate_view||st.clean;
+  img.setAttribute("data-fn",_lv);img.setAttribute("data-kind","file");
+  img.src=flink(st, _lv);
+}
+
+/* ---------- 涂抹抓取：异形/多边形部件（涂到哪算哪） ---------- */
+function paintGeom(){
+  var cv=$("partsPaint"), im=$("partsImg");
+  if(!cv||!im||!pW||!pH)return null;
+  var W=im.clientWidth, H=im.clientHeight;
+  if(!W||!H)return null;
+  cv.style.left=im.offsetLeft+"px"; cv.style.top=im.offsetTop+"px";
+  cv.style.width=W+"px"; cv.style.height=H+"px";
+  var dpr=window.devicePixelRatio||1;
+  var cw=Math.round(W*dpr), chh=Math.round(H*dpr);
+  if(cv.width!==cw||cv.height!==chh){cv.width=cw;cv.height=chh}
+  return {cv:cv, ctx:cv.getContext("2d"), s:(W/Math.max(1,pW))*dpr};
+}
+function drawPaint(){
+  var o=paintGeom();
+  if(!o)return;
+  var ctx=o.ctx,cv=o.cv,s=o.s;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.lineCap="round";ctx.lineJoin="round";
+  ctx.strokeStyle="rgba(124,58,237,.50)";ctx.fillStyle="rgba(124,58,237,.50)";
+  strokes.forEach(function(k){
+    var pts=k.pts;if(!pts||!pts.length)return;
+    ctx.lineWidth=Math.max(1,k.w*s);
+    ctx.beginPath();
+    if(pts.length===1){ctx.arc(pts[0][0]*s,pts[0][1]*s,Math.max(0.5,k.w*s/2),0,Math.PI*2);ctx.fill();return}
+    ctx.moveTo(pts[0][0]*s,pts[0][1]*s);
+    for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i][0]*s,pts[i][1]*s);
+    ctx.stroke();
+  });
+}
+function syncBrushUI(){
+  $("brushVal").textContent=brushW;
+  $("partsCount").textContent=strokes.length?("涂抹 "+strokes.length+" 笔"):(parts.length+" 个框");
+}
+function imgXY(ev){
+  var r=$("partsImg").getBoundingClientRect();
+  var kx=pW/Math.max(1,r.width), ky=pH/Math.max(1,r.height);
+  return [Math.max(0,Math.min(pW,Math.round((ev.clientX-r.left)*kx))),
+          Math.max(0,Math.min(pH,Math.round((ev.clientY-r.top)*ky)))];
+}
+(function(){
+  var cv=$("partsPaint");
+  cv.addEventListener("pointerdown",function(e){
+    if(!brushOn)return;
+    e.preventDefault();e.stopPropagation();
+    var k={w:brushW,pts:[imgXY(e)]};
+    strokes.push(k);painting=true;drawPaint();syncBrushUI();
+    function mv(ev){
+      if(!painting)return;
+      var p=imgXY(ev),last=k.pts[k.pts.length-1];
+      if(last&&Math.abs(p[0]-last[0])<2&&Math.abs(p[1]-last[1])<2)return;   /* 抽稀，别把点数刷爆 */
+      k.pts.push(p);drawPaint();
+    }
+    function up(){painting=false;document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);syncBrushUI()}
+    document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);
+  });
+})();
+$("btnBrush").onclick=function(){
+  if(!pW){alert("定位图还没加载完，稍等 1 秒再涂。");return}
+  brushOn=!brushOn;
+  if(brushOn){manualMode=false;$("btnManual").textContent="✎ 手动框选";parts=[];drawParts()}
+  $("partsPaint").classList.toggle("hide",!brushOn);
+  $("brushBox").classList.toggle("hide",!brushOn);
+  this.textContent=brushOn?"🖌 涂抹中 · 再点结束":"🖌 涂抹抓取（异形）";
+  this.classList.toggle("pri",brushOn);
+  $("partsStage").style.cursor="";
+  if(brushOn){
+    paintGeom();drawPaint();syncBrushUI();
+    $("partsTip").innerHTML='<div class="warn">在图上按住鼠标<b>涂抹</b>要抓取的区域（<b>多边形/异形</b>也能涂）：紫色范围 = 抓取范围。涂多了可「↶ 撤销」「✕ 清空」，笔刷粗细用 −/＋ 调。涂完点下面按钮开始提取。</div>';
+    $("btnPartsOk").disabled=false;
+    $("btnPartsOk").textContent="确认涂抹区 · 开始提取"+partsWant+"图案";
+  }else{
+    $("btnPartsOk").textContent="确认定位框 · 开始提取"+partsWant+"图案";
+  }
+};
+$("brushMinus").onclick=function(){brushW=Math.max(6,brushW-10);syncBrushUI();if(brushOn)drawPaint()};
+$("brushPlus").onclick=function(){brushW=Math.min(300,brushW+10);syncBrushUI();if(brushOn)drawPaint()};
+$("brushUndo").onclick=function(){strokes.pop();drawPaint();syncBrushUI()};
+$("brushClear").onclick=function(){strokes=[];drawPaint();syncBrushUI()};
+window.addEventListener("resize",function(){if(!$("partsPaint").classList.contains("hide"))drawPaint()});
+
+/* 手动框选：点按钮后在图上按下拖动画框（支架画圆、摄像头画矩形） */
+var manualMode=false;
+$("btnManual").onclick=function(){
+  manualMode=!manualMode;
+  if(manualMode){
+    brushOn=false;painting=false;
+    $("partsPaint").classList.add("hide");$("brushBox").classList.add("hide");
+    $("btnBrush").textContent="🖌 涂抹抓取（异形）";$("btnBrush").classList.remove("pri");
+    strokes=[];
+  }
+  this.textContent=manualMode?"✎ 框选中：在图上拖出范围（再点取消）":"✎ 手动框选";
+  $("partsStage").style.cursor=manualMode?"crosshair":"";
+  if(manualMode){parts=[];drawParts();syncBrushUI();
+    $("partsTip").innerHTML='<div class="warn">在图上按住拖动，画出'+(partsWant==="支架"?"圆":"矩形")+'范围。'+(partsWant==="支架"?"（异形支架请改用「🖌 涂抹抓取」）":"")+'</div>';}
+};
+$("partsStage").addEventListener("pointerdown",function(e){
+  if(!manualMode)return;
+  e.preventDefault();
+  var self=this, r=self.getBoundingClientRect();
+  var kx=pW/Math.max(1,r.width), ky=pH/Math.max(1,r.height);
+  var x0=(e.clientX-r.left)*kx, y0=(e.clientY-r.top)*ky;
+  var gh=document.createElement("div");
+  gh.className=(partsWant==="支架")?"pcircle":"pbox";
+  self.appendChild(gh);
+  function mv(ev){
+    var x1=(ev.clientX-r.left)*kx, y1=(ev.clientY-r.top)*ky;
+    var x=Math.max(0,Math.min(x0,x1)), y=Math.max(0,Math.min(y0,y1));
+    gh.style.left=(x/pW*100)+"%"; gh.style.top=(y/pH*100)+"%";
+    gh.style.width=(Math.abs(x1-x0)/pW*100)+"%"; gh.style.height=(Math.abs(y1-y0)/pH*100)+"%";
+  }
+  function up(ev){
+    document.removeEventListener("pointermove",mv); document.removeEventListener("pointerup",up);
+    if(gh.parentNode)gh.parentNode.removeChild(gh);
+    var x1=(ev.clientX-r.left)*kx, y1=(ev.clientY-r.top)*ky;
+    var x=Math.max(0,Math.min(x0,x1)), y=Math.max(0,Math.min(y0,y1));
+    var w=Math.abs(x1-x0), h=Math.abs(y1-y0);
+    manualMode=false; $("btnManual").textContent="✎ 手动框选"; self.style.cursor="";
+    if(w<14||h<14){drawParts();return}
+    parts=[];
+    if(partsWant==="支架"){
+      var rr=Math.round(Math.max(w,h)/2);
+      parts.push({kind:"支架",shape:"circle",center:[Math.round(x+rr),Math.round(y+rr)],
+        r:rr,r_inner:Math.round(rr*0.70),detected:false});
+    }else{
+      parts.push({kind:"大镜头框",shape:"rect",
+        box:[Math.round(x),Math.round(y),Math.round(w),Math.round(h)],detected:false});
+    }
+    drawParts();syncBrushUI();
+    $("partsTip").innerHTML='<div class="warn">已按你画的范围定位。可继续拖动微调，或点确认开始提取。</div>';
+  }
+  document.addEventListener("pointermove",mv); document.addEventListener("pointerup",up);
+});
+$("btnPartsOk").onclick=function(){
+  /* 有涂抹笔迹 → 走涂抹抓取（shape=mask）；否则走框选（circle / rect） */
+  var useMask=strokes.length>0;
+  if(!useMask&&!parts.length){alert("还没有定位范围。请拖动建议框，或点「手动框选」/「🖌 涂抹抓取」圈出范围。");return}
+  var payload=useMask
+    ? [{kind:partsWant||"支架",shape:"mask",strokes:strokes,detected:false}]
+    : parts;
+  this.disabled=true;this.textContent="提交中…";
+  fetch(API+"/tasks/"+curTask+"/parts",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({parts:payload})})
+  .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.detail||j.error||r.status));return j})})
+  .then(function(){showView("prog");poll()})
+  .catch(function(e){showFail("提交失败：",e);$("btnPartsOk").disabled=false;
+    $("btnPartsOk").textContent=(strokes.length?"确认涂抹区":"确认定位框")+" · 开始提取"+partsWant+"图案"});
+};
+
+/* 轮询：每次 poll 先清掉旧计时器，避免任务切换后出现两条轮询链互相打脸 */
+function poll(first){
+  if(!curTask)return;
+  stopPoll();
+  fetch(API+"/tasks/"+curTask).then(function(r){
+    if(r.status===404)throw new Error("__404__");
+    return r.json();
+  }).then(function(st){
+    render(st);
+    if(st.stage==="gen_running"||st.stage==="created"||st.stage==="psd_running"){
+      if(!pollTimer)pollTimer=setTimeout(function(){pollTimer=null;poll()},3000);
+    }
+  }).catch(function(e){
+    if(e&&e.message==="__404__"){setCur(null);if(tab!=="batch")showView("new");loadHist();return}
+    if(!pollTimer)pollTimer=setTimeout(function(){pollTimer=null;poll()},5000);
+  });
+}
+function render(st){
+  curStage=st.stage;
+  if(st.stage==="created"||st.stage==="gen_running"){
+    showView("prog");
+    $("progT").className="t"; $("progT").textContent=st.step||"准备中…";
+    $("progErr").innerHTML="";
+  }else if(st.stage==="parts_review"){
+    showView("parts");
+    $("progT").className="t"; $("progT").textContent=st.step||"";
+    if($("partsImg").getAttribute("data-tid")!==st.id){
+      $("partsImg").setAttribute("data-tid",st.id);
+      $("btnPartsOk").disabled=true;$("btnPartsOk").textContent="加载定位框…";
+      manualMode=false;$("btnManual").textContent="✎ 手动框选";$("partsStage").style.cursor="";
+      renderParts(st);
+    }
+  }else if(st.stage==="selecting"){
+    showView("sel");
+    var isParts=!!st.parts_meta;
+    var _pv=st.locate_view||st.clean;
+    if(_pv){var _sc=$("selClean");_sc.setAttribute("data-fn",_pv);_sc.setAttribute("data-kind","thumb");_sc.src=tlink(st,_pv);}      /* 预览位只拉缩略图：原图 1.6MB → 缩略 ~90KB */
+    if(selVer&&selVer!=="parts"&&selVer!=="redraw"&&st.versions.indexOf(selVer)<0)selVer=null;
+    $("fStrat").closest(".row").classList.toggle("hide",isParts);
+    var tip="";
+    if(isParts){
+      var isMask=!!(st.parts_meta.detected||[]).filter(function(p){return p.shape==="mask"}).length;
+      if(st.redraw_ok){
+        tip+='<div class="ok">✓ <b>AI 重绘版</b>已就绪'+(isMask?'（涂抹自定义区域）':'')+' —— 选一版继续生成分层 PSD。</div>';
+      }else{
+        tip+='<div class="warn">AI 完全重绘未生成'+(st.redraw_msg?('：'+esc(st.redraw_msg)):'')+' —— 已降级到<b>原图直抠（兜底版）</b>，可直接生成 PSD；也可点下方「重新生成」再试。</div>';
+      }
+      tip+=regenBox(st,"parts");
+    }else if(st.region_crop){
+      var de=st.down_ext!=null?st.down_ext:0.5;
+      rcDownExt=de;
+      tip+='<div style="margin:10px 0;padding:12px 14px;background:var(--pri-bg);border:1px solid var(--pri-100);border-radius:var(--r-ctl)">'
+        +'<div style="font-size:13.5px;font-weight:700;margin-bottom:10px">🎯 向下延伸系数<span class="small" style="font-weight:400"> · 默认 0.5，拉大往下多抠、拉小往上收</span></div>'
+        +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+        +'<input type="range" id="rcRange" min="0" max="1.5" step="0.05" value="'+de+'" oninput="rcDownExt=parseFloat(this.value);$(\'rcVal\').textContent=rcDownExt.toFixed(2)">'
+        +'<span style="font-weight:700;font-size:15px;min-width:40px" id="rcVal">'+de.toFixed(2)+'</span><span class="small">×框高</span>'
+        +'<span class="prt" style="cursor:pointer" onclick="rcSet(0.3)">0.3</span>'
+        +'<span class="prt" style="cursor:pointer" onclick="rcSet(0.5)">0.5</span>'
+        +'<span class="prt" style="cursor:pointer" onclick="rcSet(0.6)">0.6</span>'
+        +'<span class="prt" style="cursor:pointer" onclick="rcSet(1.0)">1.0</span>'
+        +'<button class="btn ghost" id="rcBtn" onclick="recropReq()" style="padding:7px 16px">↻ 重新抠选</button>'
+        +'</div>'
+        +'</div>';
+      if(st.redraw_msg)tip+='<div class="warn">'+esc(st.redraw_msg)+'</div>';
+      tip+=regenBox(st,"redraw");
+    }else{
+      tip+='<div class="ok">✓ <b>AI 满幅重绘版</b>已就绪 —— 选一版继续生成分层 PSD。</div>';
+      if(st.layout_check&&!st.layout_check.ok)tip+='<div class="warn">版式校验：'+esc(st.layout_check.note||"")+'</div>';
+      if(st.inpaint_msg)tip+='<div class="warn">遮挡区补全：'+esc(st.inpaint_msg)+'</div>';
+      if(st.redraw_msg)tip+='<div class="warn">'+esc(st.redraw_msg)+'</div>';
+      tip+=regenBox(st,"redraw");
+    }
+    $("selTip").innerHTML=tip;
+    var g=$("verGrid");g.innerHTML="";
+    if(isParts){
+      var k0=(st.parts_meta.parts||[])[0]||{};
+      var kindName=k0.kind||partsWant||"部件";
+      /* 用户拍板（2026-10-11）：支架/摄像头部件也「不要锁定版」→ 选版页只出「AI 重绘版」一张卡。
+         AI 完全重绘失败时才降级出「原图直抠（兜底版）」卡，保证页面不空、流程能继续走完。 */
+      var items=[];
+      if(st.redraw_ok&&k0.redraw){
+        var rm=k0.redraw_meta||{};
+        items.push({v:"redraw",fn:"parts/"+k0.redraw,
+                    cap:"AI 重绘版 · 完全重绘"+(k0.redraw_size?(" "+k0.redraw_size):""),
+                    sub:"线条更干净 · 版式已死锁"+(rm.scale&&rm.scale>1.01?(" · 分辨率 ×"+rm.scale.toFixed(1)):"")});
+      }else{
+        items.push({v:"parts",fn:st.versions[0]||("parts/"+k0.png),
+                    cap:"原图直抠（兜底版）· 逐像素 100% 保真",
+                    sub:"AI 重绘未成功时的兜底 · 零位置漂移 · 清晰度受原图限制"+(k0.box?("（图案区 "+k0.box[2]+"×"+k0.box[3]+"）"):"")});
+      }
+      /* 默认选中唯一一版：否则卡片未打勾时按钮灰着，用户点「没反应」。
+         同时兜掉「从别的任务/上一状态带过来的 selVer 已不存在」的串味（如刚重跑成功后
+         残留 selVer="parts"，而当前只剩 redraw 卡 → 无卡打勾）。 */
+      var _vs=items.map(function(o){return o.v});
+      if(_vs.indexOf(selVer)<0)selVer=items[0].v;
+      items.forEach(function(o){
+        var d=document.createElement("div");d.className="ver"+(selVer===o.v?" on":"");
+        d.innerHTML='<div class="tick">✓</div>'+
+          '<div class="cmp-host">'+
+          zoomBtn(st,o.fn)+
+          '<img loading="lazy" data-fn="'+esc(o.fn)+'" data-kind="thumb" src="'+tlink(st,o.fn)+'">'+
+          '</div><div class="cap">'+esc(o.cap)+'<div class="small">'+esc(o.sub)+'</div></div>'+
+          cmpBtn(st,o.fn,"vcmp");
+        d.onclick=function(){selVer=o.v;$("btnPsd").disabled=false;
+          g.querySelectorAll(".ver").forEach(function(x){x.classList.remove("on")});d.classList.add("on");
+          updPsdBtn();};
+        g.appendChild(d);
+      });
+      $("btnPsd").disabled=false;updPsdBtn();
+    }else{
+      var caps=st.region_crop?{"摄像头图案_区域比例.png":"区域比例抠选 · 延伸 "+rcDownExt.toFixed(2)}
+        :{"图案_锁定版.png":"锁定版 · 元素 1:1 复刻","图案_重绘版.png":"重绘版 · AI 满幅重绘"+(st.redraw_size?(" "+st.redraw_size):"")};
+      /* 主网格只放「当前正式产物」；`_vN` 历史件在下面单独成条，避免和历史重复。
+         三板块（手机壳/支架/摄像头）统一：锁定版一律不作候选（仅后台当版式校验基准 +
+         重绘失败兜底）→ 这里无条件滤掉，不再按 task_type 分流。 */
+      var cur=st.versions.filter(function(fn){return !/_v\d+\.(png|jpe?g|webp)$/i.test(fn)
+        &&!/图案_锁定版/.test(baseName(fn))});
+      if(!cur.length)cur=st.versions;
+      /* 默认帮用户选中一版（重绘版优先）：否则卡片未选中时按钮一直灰着，用户点「没反应」。
+         同时兜掉「从别的任务带过来的 selVer 不属于本任务」的串味情况。 */
+      if(!selVer||cur.indexOf(selVer)<0){
+        var pick=cur.filter(function(fn){return /重绘/.test(fn)})[0];
+        selVer=pick||cur[0];
+      }
+      cur.forEach(function(fn,i){
+        var d=document.createElement("div");d.className="ver"+(selVer===fn?" on":"");
+        d.innerHTML='<div class="tick">✓</div>'+
+          '<div class="cmp-host">'+
+          zoomBtn(st,fn)+
+          '<img loading="lazy" data-fn="'+esc(fn)+'" data-kind="thumb" src="'+tlink(st,fn)+'">'+
+          '</div><div class="cap">'+esc(caps[baseName(fn)]||("图案 v"+(i+1)))+'</div>'+
+          cmpBtn(st,fn,"vcmp");
+        d.onclick=function(){selVer=fn;$("btnPsd").disabled=false;
+          g.querySelectorAll(".ver").forEach(function(x){x.classList.remove("on")});d.classList.add("on")};
+        g.appendChild(d);
+      });
+      var bp=$("btnPsd");bp.disabled=false;
+      bp.textContent="用选定版生成分层 PSD（超分 2048 → 分层 → 压缩）";
+    }
+    /* 历史版本条：重新生成自动归档的 `_vN` 产物（缩略图 + 看原图 / 下载） */
+    var _old=g.parentNode.querySelector(".histwrap");if(_old)_old.parentNode.removeChild(_old);
+    var hvs=histVers(st);
+    if(hvs.length){
+      var hw=document.createElement("div");hw.className="histwrap";
+      hw.innerHTML='<div class="ht">🗂 历史版本（'+hvs.length+'）<span class="small" style="font-weight:400">· 重新生成自动保留，可对比 / 下载</span></div>';
+      var hg=document.createElement("div");hg.className="hgrid";
+      hvs.slice().reverse().forEach(function(rel){
+        var c=document.createElement("div");c.className="hcard";
+        c.innerHTML='<a href="'+flink(st,rel)+'" target="_blank"><img loading="lazy" data-fn="'+esc(rel)+'" data-kind="thumb" src="'+tlink(st,rel)+'"></a>'+
+          '<div class="hc">'+esc(baseName(rel))+'<br>'+
+          '<a href="'+flink(st,rel)+'" target="_blank">看原图</a> · '+
+          '<a href="'+flink(st,rel)+'" download>下载</a></div>';
+        hg.appendChild(c);
+      });
+      hw.appendChild(hg);g.parentNode.appendChild(hw);
+    }
+  }else if(st.stage==="psd_running"){
+    showView("psd");$("psdT").textContent=st.step||"处理中…";
+  }else if(st.stage==="done"){
+    showView("done");
+    var f=function(fn){return flink(st,fn)};                       /* 全尺寸：下载 / 看原图 */
+    var t=function(fn){return tlink(st,fn)};                       /* 缩略图：页面内预览位 */
+    var rb=regenBox(st,st.parts_meta?"parts":"redraw");            /* 成品页同样可「重新生成」 */
+    if(st.parts_outputs&&st.parts_outputs.length&&!st.merged_psd){
+      /* 独立部件任务：单部件交付（不出合并版） */
+      var o=st.parts_outputs[0];
+      var info1='<div class="cmp-host" style="margin-bottom:12px"><img class="prev" loading="lazy" data-fn="_预览.png" data-kind="thumb" src="'+t("_预览.png")+'"></div>';
+      if(st.upscale_warn)info1+='<div class="warn">⚠ '+esc(st.upscale_warn)+'</div>';
+      $("doneInfo").innerHTML=info1;
+      $("doneDl").innerHTML=
+        '<a class="dl f" href="'+f(o.psd)+'" download>⬇ '+esc(o.kind)+'_分层PSD（'+o.mb+'MB）</a> '+
+        '<a class="dl f" href="'+f(o.png)+'" download>⬇ '+esc(o.kind)+'_图案PNG（透明底）</a> '+
+        srcBtn(st,f)+
+        cmpBtn(st,"_预览.png")+
+        '<a class="dl" style="background:rgba(255,255,255,.08);color:var(--tx)" href="'+f("_预览.png")+'" target="_blank">分层预览</a>'+
+        rb;
+      return;
+    }
+    if(st.parts_outputs&&st.parts_outputs.length){
+      var info='<div class="cmp-host" style="margin-bottom:12px"><img class="prev" loading="lazy" data-fn="_预览_合并.png" data-kind="thumb" src="'+t("_预览_合并.png")+'"></div>';
+      if(st.upscale_warn)info+='<div class="warn">⚠ '+esc(st.upscale_warn)+'</div>';
+      $("doneInfo").innerHTML=info;
+      var dl="";
+      st.parts_outputs.forEach(function(o){
+        dl+='<a class="dl f" href="'+f(o.psd)+'" download>⬇ '+esc(o.kind)+'_PSD（'+o.mb+'MB）</a> ';
+        dl+='<a class="dl" style="background:rgba(255,255,255,.08);color:var(--tx)" href="'+f(o.png)+'" download>⬇ '+esc(o.kind)+'_图案PNG</a><div style="height:8px"></div>';
+      });
+      dl+='<div style="margin-top:6px"><a class="dl f" style="background:var(--pri);color:var(--on-pri)" href="'+f(st.merged_psd)+'" download>⬇ 全部分层_合并.psd（'+st.merged_mb+'MB）</a> '+
+        srcBtn(st,f)+
+        cmpBtn(st,"_预览_合并.png")+
+        '<a class="dl" style="background:rgba(255,255,255,.08);color:var(--tx)" href="'+f("_预览_合并.png")+'" target="_blank">合并预览</a></div>'+rb;
+      $("doneDl").innerHTML=dl;
+      return;
+    }
+    var info='<div class="cmp-host" style="margin-bottom:12px"><img class="prev" loading="lazy" data-fn="_预览.png" data-kind="thumb" src="'+t("_预览.png")+'"></div>';
+    if(st.upscale_warn)info+='<div class="warn">⚠ '+st.upscale_warn+'</div>';
+    $("doneInfo").innerHTML=info;
+    $("doneDl").innerHTML=
+      '<a class="dl f" href="'+f(st.psd)+'" download>⬇ 分层PSD（'+st.psd_mb+'MB）</a> '+
+      '<a class="dl f" href="'+f(st.hi_png)+'" download>⬇ 图案2048高清PNG</a> '+
+      (st.selected?'<a class="dl f" href="'+f(st.selected)+'" download>⬇ 图案PNG（透明底·原始尺寸）</a> ':'')+
+      srcBtn(st,f)+
+      cmpBtn(st,"_预览.png")+
+      '<a class="dl" style="background:rgba(255,255,255,.08);color:var(--tx)" href="'+f("_预览.png")+'" target="_blank">分层预览</a>'+
+      rb;
+  }else if(st.stage==="error"){
+    /* ⚠️ 绝不能覆盖 .stepbox 的 innerHTML —— 会把 #progT/#progS 从 DOM 里删掉，
+       之后任何 render 走到 $("progT").textContent 直接抛异常 → 轮询静默失败、页面卡死。
+       改为「只改文本 + 独立错误区」渲染。 */
+    showView("prog");
+    $("progT").className="t err"; $("progT").textContent="任务失败";
+    $("progS").textContent="可点下方「重新抠选 / 重新提交」，或直接用历史任务重试。";
+    $("progErr").innerHTML='<div class="warn" style="margin-top:12px">⛔ '+esc(st.error||"未知错误")+'</div>';
+  }
+}
+
+/* 区域比例抠选：快捷档位 + 重新抠选 */
+function rcSet(v){rcDownExt=v;var r=$("rcRange"),s=$("rcVal");if(r){r.value=v}if(s){s.textContent=v.toFixed(2)}}
+function recropReq(){
+  var b=$("rcBtn");if(!b)return;
+  b.disabled=true;b.textContent="抠选中…";
+  fetch(API+"/tasks/"+curTask+"/recrop",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({down_ext:rcDownExt})})
+  .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.detail||j.error||r.status));return j})})
+  .then(function(){selVer=null;poll()})
+  .catch(function(e){showFail("重新抠选失败：",e)})
+  .finally(function(){var x=$("rcBtn");if(x){x.disabled=false;x.textContent="↻ 重新抠选"}});
+}
+
+/* 支架：AI 完全重绘版 —— 重新生成 + 按钮文案 */
+function updPsdBtn(){
+  var b=$("btnPsd");if(!b)return;
+  var v=(selVer==="redraw")?"AI 重绘版":"原图直抠（兜底版）";
+  b.textContent="用「"+v+"」生成「"+(partsWant||"部件")+"」的分层 PSD（超分 2048 → 分层 → 压缩）";
+  b.disabled=false;
+}
+/* 【重新生成】版本区/成品区统一入口：重跑不满意的产物，旧图自动保留为 `_vN` 历史版本。
+   target=redraw → 只重跑 AI 重绘版（复用干净壳，快）；full → 整单重跑；parts → 部件重绘。 */
+function regenBox(st,kind){
+  var n=histVers(st).length;
+  var h='<div class="regen"><div class="rt">↻ 重新生成</div>'+
+    '<div class="rs">对结果不满意就重跑一版。旧图自动<b>保留为历史版本</b>'+(n?('（已有 '+n+' 版，可在下方对比）'):'')+'，不会覆盖。';
+  if(kind==="parts"){
+    h+='会按同一套定位重做 AI 完全重绘。</div>'+
+      '<button class="btn ghost" data-regen="parts" onclick="regenReq(this)" style="padding:7px 16px">↻ 重新生成 AI 重绘版</button>';
+  }else{
+    h+='「重跑 AI 重绘版」快（省一次生图，约 1-2 分钟）；「整单重跑」会连干净壳一起重出。</div>'+
+      '<button class="btn ghost" data-regen="redraw" onclick="regenReq(this)" style="padding:7px 16px">↻ 重跑 AI 重绘版</button>'+
+      '<button class="btn ghost" data-regen="full" onclick="regenReq(this)" style="padding:7px 16px">⟳ 整单重跑</button>';
+  }
+  return h+'</div>';
+}
+function regenReq(btn){
+  if(!curTask)return;
+  var target=(btn&&btn.getAttribute)?(btn.getAttribute("data-regen")||"redraw"):"redraw";
+  var bs=[].slice.call(document.querySelectorAll("#selTip button,#doneDl button"));
+  bs.forEach(function(x){x.disabled=true});
+  if(btn)btn.textContent="已提交，重跑中…";
+  fetch(API+"/tasks/"+curTask+"/regenerate",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({target:target})})
+  .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.detail||j.error||r.status));return j})})
+  .then(function(){resetProg();showView("prog");poll(true)})
+  .catch(function(e){showFail("重新生成失败：",e);bs.forEach(function(x){x.disabled=false});poll()});
+}
+
+/* PSD 触发 */
+function psdBtnLabel(){
+  var b=$("btnPsd");if(!b)return;
+  if(selVer==="parts"||selVer==="redraw"){b.textContent="用「"+(selVer==="redraw"?"AI 重绘版":"原图直抠（兜底版）")+"」生成「"+(partsWant||"部件")+"」的分层 PSD（超分 2048 → 分层 → 压缩）";}
+  else{b.textContent="用选定版生成分层 PSD（超分 2048 → 分层 → 压缩）";}
+  b.disabled=false;
+}
+$("btnPsd").onclick=function(){
+  if(!selVer){alert("请先在上方版本卡里点选一版（卡片会出现 ✓ 打勾），再点这里生成 PSD。");return;}
+  if(!curTask){alert("没有进行中的任务，请先新建一个任务。");return;}
+  this.disabled=true;this.textContent="提交中…";
+  fetch(API+"/tasks/"+curTask+"/select",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({version:selVer,strategy:strategy,layer_mode:layerMode})})
+  .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.detail||j.error||r.status));return j})})
+  .then(function(){showView("psd");poll()})
+  .catch(function(e){showFail("提交失败：",e)})
+  .finally(function(){psdBtnLabel()});
+};
+
+$("btnNew").onclick=function(){
+  stopPoll();
+  setCur(null);selVer=null;files=[];parts=[];strokes=[];rcDownExt=0.5;renderThumbs();
+  $("partsImg").removeAttribute("data-tid");
+  manualMode=false;brushOn=false;partsWant="";
+  if($("btnManual"))$("btnManual").textContent="✎ 手动框选";
+  if($("btnBrush")){$("btnBrush").textContent="🖌 涂抹抓取（异形）";$("btnBrush").classList.remove("pri")}
+  $("partsPaint").classList.add("hide");$("brushBox").classList.add("hide");
+  $("partsStage").style.cursor="";
+  $("fName").value="";maxStep=0;showView("new");syncTask();
+  resetProg();
+  loadHist();
+};
+
+/* 历史（含删除 / 批量删除） */
+var histSel={};              /* tid -> true，勾选中的任务 */
+function updateHistBar(total){
+  var n=Object.keys(histSel).filter(function(k){return histSel[k]}).length;
+  $("histCount").textContent=total;
+  $("histSelInfo").textContent=n?("已选 "+n+" 个"):"未选中";
+  var b=$("btnDelSel");b.disabled=n===0;
+  b.textContent=n?("🗑 删除选中（"+n+"）"):"🗑 删除选中";
+  $("histAll").checked=(total>0&&n===total);
+}
+/* 产物保留期提示（后端 list/get 会带 expire_in_h / ttl_h）：照片与 PSD 在服务器上
+   只保留 72 小时，到期自动清理（内存记录 + 本地目录 + COS 一起删）。这里把它显性化，
+   避免用户到时候发现图没了不知道为什么。 */
+function ttlTip(st){
+  var h=st&&st.expire_in_h;
+  if(typeof h!=="number")return "";
+  if(h<=0)return ' · <b style="color:#d9534f">已到期，将自动清理</b>';
+  if(h<24)return ' · ⏳ <b style="color:#e08a1e">仅剩 '+h.toFixed(1)+' 小时</b>';
+  return ' · ⏳ 保留 '+Math.floor(h)+' 小时';
+}
+function loadHist(){
+  fetch(API+"/tasks").then(function(r){return r.json()}).then(function(list){
+    var h=$("histList");histSel={};
+    if(!list.length){h.innerHTML='<div class="center">还没有任务</div>';updateHistBar(0);return}
+    h.innerHTML="";
+    list.forEach(function(st){
+      var stMap={done:["done","已完成"],error:["err","失败"],gen_running:["run","处理中"],psd_running:["run","PSD中"],selecting:["sel","待选版"],created:["cre","排队"],parts_review:["sel","待定位"]};
+      var m=stMap[st.stage]||["cre",st.stage];
+      var d=document.createElement("div");d.className="hitem";
+      var _mask=(st.parts_meta&&(st.parts_meta.detected||[]).filter(function(p){return p.shape==="mask"}).length);
+      d.innerHTML='<label class="chk"><input type="checkbox" data-tid="'+esc(st.id)+'"></label>'+
+        '<div class="hbody"><div class="n">'+esc(st.name)+'</div><div class="m">'+esc(st.created)+' · '+esc(st.task_name||"")+ttlTip(st)+
+        (st.redraw_size?(' · 重绘 '+st.redraw_size):'')+((st.ratio&&st.ratio!=="auto")?(' · 输出 '+esc(st.ratio)):'')+(_mask?' · 涂抹抓取':'')+' · '+((st.inputs||[]).length)+'张原图</div></div>'+
+        '<span class="st '+m[0]+'">'+m[1]+'</span>'+
+        '<button class="hdel" title="删除该任务">🗑</button>';
+      var cb=d.querySelector("input");
+      cb.addEventListener("click",function(e){e.stopPropagation()});
+      cb.addEventListener("change",function(){
+        histSel[st.id]=cb.checked;d.classList.toggle("sel",cb.checked);
+        updateHistBar(h.querySelectorAll(".hitem").length);
+      });
+      d.querySelector(".hdel").addEventListener("click",function(e){
+        e.stopPropagation();delTasks([st.id],st.name,this);
+      });
+      d.onclick=function(){setTab("single");setCur(st.id);selVer=null;poll()};
+      h.appendChild(d);
+    });
+    updateHistBar(list.length);
+  });
+}
+/* ---------- 删除确认气泡（替代原生 confirm：贴着触发按钮弹出，不再居中打断视线） ----------
+   气泡挂在 body 上（position:fixed），列表 3s 轮询重渲染也不会把它冲掉；
+   点别处 / Esc 关闭；anchor 传触发按钮，放不下时自动翻转并夹在视口内。 */
+var _cfpEl=null,_cfpDoc=null,_cfpKey=null;
+function closeCfp(){
+  if(_cfpEl){_cfpEl.remove();_cfpEl=null}
+  if(_cfpDoc){document.removeEventListener("click",_cfpDoc,true);_cfpDoc=null}
+  if(_cfpKey){document.removeEventListener("keydown",_cfpKey,true);_cfpKey=null}
+}
+function askConfirm(anchor,msg,onOk,okTxt){
+  closeCfp();
+  var el=document.createElement("div");el.className="cfp";
+  el.innerHTML='<div class="cfpm"></div><div class="cfpa">'
+    +'<button class="no" type="button">取消</button>'
+    +'<button class="ok" type="button"></button></div>';
+  el.querySelector(".cfpm").textContent=msg;
+  el.querySelector(".ok").textContent=okTxt||"确定删除";
+  document.body.appendChild(el);
+  var r=(anchor&&anchor.getBoundingClientRect)?anchor.getBoundingClientRect():null;
+  var w=el.offsetWidth||260, h=el.offsetHeight||96, left, tp;
+  if(r){left=r.left; if(left+w>innerWidth-8)left=Math.max(8,r.right-w);
+        tp=r.bottom+8; if(tp+h>innerHeight-8)tp=Math.max(8,r.top-h-8);}
+  else{left=Math.max(8,(innerWidth-w)/2); tp=Math.max(8,(innerHeight-h)/2)}
+  el.style.left=left+"px"; el.style.top=tp+"px";
+  el.querySelector(".no").onclick=function(){closeCfp()};
+  el.querySelector(".ok").onclick=function(){closeCfp();onOk()};
+  _cfpEl=el;
+  /* 延后一帧再挂「点别处关闭」：避免本次触发点击立刻把气泡关掉 */
+  _cfpDoc=function(e){if(_cfpEl&&!_cfpEl.contains(e.target))closeCfp()};
+  _cfpKey=function(e){if(e.key==="Escape")closeCfp()};
+  setTimeout(function(){document.addEventListener("click",_cfpDoc,true);
+                        document.addEventListener("keydown",_cfpKey,true)},0);
+  return el;
+}
+
+/* 删除任务（单个或批量）；删到当前打开的任务时一并复位视图 */
+function delTasks(ids,name,anchor){
+  if(!ids||!ids.length)return;
+  var msg=(ids.length>1)?("删除选中的 "+ids.length+" 个任务？原图与产物一并清除，不可恢复。")
+                        :("删除任务「"+(name||ids[0])+"」？原图与产物一并清除，不可恢复。");
+  askConfirm(anchor||null,msg,function(){doDelTasks(ids)});
+}
+function doDelTasks(ids){
+  $("btnDelSel").disabled=true;
+  fetch(API+"/tasks/delete",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ids:ids})})
+  .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.detail||j.error||r.status));return j})})
+  .then(function(j){
+    if(curTask&&ids.indexOf(curTask)>=0){stopPoll();setCur(null);selVer=null;resetProg();
+      if(tab!=="batch")showView("new");   /* 在批量板块删任务时不要抢走视图 */}
+    loadHist();
+  })
+  .catch(function(e){showFail("删除失败：",e);loadHist()});
+}
+$("histAll").onchange=function(){
+  var on=this.checked;
+  document.querySelectorAll("#histList .hitem").forEach(function(it){
+    var cb=it.querySelector("input");cb.checked=on;
+    histSel[cb.getAttribute("data-tid")]=on;it.classList.toggle("sel",on);
+  });
+  updateHistBar(document.querySelectorAll("#histList .hitem").length);
+};
+$("btnDelSel").onclick=function(){
+  var ids=Object.keys(histSel).filter(function(k){return histSel[k]});
+  delTasks(ids,"",this);
+};
+function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+/* 源图按钮：方案A（支架/摄像头）给「原图」下载，其余给「干净产品图」 */
+function srcBtn(st,f){return (st&&st.locate_src)
+  ?'<a class="dl" style="background:rgba(251,146,60,.16);color:#fdba74" href="'+f(st.locate_src)+'" download>原图（方案A·未经AI）</a> '
+  :'<a class="dl" style="background:rgba(255,255,255,.08);color:var(--tx)" href="'+f(st.clean)+'" download>干净产品图</a> ';}
+
+/* 「原图 / 成品」并排对比按钮（组件见 static/cmp.js）：
+   原图 = 方案A 原图（locate_src）优先，否则 AI 干净壳（clean）；
+   成品 = outFn（相对路径）；outFn 传空则成品层取图区当前那张图（批量卡换版时自动跟随）。
+   按钮必须放在 .cmp-host 图区「之外」，否则展开时随 innerHTML 一起被替换掉、无法收起。 */
+/* 并排对比的「原图层」取谁：定位原图优先，否则干净壳（三板块统一） */
+function cmpSrcRel(st){return (st&&st.locate_src)||(st&&st.clean)||"";}
+function cmpSrcUrl(st){var r=cmpSrcRel(st);return (r&&st)?flink(st,r):"";}
+function cmpSrcLab(st){return (st&&st.locate_src)?"原图":"干净壳";}
+function cmpBtn(st,outFn,cls,txt){
+  var src=cmpSrcUrl(st);
+  if(!src||!st)return "";
+  var lab=cmpSrcLab(st);
+  return '<button type="button" class="cmp-btn'+(cls?(" "+cls):'')+'" data-cmp'
+    +' data-src="'+esc(src)+'"'
+    +(outFn?(' data-out="'+esc(flink(st,outFn))+'"'):'')
+    +' data-lab-src="'+lab+'">'+(txt||'⇄ 对比原图')+'</button>';
+}
+/* 「🔍 放大对比」：点开全屏灯箱，原图 / 成品 两张并排铺满屏幕（cmp.js 的 data-zoom）。
+   原来的 target=_blank 只开单张全尺寸，看不到「原图 vs 成品」的差别，故改为并排放大。 */
+function zoomBtn(st,fn){
+  var src=cmpSrcUrl(st);
+  if(!src||!st||!fn)return "";
+  return '<a class="zoom" href="'+flink(st,fn)+'" data-zoom'
+    +' data-src="'+esc(src)+'" data-out="'+esc(flink(st,fn))+'"'
+    +' data-lab-src="'+cmpSrcLab(st)+'"'
+    +' onclick="event.preventDefault();event.stopPropagation()"'
+    +' title="放大对比：'+cmpSrcLab(st)+' 与 成品 两张并排铺满屏幕">🔍 放大对比</a>';
+}
+
+/* 问号说明：hover 由 CSS 触发；这里补「点击展开 / 再点收起 / 点空白处关闭」 */
+document.addEventListener("click",function(e){
+  var q=e.target.closest?e.target.closest(".q"):null;
+  if(q){e.stopPropagation();
+    var wasOpen=q.classList.contains("open");
+    document.querySelectorAll(".q.open").forEach(function(x){x.classList.remove("open")});
+    if(!wasOpen)q.classList.add("open");
+    return;}
+  document.querySelectorAll(".q.open").forEach(function(x){x.classList.remove("open")});
+},true);
+
+syncTask();
+renderDrafts();          /* 批量板块：初始化草稿区（默认 1 个图案任务） */
+loadHist();
+/* 刷新页面后自动恢复当前任务 / 当前批次 / 当前板块（否则刷新 = 任务丢失、找不到刚才那单） */
+(function(){
+  /* 素材库「继续任务」跳转会带 ?task=<tid>，优先于 localStorage 恢复 */
+  var t=null, wantTab="single";
+  try{
+    var sp=new URLSearchParams(location.search);
+    t=sp.get("task");
+    if(!t){t=localStorage.getItem("pw_tid")}
+    var b=sp.get("batch")||localStorage.getItem("pw_bid");
+    if(b)setBatchId(b);
+    /* 板块恢复优先级：显式 ?tab= > 「素材库·继续任务」?task=（单张任务）> ?batch=（批量）> localStorage
+       —— 深链必须按链接语义锁定板块：?task= 是单张任务，若被 localStorage 里的 batch 覆盖，
+          #paneSingle 会被 .hide 藏掉，用户从素材库「继续任务」进来看到的是空白选版页。 */
+    var qTab=sp.get("tab"), qTask=sp.get("task"), qBatch=sp.get("batch");
+    if(qTab){wantTab=(qTab==="batch")?"batch":"single";}
+    else if(qTask){wantTab="single";}
+    else if(qBatch){wantTab="batch";}
+    else if(localStorage.getItem("pw_tab")){wantTab=(localStorage.getItem("pw_tab")==="batch")?"batch":"single";}
+    if(b&&!qTask){wantTab="batch";showView("batch");pollBatch(true)}
+    else if(t&&!curTask){setCur(t);selVer=null;poll(true)}
+  }catch(e){}
+  setTab(wantTab);
+  syncBSteps();
+})();
+</script>
+</body>
+</html>

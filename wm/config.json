@@ -1,0 +1,51 @@
+{
+  "engine": "lensapi",
+  "lensapi": {
+    "base_url": "https://lensapi.cn",
+    "api_key": "",
+    "model": "gpt-image-2.5",
+    "prompt_template": "去除图片中的所有水印、文字、logo 和标识，用周围背景自然无缝填充，保持其余画面完全不变（构图、元素位置、颜色、大小、清晰度一律不动），输出完整图片。"
+  },
+  "modelscope": {
+    "base_url": "https://api-inference.modelscope.cn",
+    "api_key": "ms-bf0b29c3-a0b5-4651-a82f-a88877c41b32",
+    "model": "Qwen/Qwen-Image-Edit-2511",
+    "reference_image": "",
+    "prompt_template": "请去除图片中的水印文字，用周围背景自然无缝填充，其余画面保持不变。"
+  },
+  "wanx": {
+    "base_url": "",
+    "api_key": "",
+    "model": "wanx2.1-imageedit",
+    "function": "remove_watermark"
+  },
+  "qwen": {
+    "base_url": "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+    "api_key": "",
+    "model": "qwen-image-edit",
+    "prompt_template": "请去除图片中的水印文字，用周围背景自然无缝填充，其余画面保持不变。"
+  },
+  "custom": {
+    "base_url": "",
+    "api_key": "",
+    "model": "",
+    "mode": "chat",
+    "prompt_template": "请去除图片中位于矩形区域 [x1,y1] 到 [x2,y2] 内的水印或文字，用周围背景自然无缝填充，其余画面保持不变。"
+  },
+  "region": {
+    "type": "rect",
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "points": []
+  },
+  "template": {
+    "threshold": 0.65,
+    "brush_width": 24
+  },
+  "paths": {
+    "input": "",
+    "output": ""
+  }
+}

@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>分部位编辑工作台 · 产品组</title>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --ink:#1b1f24; --muted:#6b7280; --line:#e5e7eb;
+  --accent:#2563eb; --accent-soft:#eff6ff; --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
+  --radius:14px; --shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;padding-bottom:80px}
+a{color:var(--accent);text-decoration:none}
+header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{font-size:17px;font-weight:700;letter-spacing:.2px}
+.logo span{color:var(--accent)}
+.sub{color:var(--muted);font-size:12px}
+.pill{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);border:1px solid #dbeafe}
+.fchip{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;user-select:none;transition:all .15s}
+.fchip:hover{border-color:var(--accent)}
+.fchip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.frow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:5px 0}
+.frow .flab{font-size:12px;color:var(--muted);min-width:58px;font-weight:600}
+.frow input[type=text]{font-size:12px;padding:3px 8px;border:1px solid var(--line);border-radius:8px;min-width:150px}
+main{max-width:1360px;margin:0 auto;padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+h2{font-size:14px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+h2 .n{width:20px;height:20px;border-radius:6px;background:var(--ink);color:#fff;font-size:11px;display:grid;place-items:center}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hint{font-size:11.5px;color:var(--muted)}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:#fff;padding:8px 15px;color:var(--ink)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.primary:disabled{opacity:.55;cursor:not-allowed}
+button.sm{font-size:12px;padding:5px 11px;border-radius:8px}
+button.ghost{background:#fff;color:#374151;border:1px dashed var(--line)}
+input[type=text],select,textarea{font:inherit;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:#fff;width:100%;color:var(--ink);outline:none}
+input[type=text]:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{font-size:11.5px;line-height:1.55;resize:vertical}
+label.lb{font-size:11.5px;color:var(--muted);display:block;margin:8px 0 3px}
+
+/* ① 产品组宫格条（1~7 张，图1=基准 ⭐） */
+.gbar{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px}
+.gcell{position:relative;border:2px solid var(--line);border-radius:10px;aspect-ratio:3/4;background:#fbfcfe;
+      cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;
+      color:#94a3b8;font-size:12px;transition:.12s;text-align:center;line-height:1.5}
+.gcell.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,99,235,.16)}
+.gcell img{width:100%;height:100%;object-fit:cover}
+.gcell .gn{position:absolute;left:4px;bottom:3px;background:rgba(17,24,39,.66);color:#fff;font-size:10px;padding:1px 6px;border-radius:6px;z-index:2}
+.gcell .star{position:absolute;left:4px;top:3px;font-size:12px;z-index:2;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}
+.gcell .gctl{position:absolute;right:3px;top:3px;display:flex;gap:3px;opacity:0;transition:.12s;z-index:3}
+.gcell:hover .gctl{opacity:1}
+.gcell .gctl button{padding:2px 6px;font-size:11px;border-radius:6px;background:rgba(255,255,255,.94);border:1px solid var(--line)}
+.gcell .gst{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(17,24,39,.74));color:#fff;font-size:10px;padding:15px 3px 3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:1}
+.gcell.add{border-style:dashed;color:#64748b}
+.gcell.add:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+
+/* 主图编辑区（左图右控） */
+.mrow{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.stg{flex:0 0 clamp(280px,36%,460px);min-width:280px}
+#drop{border:2px dashed #cbd5e1;border-radius:12px;min-height:280px;display:grid;place-items:center;
+      text-align:center;color:#94a3b8;font-size:13px;cursor:pointer;transition:.15s;background:#fbfcfe;padding:20px}
+#drop.on{border-color:var(--accent);background:var(--accent-soft)}
+#stage{position:relative;user-select:none;touch-action:none;display:none}
+#btnSwap{position:absolute;top:10px;right:10px;z-index:5;font-size:12px;padding:5px 11px;border-radius:9px;
+      background:rgba(255,255,255,.94);border:1px solid #bfdbfe;color:var(--accent);box-shadow:0 1px 4px rgba(16,24,40,.14)}
+#btnSwap:hover{background:var(--accent-soft)}
+#stage.dragging img{outline:3px dashed var(--accent);outline-offset:-6px;border-radius:10px}
+#stage img{display:block;width:100%;border-radius:10px;border:1px solid var(--line);cursor:crosshair}
+.box{position:absolute;border:2px solid;cursor:move;border-radius:4px}
+.box .tag{position:absolute;top:-22px;left:-2px;font-size:11px;color:#fff;
+      padding:1px 7px;border-radius:6px 6px 6px 0;white-space:nowrap;cursor:move}
+.box .rsz{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;
+      border-radius:50%;background:#fff;border:2px solid;cursor:nwse-resize}
+.side{flex:1;min-width:280px}
+.flow{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
+.flow .f{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:#374151}
+.flow .f i{flex:0 0 18px;height:18px;border-radius:6px;background:var(--accent-soft);color:var(--accent);
+      font-style:normal;font-size:11px;font-weight:700;display:grid;place-items:center;margin-top:2px}
+.side .row{margin-top:4px}
+#vm{width:130px;display:inline-block;padding:5px 9px;font-size:12px}
+
+/* ② 部位卡（全组共享操作，横排并列） */
+.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+#patBlock{margin-top:12px;border:1.5px dashed #f59e0b;background:#fffbeb;border-radius:12px;padding:12px 14px}
+.pcard{border:1px solid var(--line);border-radius:12px;padding:11px;background:#fcfdff;display:flex;flex-direction:column}
+.pcard.off{opacity:.6}
+.pcard .ph{display:flex;align-items:center;gap:7px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.pcard .dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+.pcard .ph b{font-size:13px}
+.badge{font-size:11px;padding:1px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.badge.ok{color:var(--ok);border-color:#bbf7d0;background:#f0fdf4}
+.badge.miss{color:var(--warn);border-color:#fde68a;background:#fffbeb}
+.badge.pend{color:#1d4ed8;border-color:#bfdbfe;background:#eff6ff}
+.meta{font-size:11.5px;color:var(--muted);margin-top:5px}
+.prev{max-width:100%;height:64px;object-fit:contain;border-radius:8px;border:1px solid var(--line)}
+.refgrid{display:flex;gap:8px;flex-wrap:wrap}
+.refslot{flex:1;min-width:150px;display:flex;flex-direction:column;gap:4px}
+.refslot .sm{width:100%}
+.refwrap{position:relative;display:inline-block;flex:0 0 auto}
+.refwrap .prev{height:58px;width:auto;max-width:110px}
+.xbtn{position:absolute;top:-7px;right:-7px;width:18px;height:18px;border-radius:50%;border:1px solid #fca5a5;
+  background:#fff;color:#dc2626;font-size:11px;line-height:1;cursor:pointer;padding:0}
+.refhint{font-size:11px;color:var(--muted)}
+
+/* ③ 产品规格卡（全组一致性 · 文本锁） */
+#cardSpec textarea{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:12px}
+#cardSpec.locked textarea{background:#f0fdf4;border-color:#bbf7d0}
+
+/* ④ 执行方式 */
+.mode{display:block;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#fcfdff;transition:.15s}
+.mode:hover{border-color:var(--accent)}
+.mode:has(input:checked){border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px rgba(37,99,235,.12)}
+.mode input{margin-right:8px}
+.mode b{font-size:13.5px}
+.mode .d{font-size:12px;color:#374151;margin-top:4px;line-height:1.55}
+.mode:has(input:checked) .d{color:#1e40af}
+#nSel{width:70px;display:inline-block;padding:5px 8px;font-size:12px}
+#btnRunGroup{background:#16a34a;border-color:#16a34a}
+
+/* ⑤ 结果（横排网格卡片） */
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.rstep{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+.rstep .hd{padding:8px 11px;display:flex;justify-content:space-between;align-items:center;gap:6px;border-bottom:1px solid var(--line);background:#fafbfc;flex-wrap:wrap}
+.rstep .hd b{font-size:12.5px}
+.rstep .sc{font-size:11px;padding:2px 8px;border-radius:999px;background:#f3f4f6;color:#374151;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.rstep img{width:100%;height:230px;object-fit:contain;background:#f8fafc;cursor:zoom-in;border-bottom:1px solid var(--line)}
+.rstep .bd{padding:9px 11px;flex:1}
+.rstep .ft{padding:8px 11px;border-top:1px solid var(--line);display:flex;gap:6px}
+.rstep details{margin-top:5px}
+details summary{cursor:pointer;font-size:11.5px;color:var(--muted)}
+.hide{display:none!important}
+.prog{grid-column:1/-1;font-size:12.5px;color:var(--accent);background:var(--accent-soft);border:1px solid #bfdbfe;border-radius:10px;padding:10px 13px;line-height:1.7}
+
+/* ⑥ 生图记录 */
+.jobrow{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#fcfdff}
+.jobrow.running{border-color:#bfdbfe;background:#eff6ff}
+.jobrow.error{border-color:#fecaca;background:#fef2f2}
+.jobrow .hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.jobrow img.jt{width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;flex:0 0 54px}
+.hsteps{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:10px}
+
+#overlay{position:fixed;inset:0;background:rgba(20,24,32,.45);display:none;align-items:center;justify-content:center;z-index:50}
+#overlay .boxd{background:#fff;border-radius:14px;padding:22px 28px;text-align:center}
+.spin{width:34px;height:34px;border:4px solid #dbe4ff;border-top-color:var(--accent);border-radius:50%;margin:0 auto 10px;animation:r .9s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#111827;color:#fff;
+      padding:9px 18px;border-radius:10px;font-size:13px;display:none;z-index:60;max-width:86vw}
+#bigimg{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;z-index:70;align-items:center;justify-content:center;cursor:zoom-out}
+#bigimg img{max-width:94vw;max-height:94vh;border-radius:8px}
+footer{text-align:center;margin-top:4px}
+@media(max-width:1200px){.pgrid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.gbar{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:680px){.gbar{grid-template-columns:repeat(3,1fr)}.pgrid{grid-template-columns:1fr}.mrow{flex-direction:column}.stg{flex:1 1 auto}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">分部位编辑<span>工作台</span></div>
+  <div class="sub">产品组 1~7 张同款关联 · 材质/款式/图案/细节全组锁定</div>
+  <div style="flex:1"></div>
+  <span class="hint" id="keyState"></span>
+  <button id="aikey" style="display:none;font-size:12px;padding:5px 11px;border-radius:9px;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3">🤖 AI 接口设置</button>
+  <button id="coskey" style="display:none;font-size:12px;padding:5px 11px;border-radius:9px;background:#fffbeb;border:1px solid #fde68a;color:#92400e">☁️ 存储设置</button>
+</header>
+
+<main>
+  <div id="aiBox" style="display:none;margin:0 0 12px;border:1px dashed #6366f1;border-radius:12px;padding:12px;background:#eef2ff">
+    <div class="hint" style="margin-bottom:8px">🤖 AI 接口（apib.ai 网关）：Key 留空＝沿用已保存值；生图模型默认 gpt-image-2；视觉模型用于识别/规格卡提取（也可在下方「识别」行直接改）。</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <label class="hint">API Key <input id="aiKeyIn" type="password" placeholder="留空＝不改" style="width:260px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+      <label class="hint">生图模型 <input id="aiModelIn" placeholder="gpt-image-2" style="width:150px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+      <label class="hint">视觉模型 <input id="aiVisionIn" placeholder="gpt-5.4" style="width:120px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+      <button class="btn" id="aiSave">保存</button>
+      <span class="hint" id="aiHint"></span>
+    </div>
+  </div>
+  <div id="cosBox" style="display:none;margin:0 0 12px;border:1px dashed #f59e0b;border-radius:12px;padding:12px;background:#fffbeb">
+    <div class="hint" style="margin-bottom:8px">☁️ 腾讯云 COS：图片上传/下载/存放经 COS（公有读私有写）。SecretKey 留空＝沿用已保存值；不配置则图片存服务器本地。</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <label class="hint">地域 <input id="cosRegion" placeholder="如 ap-guangzhou" style="width:120px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+      <label class="hint">桶名 <input id="cosBucket" placeholder="如 duotu-125xxxxxx" style="width:140px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+      <label class="hint">SecretId <input id="cosSid" style="width:190px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+      <label class="hint">SecretKey <input id="cosSkey" type="password" placeholder="留空＝不改" style="width:140px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px">
+      <label class="hint">路径前缀 <input id="cosPrefix" placeholder="可留空" style="width:100px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+      <label class="hint">自定义域名 <input id="cosBase" placeholder="可选（CDN）" style="width:150px;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:9px"></label>
+      <button class="btn" id="cosSave">保存并测试</button>
+      <span class="hint" id="cosHint"></span>
+    </div>
+  </div>
+  <section class="card">
+    <h2><i class="n">1</i>主图 · 产品组（1~7 张同款） <span class="pill" id="sessTag">未建组</span></h2>
+    <p class="hint" style="margin:0 0 10px">同一产品拍的不同角度放进 7 个宫格（<b>图1 = ⭐ 基准图</b>，组执行时先出、再当其余各张的锚点）。操作 / 参考图 / 提示词 <b>全组共享</b>一份；识别框每张各自独立。点缩略图切换编辑。</p>
+    <div class="gbar" id="gbar"></div>
+    <div class="mrow">
+      <div class="stg">
+        <div id="drop">点左侧宫格 ＋ 上传第一张（基准图）<br><span style="font-size:11.5px">（手机壳 + 挂绳 + 支架 那种产品图）</span></div>
+        <div id="stage"><img id="mainImg" alt="主图"><button id="btnSwap" title="换一张主图：共享操作/提示词保留，这张的框和结果清空">🔄 换这张主图</button></div>
+      </div>
+      <div class="side">
+        <div class="flow">
+          <div class="f"><i>1</i><div>往宫格传 1~7 张同款不同角度的图，<b>图1 是基准</b>（其余张向它对齐视角）</div></div>
+          <div class="f"><i>2</i><div>点「🔍 批量识别全组」一次识别所有张；哪张框不准就点它单独拖动 / 拉角 / 手画</div></div>
+          <div class="f"><i>3</i><div>下方部位操作<b>全组共享</b>：配一次，7 张全用；再到「📋 规格卡」提取并锁定产品定义</div></div>
+          <div class="f"><i>4</i><div>「▶ 对全组执行」逐张后台串行生成（<b>图1 成品自动当其余张的视觉锚点</b>）；哪张不满意就单独重做那张，材质/款式/图案/细节照样一致</div></div>
+        </div>
+        <div class="row">
+          <button id="btnDetect">🔍 识别当前张</button>
+          <button class="primary" id="btnDetectAll" disabled>🔍 批量识别全组</button>
+          <span class="hint">视觉模型 <input id="vm" value="gpt-5.4"></span>
+        </div>
+        <div class="hint" style="margin-top:8px">批量识别约 10s/张；生成任务在服务端后台跑、页面可以关。</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><i class="n">2</i>部位操作（<b>全组共享</b>——配一次 7 张全用；参考图每种 1~3 张）</h2>
+    <div class="pgrid" id="partList"></div>
+    <div id="patBlock" style="display:none"><div id="patBody"></div></div>
+    <p class="hint" style="margin:10px 0 0" id="partHint">先上传主图并识别，这里会出现 4 张部位卡（操作/描述/提示词对全组每张生效）；「手机壳」卡两个换壳动作都先出<b>无图案的干净壳</b>供你验材质：①「自选」= 在下方第 3 步「🏷️ 特征标注」挑工艺/颜色，<b>可选</b>再传材质参考图；②「按参考图」= 必传材质参考图，照着质感 1:1 换。壳验过之后用「🎨 铺图案」把图案贴回（按原图贴回 / 提供图案贴回），材质验证通过后在结果卡点「✅ 贴回」。</p>
+  </section>
+
+  <section class="card" id="cardSpec">
+    <h2><i class="n">3</i>📋 产品规格卡 <span class="pill" id="specMeta" style="font-weight:400">全组一致性 · 第 1 层文本锁</span></h2>
+    <div class="row" style="margin-bottom:8px">
+      <button id="btnSpec">🔍 从基准图（图1）提取</button>
+      <button class="primary" id="btnSpecLock" disabled>🔒 锁定规格卡</button>
+      <span class="hint" id="specHint">视觉模型读图1 产出 MATERIAL / FORM / PATTERN / DETAILS 四行定义（约 10s），可编辑；锁定后注入全组每一条提示词</span>
+    </div>
+    <textarea id="specText" rows="5" placeholder="点上面「提取」按钮生成（或自己直接写，英文效果更好）。四行：MATERIAL: …&#10;FORM: …&#10;PATTERN: …&#10;DETAILS: …"></textarea>
+    <div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
+      <div class="hint" style="margin-bottom:4px">🏷️ <b>特征标注</b>（目标锚定 · 标的是「要换进去的壳」长什么样 · <b>权重最高</b>：与 AI 提取、参考图印象、原图旧材质冲突时一律以这份为准；全组每张 + 单张重做都注入同一份。<b>这里是换壳材质（工艺/颜色）的唯一入口</b>，改完手机壳卡的提示词自动跟着变）</div>
+      <div id="featBody"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><i class="n">4</i>执行方式（对全组每张生效）</h2>
+    <div class="mode" style="cursor:default">
+      <b>✅ 整图融合</b>
+      <div class="d">所有部位指令 + 规格卡 + 锚点图拼成一条提示词，对每张整图重绘一次出图——组内材质、款式、图案、细节最协调一致。</div>
+    </div>
+    <div class="row">
+      <button class="primary" id="btnRun" disabled>▶ 只执行当前张</button>
+      <button class="primary" id="btnRunGroup" disabled>▶ 对全组执行</button>
+      <span class="hint">每张张数</span>
+      <select id="nSel"><option>2</option><option>1</option><option>3</option><option>4</option></select>
+      <span class="hint" id="runHint">全组串行执行（图1→图N），每张真金白银别乱点 😂</span>
+    </div>
+  </section>
+
+  <section class="card" id="cardResult" style="display:none">
+    <h2><i class="n">5</i>结果 <span class="pill" id="resMeta" style="font-weight:400"></span></h2>
+    <div class="rgrid" id="resultBody"></div>
+    <div id="resultExtra"></div>
+  </section>
+
+  <section class="card" id="cardHistory">
+    <h2><i class="n">6</i>📜 生图记录 <span class="pill" id="hisMeta" style="font-weight:400"></span></h2>
+    <p class="hint" style="margin:0 0 10px">所有任务存在服务器上（页面关掉 / 换电脑打开都在）：点「查看」看每张的图和提示词；组任务展开后可对<b>单独一张</b>重做（其余张零消耗零影响）。<b style="color:#c2410c">记录与图片只保留 7 天</b>，云端到期自动清理，要留的图记得及时下载。</p>
+    <div id="hisBar" style="display:none;align-items:center;gap:10px;margin:0 0 8px;padding:6px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px"><input type="checkbox" id="hisAll"> 全选</label>
+      <button class="sm" id="hisDelSel" style="color:#b91c1c">🗑 删除选中</button>
+      <span class="hint" id="hisSelMeta">未选中</span>
+    </div>
+    <div id="hisBody"></div>
+  </section>
+
+  <footer class="hint">提示词库存在服务端 <code>engine/parts.py</code>，改一处全线生效 · 分部位工作台 · 产品组一致性版</footer>
+</main>
+
+<div id="overlay"><div class="boxd">
+  <div class="spin"></div><b id="ovTxt">处理中…</b>
+  <div class="hint" style="margin-top:6px">一般几秒到十几秒</div>
+</div></div>
+<div id="toast"></div>
+<div id="bigimg"><img id="bigSrc" alt=""></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const API={
+  upload:f=>{const fd=new FormData();fd.append("file",f);fd.append("slot","90");return fetch("/api/upload",{method:"POST",body:fd})},
+  detect:d=>fetch("/api/parts/detect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}),
+  runAsync:d=>fetch("/api/parts/run_async",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}),
+  groupSpec:d=>fetch("/api/parts/group_spec",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}),
+  groupDetect:d=>fetch("/api/parts/group_detect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}),
+  groupRun:d=>fetch("/api/parts/group_run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}),
+  groupRedo:d=>fetch("/api/parts/group_redo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}),
+  jobs:()=>fetch("/api/parts/jobs?limit=50"),
+  job:id=>fetch("/api/parts/job/"+id),
+  jobDel:id=>fetch("/api/parts/job/"+id+"/delete",{method:"POST"}),
+  jobsDel:d=>fetch("/api/parts/jobs/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}),
+  conf:()=>fetch("/api/ai_config"),
+  saveConf:d=>fetch("/api/ai_config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}),
+};
+/* 两段式删除确认（替代 confirm()——内嵌 iframe 里 confirm 会被浏览器静默吞掉并返回 false，表现为点了没反应）：
+   第一次点 → 按钮变红显示「确认删除？」；3 秒内再点 → 返回 true 执行；超时自动还原。 */
+function armConfirm(btn,ms=3000){
+  if(btn.dataset.arm==="1"){
+    btn.dataset.arm="";btn.textContent=btn.dataset.oldTxt;
+    btn.style.background=btn.dataset.oldBg||"";btn.style.color=btn.dataset.oldCl||"";
+    return true;
+  }
+  btn.dataset.arm="1";btn.dataset.oldTxt=btn.textContent;
+  btn.dataset.oldBg=btn.style.background;btn.dataset.oldCl=btn.style.color;
+  btn.textContent="确认删除？";btn.style.background="#b91c1c";btn.style.color="#fff";
+  setTimeout(()=>{if(btn.dataset.arm==="1"){
+    btn.dataset.arm="";btn.textContent=btn.dataset.oldTxt;
+    btn.style.background=btn.dataset.oldBg||"";btn.style.color=btn.dataset.oldCl||"";
+  }},ms);
+  return false;
+}
+/* ☁️ COS 存储设置 */
+async function cosLoad(){
+  const r=await fetch("/api/cos_conf").then(x=>x.json()).catch(()=>({conf:{}}));
+  const c=r.conf||{};
+  $("#cosRegion").value=c.region||"";$("#cosBucket").value=c.bucket||"";
+  $("#cosSid").value=c.secret_id||"";$("#cosSkey").value="";
+  $("#cosPrefix").value=c.prefix||"";$("#cosBase").value=c.base||"";
+  $("#cosHint").textContent=c.ready?("✅ COS 已启用（桶 "+(c.bucket||"")+"），图片走 COS")
+    :(c.has_key?"⚠️ 已配但未启用或不完整":"未配置（图片存服务器本地）");
+}
+$("#coskey").onclick=()=>{const b=$("#cosBox");
+  b.style.display=b.style.display==="none"?"":"none";
+  if(b.style.display!=="none"){cosLoad();b.scrollIntoView({behavior:"smooth",block:"start"});}};
+$("#cosSave").onclick=async()=>{
+  const body={region:$("#cosRegion").value.trim(),bucket:$("#cosBucket").value.trim(),
+    secret_id:$("#cosSid").value.trim(),secret_key:$("#cosSkey").value.trim(),
+    prefix:$("#cosPrefix").value.trim(),base:$("#cosBase").value.trim(),enabled:true};
+  if(!body.bucket||!body.region||!body.secret_id){toast("地域/桶名/SecretId 都要填");return}
+  $("#cosHint").textContent="正在验证（传一个小探针文件）…";
+  const r=await fetch("/api/cos_conf",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(body)}).then(x=>x.json()).catch(()=>({error:"网络错误"}));
+  $("#cosHint").textContent=r.ok?("✅ "+r.msg):("❌ "+(r.error||r.msg||"失败"));
+  toast(r.ok?"COS 已配置并验证通过":"COS 验证失败，看面板提示");
+  if(r.ok)cosLoad();
+};
+const META={ /* 与服务端 engine/parts.py 对齐 */
+  phone_case:{zh:"手机壳",color:"#2563eb",acts:[["none","不动"],["material_pick","换壳材质（自选·出干净壳）"],["material","换壳材质（按参考图·出干净壳）"],["custom","自定义（写描述）"]]},
+  lanyard:{zh:"手机挂绳",color:"#d97706",acts:[["none","不动"],["remove","去掉挂绳"],["replace","换成我的挂绳"],["custom","自定义（写描述）"]]},
+  stand:{zh:"手机支架",color:"#16a34a",acts:[["none","不动"],["remove","去掉支架"],["replace","换成我的支架"],["pattern","改图案"],["color","改颜色"],["custom","自定义（写描述）"]]},
+  camera_area:{zh:"摄像头孔位区",color:"#dc2626",acts:[["none","不动"],["clean","改干净（无图案）"],["color","改颜色"],["custom","自定义（写描述）"]]},
+};
+const ORDER=["phone_case","lanyard","stand","camera_area"];
+/* 参考图槽：phone_case.material=必传材质参考图（按参考图换材质）；
+   material_pick 不在表内=参考图可选（自选材质免传图，传了就照着质感走） */
+const REF_KIND={ "lanyard.replace":"look","stand.replace":"look","phone_case.material":"material" };
+/* 产品组状态：imgs=7 槽主图（每张独立 boxes/成品），parts=全组共享操作，spec=规格卡（文本锁） */
+const S={lib:{},imgs:[null,null,null,null,null,null,null],cur:0,parts:{},
+        spec:{text:"",locked:false,features:{finish:"",color:"",buttons:"",wrap:"",lens:"",lenscolor:"",extra:""}},watchGroup:null,groupLast:null,
+        patOn:false,
+        jobs:[],hisOpen:new Set(),hisDetail:{},hisSel:new Set()};
+function newPart(){return{action:"none",desc:"",ref:[],refPat:[],refMat:[],prompt:"",dirty:false,matPrompt:"",patPrompt:"",patDesc:"",matFin:"",matColor:"",patSrc:"restore"}}
+function newImg(){return{path:null,url:null,preview:null,thumb:null,w:0,h:0,name:"",t:0,detected:false,boxes:{},drawing:null,jobId:null,lastRun:null,busyD:false,uploading:false}}
+function im(){return S.imgs[S.cur]}
+/* 组内非空槽（从左到右），第一个 = 基准图（图1） */
+function groupList(){const out=[];S.imgs.forEach((m,k)=>{if(m&&m.path)out.push({m,k})});return out}
+let refSeq=91;
+
+function toast(m,ms){const t=$("#toast");t.textContent=m;t.style.display="block";
+  clearTimeout(t._h);t._h=setTimeout(()=>t.style.display="none",ms||2600)}
+function ov(on,txt){$("#overlay").style.display=on?"flex":"none";if(txt)$("#ovTxt").textContent=txt}
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+/* ---------- 提示词库 ---------- */
+async function loadLib(){
+  try{
+    const r=await(await fetch("/api/parts/prompts")).json();
+    S.lib=r.lib||{};
+  }catch(e){toast("提示词库加载失败（用内置默认）")}
+}
+function tpl(part,action){return S.lib[part+"."+action]||""}
+function renderPrompt(p){
+  const t=tpl(p.id,p.action)||"";
+  if(!p.dirty){p.prompt=t.replace("{DESC}",(p.desc||"").trim())}
+}
+
+/* ---------- ① 宫格条 + 主图编辑区 ---------- */
+function renderAll(){renderGbar();renderStage();renderParts();renderSpec();checkRun();renderResultSection();renderFeat()}
+function pickImg(k){
+  if(!S.imgs[k])return;
+  S.cur=k;renderAll();
+}
+function gcellState(m,k){
+  if(m.uploading)return "⏳上传中";
+  if(m.jobId&&runningJobOf(m.jobId))return "⏳";
+  if(m.lastRun)return m.lastRun.status==="done"?"✅有结果":"❌";
+  if(m.detected)return "已识别";
+  return "未识别";
+}
+function renderGbar(){
+  const host=$("#gbar");host.innerHTML="";
+  const g=groupList();
+  S.imgs.forEach((m,k)=>{
+    const c=document.createElement("div");
+    if(!m){
+      c.className="gcell add";c.innerHTML="＋<br>上传<br><span style='font-size:10px'>图"+(g.length+1)+(g.length===0?"（基准）":"")+"</span>";
+      c.onclick=()=>pickFile(k,false);
+      c.ondragover=e=>{e.preventDefault();c.classList.add("on")};
+      c.ondragleave=()=>c.classList.remove("on");
+      c.ondrop=e=>{e.preventDefault();c.classList.remove("on");
+        if(e.dataTransfer.files[0])uploadTo(k,e.dataTransfer.files[0],false)};
+      host.appendChild(c);return;
+    }
+    c.className="gcell"+(k===S.cur?" on":"");
+    c.innerHTML=`<img src="${m.preview||(m.url+"?t="+(m.t||0))}" loading="lazy">
+      ${g.length&&g[0].k===k?'<span class="star" title="基准图：组执行先出，再当其余张的锚点">⭐</span>':""}
+      <span class="gn">${g.findIndex(x=>x.k===k)+1}</span>
+      <div class="gctl">
+        <button data-gsw title="换这张图（共享操作保留，这张的框/结果清空）">🔄</button>
+        <button data-gdel title="从组里移除这张">✕</button>
+      </div>
+      <div class="gst">${esc(gcellState(m,k))}</div>`;
+    c.onclick=ev=>{if(ev.target.closest("button"))return;pickImg(k)};
+    c.querySelector("[data-gsw]").onclick=ev=>{ev.stopPropagation();pickFile(k,true)};
+    c.querySelector("[data-gdel]").onclick=ev=>{
+      ev.stopPropagation();
+      S.imgs[k]=null;
+      if(S.cur===k){const g2=groupList();S.cur=g2.length?g2[0].k:0}
+      renderAll();toast("已从组里移除（图会重新编号，基准顺位顶上）");
+    };
+    host.appendChild(c);
+  });
+}
+function pickFile(k,swap){
+  const i=document.createElement("input");i.type="file";i.accept="image/*";
+  i.onchange=()=>i.files[0]&&uploadTo(k,i.files[0],swap);i.click();
+}
+function renderStage(){
+  const m=im();
+  if(m&&(m.path||m.preview)){
+    $("#drop").style.display="none";$("#stage").style.display="block";
+    const img=$("#mainImg");
+    img.src=m.preview||(m.url+"?t="+(m.t||0));
+    img.onload=()=>{m.w=img.naturalWidth;m.h=img.naturalHeight;renderBoxes()};
+  }else{
+    $("#drop").style.display="grid";$("#stage").style.display="none";
+  }
+  $("#sessTag").textContent=groupList().length?`产品组 ${groupList().length} 张 · 编辑第 ${groupList().findIndex(x=>x.k===S.cur)+1||"－"} 张`:"未建组";
+  renderBoxes();
+}
+async function uploadTo(k,f,swap){
+  const old=S.imgs[k];
+  const pv=URL.createObjectURL(f);
+  /* 乐观显示：不等网络往返和服务端处理，本地文件立刻上屏 */
+  S.imgs[k]=Object.assign(newImg(),{preview:pv,w:0,h:0,name:f.name,t:Date.now(),uploading:true});
+  S.cur=k;renderAll();
+  try{
+    const r=await(await API.upload(f)).json();
+    if(r.error)throw new Error(r.error);
+    /* 上传期间该槽没被再动过才落地（防串图） */
+    if(S.imgs[k]&&S.imgs[k].preview===pv){
+      Object.assign(S.imgs[k],{path:r.path,url:r.url,thumb:r.thumb,name:r.name,t:Date.now(),uploading:false});
+    }
+    if(swap)toast("已换图：共享操作/参考图/提示词全保留，这张的框和结果已清空——重新识别即可",4200);
+    else toast(`已上传到图 ${groupList().findIndex(x=>x.k===k)+1}${groupList()[0].k===k?"（基准 ⭐）":""}：`+r.name);
+    renderAll();
+  }catch(e){
+    toast("上传失败："+e.message);
+    if(S.imgs[k]&&S.imgs[k].preview===pv)S.imgs[k]=old;
+    renderAll();
+  }
+}
+/* 舞台上的换图按钮 + 拖拽换图（当前张） */
+$("#btnSwap").onclick=()=>pickFile(S.cur,true);
+$("#drop").onclick=()=>{const k=S.imgs.findIndex(m=>!m);pickFile(k<0?0:k,false)};
+["dragover","dragleave","drop"].forEach(ev=>$("#stage").addEventListener(ev,e=>{
+  const m=im();if(!m||!m.path)return;e.preventDefault();
+  $("#stage").classList.toggle("dragging",ev==="dragover");
+  if(ev==="drop"&&e.dataTransfer.files[0])uploadTo(S.cur,e.dataTransfer.files[0],true);
+}));
+$("#mainImg").ondragstart=e=>e.preventDefault();
+
+/* ---------- 部位识别（单张 / 批量） ---------- */
+function applyDetect(m,parts){
+  (parts||[]).forEach(p=>{m.boxes[p.id]={present:!!p.present,bbox:p.bbox||[0,0,0,0]}});
+  m.detected=true;
+}
+$("#btnDetect").onclick=async()=>{
+  const m=im();
+  if(!m||!m.path)return toast(m&&m.uploading?"这张还在上传中，稍等一下…":"先在宫格里上传主图");
+  if(m.busyD)return;
+  m.busyD=true;ov(true,"视觉模型识别部位中（当前张）…");
+  try{
+    const r=await(await API.detect({image:m.path,vision_model:$("#vm").value.trim()||"gpt-5.4"})).json();
+    if(r.error)throw new Error(r.error);
+    applyDetect(m,r.parts);
+    ORDER.forEach(id=>renderPrompt(S.parts[id]));
+    renderAll();
+    const found=(r.parts||[]).filter(p=>p.present).length;
+    toast(`识别完成（${r.elapsed}s）：当前张找到 ${found}/4 个部位，框不准可直接拖`);
+  }catch(e){toast("识别失败："+e.message,4000)}
+  m.busyD=false;ov(false);
+};
+$("#btnDetectAll").onclick=async()=>{
+  const g=groupList();
+  if(!g.length)return toast("先在宫格里上传主图");
+  const run=S.jobs.find(j=>j.status==="running");
+  if(run)return toast("还有任务在跑，等它结束",4000);
+  try{
+    const r=await(await API.groupDetect({images:g.map(x=>x.m.path),session:"G",note:"批量识别部位"})).json();
+    if(r.error)throw new Error(r.error);
+    S.watchGroup=r.job_id;S.groupLast=null;
+    pollNow();
+    toast(`批量识别开跑（${g.length} 张，约 ${Math.ceil(g.length*10)}s）——后台跑，页面可以关`,4200);
+  }catch(e){toast("启动失败："+e.message,5000)}
+};
+
+/* ---------- 框：渲染 / 拖动 / 缩放 / 手动画（当前张） ---------- */
+function boxStyle(b){return `left:${b[0]/10}%;top:${b[1]/10}%;width:${(b[2]-b[0])/10}%;height:${(b[3]-b[1])/10}%`}
+function renderBoxes(){
+  const st=$("#stage");
+  st.querySelectorAll(".box").forEach(e=>e.remove());
+  const m=im();
+  if(!m||!m.path)return;
+  ORDER.forEach(id=>{
+    const b=m.boxes[id];if(!b||!b.present||!b.bbox||b.bbox[2]<=b.bbox[0])return;
+    const mt=META[id],d=document.createElement("div");
+    d.className="box";d.style.cssText=boxStyle(b.bbox)+`;border-color:${mt.color}`;
+    d.innerHTML=`<span class="tag" style="background:${mt.color}">${mt.zh}</span><span class="rsz" style="border-color:${mt.color}"></span>`;
+    d.__part=id;
+    st.appendChild(d);
+    d.onpointerdown=ev=>{if(ev.target.classList.contains("rsz"))startResize(ev,d,id);else startMove(ev,d,id)};
+  });
+}
+function pctOf(ev,st){const r=st.getBoundingClientRect();
+  return[Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(ev.clientY-r.top)/r.height))]}
+function startMove(ev,el,id){
+  ev.preventDefault();el.setPointerCapture(ev.pointerId);
+  const st=$("#stage"),b=im().boxes[id],[x0,y0]=pctOf(ev,st),b0=[...b.bbox];
+  const mv=e=>{const[x,y]=pctOf(e,st),dx=(x-x0)*1000,dy=(y-y0)*1000;
+    const w=b0[2]-b0[0],h=b0[3]-b0[1];
+    b.bbox=[Math.round(Math.max(0,Math.min(1000-w,b0[0]+dx))),Math.round(Math.max(0,Math.min(1000-h,b0[1]+dy))),
+            0,0];b.bbox[2]=b.bbox[0]+w;b.bbox[3]=b.bbox[1]+h;
+    el.style.cssText=boxStyle(b.bbox)+`;border-color:${META[id].color}`};
+  const up=()=>{el.removeEventListener("pointermove",mv);el.removeEventListener("pointerup",up);syncBbox(id)};
+  el.addEventListener("pointermove",mv);el.addEventListener("pointerup",up);
+}
+function startResize(ev,el,id){
+  ev.preventDefault();ev.stopPropagation();el.setPointerCapture(ev.pointerId);
+  const st=$("#stage"),b=im().boxes[id],b0=[...b.bbox];
+  const mv=e=>{const[x,y]=pctOf(e,st);
+    b.bbox=[b0[0],b0[1],Math.round(Math.max(b0[0]+20,Math.min(1000,x*1000))),
+            Math.round(Math.max(b0[1]+20,Math.min(1000,y*1000)))];
+    el.style.cssText=boxStyle(b.bbox)+`;border-color:${META[id].color}`};
+  const up=()=>{el.removeEventListener("pointermove",mv);el.removeEventListener("pointerup",up);syncBbox(id)};
+  el.addEventListener("pointermove",mv);el.addEventListener("pointerup",up);
+}
+function syncBbox(id){const el=$("#bbox_"+id);if(el)el.textContent=((im().boxes[id]||{}).bbox||[]).join(", ")}
+function enableDraw(id){
+  const m=im();if(!m)return;
+  m.drawing=id;toast("在主图上按住拖一个框出来（"+META[id].zh+" · 当前张）");
+}
+(function stageDraw(){
+  const st=$("#stage");let tmp=null,sx=0,sy=0;
+  st.addEventListener("pointerdown",ev=>{
+    const m=im();
+    if(!m||!m.drawing||ev.target.closest(".box"))return;
+    ev.preventDefault();[sx,sy]=pctOf(ev,st);
+    tmp=document.createElement("div");tmp.className="box";tmp.style.borderColor=META[m.drawing].color;
+    st.appendChild(tmp);st.setPointerCapture(ev.pointerId);
+    const mv=e=>{const[x,y]=pctOf(e,st);
+      tmp.style.cssText=`left:${Math.min(sx,x)*100}%;top:${Math.min(sy,y)*100}%;width:${Math.abs(x-sx)*100}%;height:${Math.abs(y-sy)*100}%;border-color:${META[m.drawing].color}`};
+    const up=e=>{const[x,y]=pctOf(e,st);
+      if(Math.abs(x-sx)>0.03&&Math.abs(y-sy)>0.03){
+        m.boxes[m.drawing]={present:true,
+          bbox:[Math.round(Math.min(sx,x)*1000),Math.round(Math.min(sy,y)*1000),
+                Math.round(Math.max(sx,x)*1000),Math.round(Math.max(sy,y)*1000)]};
+        m.detected=true;
+        renderBoxes();renderParts();
+        toast(META[m.drawing].zh+" 框好了（当前张），可继续拖动微调");
+      }else{tmp.remove()}
+      m.drawing=null;st.removeEventListener("pointermove",mv);st.removeEventListener("pointerup",up)};
+    st.addEventListener("pointermove",mv);st.addEventListener("pointerup",up);
+  });
+})();
+
+/* ---------- ② 部位卡（全组共享操作 + 当前张区域框） ---------- */
+function renderParts(){
+  const host=$("#partList");host.innerHTML="";
+  $("#partHint").style.display="none";
+  const m=im(),g=groupList();
+  ORDER.forEach(id=>{
+    const mt=META[id];
+    const p=S.parts[id]||newPart();
+    S.parts[id]=p;p.id=id;
+    const b=(m&&m.boxes[id])||null;
+    const cnt=g.filter(x=>x.m.boxes[id]&&x.m.boxes[id].present).length;
+    const c=document.createElement("div");c.className="pcard"+(p.action==="none"?" off":"");
+    const badge=(m&&m.path)?(b&&b.present?'<span class="badge ok" style="margin-left:auto">当前张已框</span>'
+        :'<span class="badge miss" style="margin-left:auto">当前张无框</span>'):'';
+    c.innerHTML=`
+      <div class="ph"><span class="dot" style="background:${mt.color}"></span><b>${mt.zh}</b>
+        ${badge}<span class="badge">全组 ${cnt}/${g.length} 张</span></div>
+      ${(!b||!b.present)&&m&&m.path?`<button class="sm ghost" data-draw="${id}" style="width:100%;margin-bottom:8px">✏️ 当前张手动画框</button>`:""}
+      <div class="row"><select id="act_${id}">
+        ${mt.acts.map(a=>`<option value="${a[0]}" ${p.action===a[0]?"selected":""}>${a[1]}</option>`).join("")}
+      </select></div>
+      ${b&&b.present?`<div class="meta">当前张区域框(0-1000)：<span id="bbox_${id}">${(b.bbox||[]).join(", ")}</span>（可拖动微调）</div>`:""}
+      <div id="dyn_${id}"></div>`;
+    host.appendChild(c);
+    const sel=c.querySelector("select");
+    sel.onchange=()=>{p.action=sel.value;p.dirty=false;renderPrompt(p);renderDyn(id);checkRun()};
+    c.querySelector("[data-draw]")?.addEventListener("click",()=>enableDraw(id));
+    renderDyn(id);
+  });
+  renderPatternBlock();
+  checkRun();
+}
+function refArr(p,kind){return kind==="pattern"?p.refPat:(kind==="material"?p.refMat:p.ref)}
+function refSlotHtml(p,kind){
+  const arr=refArr(p,kind);
+  const icon=kind==="pattern"?"🎨":(kind==="material"?"🧱":"📎");
+  const label=kind==="pattern"?"图案参考图":(kind==="material"?"材质参考图":"参考图");
+  const thumbs=arr.map((r,i)=>`<span class="refwrap"><img class="prev" src="${r.preview||r.url}" title="${label} ${i+1}">
+      <button class="xbtn" data-refx="${kind}" data-refi="${i}" title="移除这张参考图">✕</button></span>`).join("");
+  return `<div class="refslot">
+    <div style="font-size:12px;font-weight:600">${icon} ${label}（${arr.length}/3 · 全组共享）</div>
+    <div class="refgrid">
+      ${thumbs}
+      ${arr.length<3?`<button class="sm ghost" data-refadd="${kind}" style="flex:0 0 auto">${arr.length?"＋ 再加一张":"上传"+label}</button>`:`<span class="refhint">最多 3 张</span>`}
+    </div>
+    ${(kind==="material"&&arr.length)?`<span class="refhint">AI 只取质感/颜色，图上自带的图案会被忽略</span>`:(arr.length?"":`<span class="refhint">${kind==="pattern"?"要铺上去的图案（可给多张候选）":(kind==="material"?"磨砂/亮面等质感（建议用素色小样）":"要换上去的东西（可给多张候选）")}</span>`)}
+  </div>`;
+}
+function wireRefs(host,id){
+  const p=S.parts[id];
+  const up=async(k,file)=>{
+    ov(true,"上传参考图…");
+    try{
+      const fd=new FormData();fd.append("file",file);fd.append("slot",String(refSeq++));
+      const r=await(await fetch("/api/upload",{method:"POST",body:fd})).json();
+      if(r.error)throw new Error(r.error);
+      const arr=refArr(p,k);
+      if(arr.length>=3)throw new Error("这个槽最多 3 张");
+      arr.push({path:r.path,url:r.url,preview:URL.createObjectURL(file)});
+      renderDyn(id);if(id==="phone_case")renderPatternBlock();
+      toast(k==="material"?"材质参考已上传（AI 只取质感/颜色，图上自带的图案会被忽略）":
+        ((k==="pattern"?"图案":"")+"参考图已上传"));checkRun();
+    }catch(e){toast("参考图上传失败："+e.message)}ov(false)};
+  host.querySelectorAll("[data-refadd]").forEach(btn=>{
+    const k=btn.dataset.refadd;
+    btn.onclick=()=>{const i=document.createElement("input");i.type="file";i.accept="image/*";
+      i.onchange=()=>i.files[0]&&up(k,i.files[0]);i.click()};
+  });
+  host.querySelectorAll("[data-refx]").forEach(btn=>{
+    const k=btn.dataset.refx,ix=+btn.dataset.refi;
+    btn.onclick=()=>{refArr(p,k).splice(ix,1);
+      renderDyn(id);if(id==="phone_case")renderPatternBlock();
+      toast("已移除该参考图");checkRun()};
+  });
+}
+/* 换壳材质（自选）的 {DESC}：唯一来源是底部第 3 步「🏷️ 特征标注」（避免卡内/卡外两处重复维护）；
+   标注为空但传了材质参考图 → 退化为「照参考图质感走」；都空 → 模板兜底 */
+function matDescAuto(p){
+  const f=S.spec.features||{},bits=[];
+  if((f.finish||"").trim())bits.push(f.finish.trim());
+  if((f.color||"").trim())bits.push(f.color.trim()+" case color");
+  if(bits.length)return bits.join(", ");
+  return (p&&p.refMat&&p.refMat.length)
+    ?"match the material and surface finish shown in the MATERIAL reference image(s)"
+    :"the selected material";
+}
+function matPickPrompt(p){return (tpl("phone_case","material_pick")||"").replace("{DESC}",matDescAuto(p))}
+/* 底部特征标注改动 → 回写 material_pick 提示词（用户手改过就不覆盖） */
+function syncMatPick(){
+  const p=S.parts.phone_case;
+  if(!p||p.action!=="material_pick"||p.dirty)return;
+  p.prompt=matPickPrompt(p);
+  const t=$("#pt_phone_case");if(t&&t.value!==p.prompt)t.value=p.prompt;
+  /* 摄像头框锚定行单独刷新（不整卡重建，防输入框失焦） */
+  const h=$("#matCamHint");
+  if(h)h.innerHTML=matCamHintHtml(p);
+}
+/* 摄像头框是「多张同产品一起换壳」时最容易各出各的部件 → 未锚定就显式告警 */
+function matCamHintHtml(p){
+  const lc=(S.spec.features.lenscolor||"").trim();
+  const cam=lc?esc(lc)
+    :`<b style="color:#b45309">未锚定 → 默认跟壳身同材质同色</b>（多张一起跑时建议到下方「🏷️ 特征标注 · 镜头框颜色」点一个具体颜色，最稳）`;
+  return `当前锚定：<b>${esc(matDescAuto(p))}</b>；摄像头框：${cam}。本轮先出<b>无图案的干净壳</b>给你验材质；壳没问题后，在结果里点「✅ 用这张贴回图案」（图案来源在下方「🎨 铺图案」版块选：按原图贴回 / 提供图案贴回）`;
+}
+function renderDyn(id){
+  const p=S.parts[id],m=META[id],host=$("#dyn_"+id);if(!host)return;
+  if(id==="phone_case"&&p.action==="material_pick"){
+    /* 换壳材质（自选）：材质/颜色统一在下方「🏷️ 特征标注」选（唯一入口），这里只放可选的材质参考图 */
+    if(!p.dirty)p.prompt=matPickPrompt(p);
+    host.innerHTML=`
+      <div class="frow" style="margin:2px 0 6px"><span class="flab">锚定来源</span>
+        <span class="refhint">工艺 / 颜色 / 按键 / 结构都在下方第 3 步「🏷️ 特征标注」选（目标锚定 · 权重最高），选完这里的提示词自动跟着变；这里不再重复摆一遍</span></div>
+      <div class="refgrid">${refSlotHtml(p,"material")}</div>
+      <div class="meta" style="margin:2px 0 8px">材质参考图<b>可选</b>：手上有实拍质感小样就传（AI 只取质感/颜色，参考图自带的图案会被忽略）；不传也能跑，纯靠下方标注描述。${(p.refMat||[]).length>1?`<b style="color:#b45309">⚠️ 已传 ${p.refMat.length} 张：多张会被混合参考，全组容易各出各的质感/框色，建议只留最准的 1 张</b>`:""}</div>
+      <label class="lb">提示词（可改，改完全组每张都用你改的）</label>
+      <textarea id="pt_${id}" rows="5">${esc(p.dirty&&p.prompt?p.prompt:matPickPrompt(p))}</textarea>
+      <button class="sm ghost" id="rst_${id}" style="margin-top:4px">↺ 恢复默认提示词</button>
+      <div class="meta" id="matCamHint" style="margin-top:2px">${matCamHintHtml(p)}</div>`;
+    wireRefs(host,id);
+    const pt=$("#pt_"+id);
+    if(pt){pt.oninput=()=>{p.prompt=pt.value;p.dirty=true};
+      $("#rst_"+id).onclick=()=>{p.dirty=false;p.prompt=matPickPrompt(p);pt.value=p.prompt;toast("已恢复默认提示词")}}
+    renderPatternBlock();
+    return;
+  }
+  const needDesc=(tpl(id,p.action)||"").includes("{DESC}");
+  const kind=REF_KIND[id+"."+p.action];
+  let refHtml="";
+  if(kind&&kind!=="both"){
+    refHtml=`<div class="refgrid">${refSlotHtml(p,kind)}</div><div style="height:4px"></div>`;
+  }
+  if(!p.dirty)renderPrompt(p);   /* 无 {DESC} 的模板（如按参考图换材质）也要把模板填进框 */
+  let ptHtml=`<label class="lb">提示词（可改，改完全组每张都用你改的）</label>
+      <textarea id="pt_${id}" rows="5">${esc(p.prompt||"")}</textarea>
+      <button class="sm ghost" id="rst_${id}" style="margin-top:4px">↺ 恢复默认提示词</button>`;
+  host.innerHTML=(needDesc?`<label class="lb">补充描述（比如“磨砂淡金色”）</label>
+      <input type="text" id="desc_${id}" value="${esc(p.desc||"")}" placeholder="要改成什么样？">`:"")
+    +refHtml+ptHtml;
+  const di=$("#desc_"+id);if(di)di.oninput=()=>{p.desc=di.value;
+    renderPrompt(p);const t=$("#pt_"+id);if(t)t.value=p.prompt};
+  wireRefs(host,id);
+  const pt=$("#pt_"+id);
+  if(pt){pt.oninput=()=>{p.prompt=pt.value;p.dirty=true};
+    $("#rst_"+id).onclick=()=>{p.dirty=false;renderPrompt(p);pt.value=p.prompt;toast("已恢复默认提示词")}}
+  if(id==="phone_case")renderPatternBlock();
+}
+function renderPatternBlock(){
+  const wrap=$("#patBlock"),host=$("#patBody");if(!wrap)return;
+  const pc=S.parts.phone_case||newPart();
+  wrap.style.display=S.parts.phone_case?"block":"none";
+  if(!S.parts.phone_case)return;
+  if(!pc.patSrc)pc.patSrc="restore";
+  const restore=pc.patSrc==="restore";
+  const patAct=()=>restore?"pattern_restore":"pattern";
+  const matArmed=["material","material_pick"].includes(pc.action);
+  const autoPat=()=>{const d_=(pc.patDesc||"").trim();
+    return (tpl("phone_case",patAct())||"")+(d_?` Extra requirement for the new pattern: ${d_}.`:"")};
+  const patNow=(pc.patPrompt&&pc.patPrompt.trim())?pc.patPrompt:autoPat();
+  host.innerHTML=`
+    <div class="row" style="margin-bottom:8px">
+      <span style="font-size:15px">🎨</span><b style="font-size:13.5px">铺图案 · 材质验证通过后贴回（全组共享）</b>
+      <label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;font-weight:600">
+        <input type="checkbox" id="patSw" ${S.patOn?"checked":""}> 启用铺图案</label></div>
+    ${S.patOn?`
+    <div class="frow" style="margin:2px 0 8px"><span class="flab">图案来源</span>
+      <span class="fchip${restore?" on":""}" data-patsrc="restore">按原图贴回（免传图）</span>
+      <span class="fchip${!restore?" on":""}" data-patsrc="provide">提供图案贴回（传图 1:1）</span></div>
+    ${matArmed
+      ?`<span class="badge pend">换壳任务先出干净壳 · 图案步已扣下——出图后到结果卡点「✅ 贴回」</span>`
+      :`<span class="badge pend">整条管线最后执行 · 所有部位改完才铺，不会被后续步骤弄脏</span>`}
+    ${restore
+      ?`<div class="meta" style="margin-top:6px">贴回时引用每张的<b>原图案</b>：只复制图案 1:1，壳子保持换壳后的新材质，不会把原图的旧材质/旧颜色带回来</div>`
+      :`<div class="refgrid" style="max-width:560px;margin-top:6px">${refSlotHtml(pc,"pattern")}</div>`}
+    <label class="lb">补充描述（没自己改提示词时拼进这一步，比如“小雏菊图案铺满壳面”）</label>
+    <input type="text" id="pdesc_phone_case" value="${esc(pc.patDesc||"")}" placeholder="对图案的额外要求？">
+    <label class="lb" style="margin-top:8px">提示词（可改，改完全组每张都用你改的）</label>
+    <textarea id="pt2_phone_case" rows="5">${esc(patNow)}</textarea>
+    <button class="sm ghost" id="rst2_phone_case" style="margin-top:4px">↺ 恢复默认图案提示词</button>`
+    :`<div class="meta">贴回图案的独立版块——「按原图贴回」免传图引用原图案，「提供图案贴回」传一张要贴的图案。可与「换壳材质」组合（先出干净壳验证，再贴回），也可单用</div>`}`;
+  const sw=$("#patSw");
+  if(sw)sw.onchange=()=>{S.patOn=sw.checked;renderPatternBlock();checkRun();
+    toast(S.patOn?"铺图案已启用":"铺图案已关闭")};
+  host.querySelectorAll("[data-patsrc]").forEach(c=>c.onclick=()=>{
+    if(pc.patSrc===c.dataset.patsrc)return;
+    pc.patSrc=c.dataset.patsrc;renderPatternBlock();checkRun()});
+  if(!S.patOn)return;
+  wireRefs(host,"phone_case");
+  const di=$("#pdesc_phone_case");
+  if(di)di.oninput=()=>{pc.patDesc=di.value;
+    if(!(pc.patPrompt&&pc.patPrompt.trim())){const t2=$("#pt2_phone_case");if(t2)t2.value=autoPat()}};
+  const t2=$("#pt2_phone_case");
+  if(t2){t2.oninput=()=>{pc.patPrompt=t2.value};
+    $("#rst2_phone_case").onclick=()=>{pc.patPrompt="";t2.value=autoPat();toast("已恢复默认图案提示词")}}
+}
+/* 就绪检查：共享操作一份 + 每张独立识别状态 */
+function hasRef(id){
+  const p=S.parts[id];if(!p)return true;
+  const kind=REF_KIND[id+"."+p.action];
+  if(!kind)return true;
+  if(kind==="both")return !!(p.refPat.length||p.refMat.length);
+  if(kind==="pattern")return !!p.refPat.length;
+  if(kind==="material")return !!p.refMat.length;
+  return !!p.ref.length;
+}
+function sharedErr(){
+  const act=ORDER.filter(id=>S.parts[id]&&S.parts[id].action!=="none");
+  if(!act.length&&!S.patOn)return "没有要执行的修改";
+  const miss=act.filter(id=>!hasRef(id));
+  if(miss.length)return "有部位参考图没传齐";
+  if(S.patOn){
+    const pc=S.parts.phone_case;
+    if(pc){
+      const matArmed=["material","material_pick"].includes(pc.action);
+      /* 换壳 armed 时图案步扣下（验证门）本轮不跑，不拦；否则图案必须就位 */
+      if(!matArmed&&pc.patSrc!=="restore"&&!pc.refPat.length)
+        return "铺图案（提供图案）已启用：先在「🎨 铺图案」版块传图案参考图";
+    }
+  }
+  return "";
+}
+function imgReady(k){
+  const m=S.imgs[k];
+  if(!m||!m.path)return "该槽没有图";
+  const e=sharedErr();if(e)return e;
+  if(!m.detected)return "先识别部位";
+  return "";
+}
+function groupReady(){
+  const g=groupList();
+  if(!g.length)return "先上传主图";
+  if(g.length===1)return "组里只有 1 张——直接用「只执行当前张」";
+  for(let i=0;i<g.length;i++){
+    const e=imgReady(g[i].k);
+    if(e)return `图 ${i+1}：${e}`;
+  }
+  return "";
+}
+function checkRun(){
+  const run=S.jobs.find(j=>j.status==="running");
+  /* 批量识别：有图就行 */
+  $("#btnDetectAll").disabled=!groupList().length||!!run;
+  /* 当前张执行 */
+  const e1=im()?imgReady(S.cur):"先上传主图";
+  const curRun=im()&&im().jobId&&runningJobOf(im().jobId);
+  $("#btnRun").disabled=!!e1||!!run;
+  $("#btnRun").textContent=curRun?"⏳ 当前张跑着…":(e1?`▶ 只执行当前张（${e1}）`:"▶ 只执行当前张");
+  /* 全组执行 */
+  const e2=groupReady();
+  $("#btnRunGroup").disabled=!!e2||!!run;
+  $("#btnRunGroup").textContent=run?"⏳ 后台任务跑着…":(e2?`▶ 对全组执行（${e2}）`:`▶ 对全组执行（${groupList().length} 张 · 串行）`);
+  $("#runHint").textContent=S.spec.locked?"🔒 规格卡已锁定：全组每条提示词都会注入同一份产品定义":(S.spec.text?"⚠️ 规格卡还没锁定（组执行会用当前文本）":"组执行时若规格卡为空会自动对图1提取（约 10s）");
+}
+function runningJobOf(id){return (S.jobs||[]).find(j=>j.id===id&&j.status==="running")}
+
+/* ---------- ④ 执行 ---------- */
+function modeVal(){return "fusion"}
+function buildSteps(k){
+  const m=S.imgs[k];
+  const steps=ORDER.filter(id=>S.parts[id]&&S.parts[id].action!=="none").map(id=>{
+    const p=S.parts[id];
+    const b=(m.boxes[id]||{present:false,bbox:[0,0,0,0]});
+    const refs=[];
+    if(id==="phone_case"){
+      /* 换壳材质参考图（material=必传 / material_pick=可选，都存 refMat）→ tag=material，
+         服务端自动加严格复刻约束：只取质感颜色、忽略参考图自带图案 */
+      if(["material","material_pick"].includes(p.action))p.refMat.forEach(r=>refs.push({path:r.path,tag:"material"}));
+    }else p.ref.forEach(r=>refs.push({path:r.path,tag:"look"}));
+    return{part:id,action:p.action,desc:p.desc||"",prompt:p.prompt||tpl(id,p.action)||"",
+           refs,bbox:b.present?(b.bbox||[0,0,0,0]):[0,0,0,0]};
+  });
+  /* 铺图案：换壳动作 armed → 本轮扣下不跑（验证门：先出干净壳，结果卡点「✅ 贴回」再跑）；否则追加为最后一步 */
+  const pc=S.parts.phone_case;
+  const matArmed=pc&&["material","material_pick"].includes(pc.action);
+  if(S.patOn&&pc&&!matArmed){
+    const b=(m.boxes.phone_case||{present:false,bbox:[0,0,0,0]});
+    const restore=pc.patSrc==="restore";
+    steps.push({part:"phone_case",action:restore?"pattern_restore":"pattern",desc:(pc.patDesc||"").trim(),
+      prompt:(pc.patPrompt&&pc.patPrompt.trim())?pc.patPrompt.trim():(tpl("phone_case",restore?"pattern_restore":"pattern")||""),
+      refs:restore?[{path:m.path,tag:"pattern"}]:pc.refPat.map(r=>({path:r.path,tag:"pattern"})),
+      bbox:b.present?(b.bbox||[0,0,0,0]):[0,0,0,0]});
+  }
+  return steps;
+}
+/* 单张执行：也带规格卡 + 锚点（和组保持一致） */
+function buildPayload(k){
+  const m=S.imgs[k];
+  const pl={mode:modeVal(),base_img:m.path,base_url:m.url,base_name:m.name,session:"G",
+         n:parseInt($("#nSel").value,10),steps:buildSteps(k)};
+  if(S.spec.text.trim())pl.spec=S.spec.text.trim();
+  const ft=featuresText();if(ft)pl.features=ft;
+  const sib=siblingFor(S.groupLast,k);
+  if(sib)pl.sibling=sib;
+  return pl;
+}
+async function postJob(payload){
+  try{
+    const r=await(await API.runAsync(payload)).json();
+    if(r.error)throw new Error(r.error);
+    const k=S.imgs.findIndex(m=>m&&m.path===payload.base_img);
+    if(k>=0&&S.imgs[k]&&!S.imgs[k].jobId)S.imgs[k].jobId=r.job_id;
+    pollNow();
+    return r.job_id;
+  }catch(e){toast("启动失败："+e.message,6000);return null}
+}
+$("#btnRun").onclick=async()=>{
+  const err=imgReady(S.cur);if(err)return toast(err,4000);
+  camFrameWarn(false);
+  const id=await postJob(buildPayload(S.cur));
+  if(id)toast("当前张已在后台开跑——页面可以关，回来看「生图记录」🚀",4200);
+};
+/* 换壳 + 多张一起跑 → 摄像头框颜色没锚定时提醒一次（这个部件最容易各出各的） */
+function camFrameWarn(multi){
+  const pc=S.parts.phone_case;
+  if(!pc||!["material","material_pick"].includes(pc.action))return;
+  if((S.spec.features.lenscolor||"").trim())return;
+  if(S._camWarned)return;S._camWarned=true;
+  toast((multi?"多张一起换壳":"换壳")+"：摄像头框颜色还没锚定 → 现在按「跟壳身同材质同色」跑。"+
+    "要指定具体颜色，去「🏷️ 特征标注 · 镜头框 · 颜色」点一下再跑，多张一致最稳 🔒",7000);
+}
+$("#btnRunGroup").onclick=async()=>{
+  const err=groupReady();if(err)return toast(err,5000);
+  camFrameWarn(true);
+  const g=groupList();
+  const payload={mode:modeVal(),session:"G",note:"对全组执行",
+    spec:S.spec.text.trim(),features:featuresText(),
+    images:g.map(x=>({path:x.m.path,name:x.m.name,base_url:x.m.url,steps:buildSteps(x.k)}))};
+  try{
+    const r=await(await API.groupRun(payload)).json();
+    if(r.error)throw new Error(r.error);
+    S.watchGroup=r.job_id;S.groupLast=null;
+    pollNow();
+    toast(`全组 ${r.n_images} 张串行开跑（图1→图N，图1 成品会当其余张的锚点）——页面可以关 🚀`,5000);
+  }catch(e){toast("启动失败："+e.message,6000)}
+};
+/* 从第 fi 步重跑（单张管线，存档复用不花钱） */
+async function rerunFrom(payloadBase,fi,prev,note,replay){
+  const p=JSON.parse(JSON.stringify(payloadBase));
+  delete p.from_index;delete p.prev_outputs;delete p.replay_after;
+  Object.assign(p,{from_index:fi,prev_outputs:prev,note:note||`重跑自第 ${fi+1} 步`});
+  if(replay)p.replay_after=true;
+  if(!p.session)p.session="G";
+  const id=await postJob(p);
+  if(id)toast(replay
+    ?`已重跑第 ${fi+1} 步（这一步之后的环节直接复用存档、不花钱⚡）`
+    :`已从第 ${fi+1} 步重跑（之前的步用存档、不花钱）`);
+}
+
+/* ---------- ③ 规格卡面板 ---------- */
+/* 特征标注：目标锚定（要换进去的壳长什么样），权重最高。chips 值直接存英文 */
+const FEATURE_GROUPS=[
+  {key:"finish", label:"换入壳 · 材质工艺（目标锚定）", en:"MATERIAL/FINISH", opts:[["磨砂","matte finish"],["亮面","glossy finish"],["肤感","skin-feel soft touch"],["透明","clear transparent"],["皮纹","leather texture"],["镜面","mirror finish"]]},
+  {key:"color",  label:"换入壳 · 壳体颜色（目标锚定）", en:"CASE COLOR", input:true, ph:"如：白色 / 奶蓝 / 樱花粉"},
+  {key:"buttons",label:"按键", en:"BUTTONS", opts:[["随壳色","same color as the case body"],["黑色","black"],["白色","white"],["金属","metallic"]]},
+  {key:"wrap",   label:"结构", en:"STRUCTURE", opts:[["全包","full-wrap, all four edges covered"],["半包","half-wrap, top and bottom edges exposed"]]},
+  {key:"lens",   label:"镜头框 · 孔型", en:"CAMERA FRAME", opts:[["精孔","precise individual lens cutouts"],["大孔","one large camera opening"]]},
+  /* 🔒 摄像头框颜色（2026-10-12 新增）：全组一致的关键锚定，不留默认值给 AI 自由发挥 */
+  {key:"lenscolor", label:"镜头框 · 颜色（全组一致关键🔒）", en:"CAMERA FRAME COLOR",
+   opts:[["跟壳身同色","the SAME material and color as the case body - it changes together with the case, identical in every photo"],
+         ["保持原图不变","keep EXACTLY the same color and finish as in the base photo, do NOT recolor it"],
+         ["黑色","black"],["白色","white"],["透明","clear transparent"],["金属银","metallic silver"]],
+   input:true, ph:"不填=跟壳身同材质同色（推荐，全组最稳）"},
+];
+function featuresText(){
+  const f=S.spec.features,bits=[];
+  for(const g of FEATURE_GROUPS){
+    const v=(f[g.key]||"").trim();
+    if(v)bits.push(`${g.en}: ${v}`);
+  }
+  if((f.extra||"").trim())bits.push(`EXTRA: ${f.extra.trim()}`);
+  return bits.join("\n");
+}
+function renderFeat(){
+  const box=$("#featBody");if(!box)return;
+  const ae=document.activeElement;
+  if(ae&&ae.tagName==="INPUT"&&box.contains(ae))return;  // 正在文本框输入时不重建，防失焦
+  box.innerHTML="";
+  for(const g of FEATURE_GROUPS){
+    const row=document.createElement("div");row.className="frow";
+    row.innerHTML=`<span class="flab">${g.label}</span>`;
+    if(g.input){
+      const inp=document.createElement("input");
+      inp.type="text";inp.placeholder=g.ph||"";inp.value=S.spec.features[g.key]||"";
+      inp.oninput=e=>{S.spec.features[g.key]=e.target.value;renderSpecMeta();syncMatPick();};
+      row.appendChild(inp);
+    }else{
+      for(const [zh,en] of g.opts){
+        const c=document.createElement("span");
+        c.className="fchip"+((S.spec.features[g.key]||"")===en?" on":"");
+        c.textContent=zh;
+        c.onclick=()=>{S.spec.features[g.key]=(S.spec.features[g.key]===en?"":en);renderFeat();renderSpecMeta();syncMatPick();};
+        row.appendChild(c);
+      }
+    }
+    box.appendChild(row);
+  }
+  const row=document.createElement("div");row.className="frow";
+  row.innerHTML=`<span class="flab">其他</span>`;
+  const inp=document.createElement("input");
+  inp.type="text";inp.placeholder="自定义补充，如：挂绳孔在左下 / 无挂绳孔";inp.style.flex="1";
+  inp.value=S.spec.features.extra||"";
+  inp.oninput=e=>{S.spec.features.extra=e.target.value;renderSpecMeta();syncMatPick();};
+  row.appendChild(inp);
+  box.appendChild(row);
+}
+function renderSpecMeta(){
+  const ft=featuresText(),fn=ft?ft.split("\n").length:0;
+  $("#specMeta").textContent=(S.spec.locked
+    ?"🔒 已锁定 · 注入全组每条提示词"
+    :(S.spec.text.trim()?"已生成 · 检查后点「锁定」":"全组一致性 · 第 1 层文本锁"))
+    +(fn?` · 🏷️特征×${fn}`:"");
+}
+function renderSpec(){
+  const t=$("#specText");
+  if(document.activeElement!==t)t.value=S.spec.text;
+  $("#cardSpec").classList.toggle("locked",S.spec.locked);
+  t.readOnly=S.spec.locked;
+  const btn=$("#btnSpecLock");
+  btn.textContent=S.spec.locked?"🔓 解锁（可改）":"🔒 锁定规格卡";
+  btn.disabled=!S.spec.text.trim();
+  renderSpecMeta();
+}
+$("#btnSpec").onclick=async()=>{
+  const g=groupList();
+  if(!g.length)return toast("先在宫格里上传主图（以图1为基准提取）");
+  ov(true,"从基准图（图1）提取规格卡（约 10s）…");
+  try{
+    const r=await(await API.groupSpec({image:g[0].m.path,vision_model:$("#vm").value.trim()||"gpt-5.4"})).json();
+    if(r.error)throw new Error(r.error);
+    S.spec.text=r.spec;S.spec.locked=false;
+    $("#specText").value=r.spec;
+    renderSpec();checkRun();
+    toast(`规格卡提取成功（${r.elapsed}s）——检查一遍，没问题就点「🔒 锁定」`,4200);
+  }catch(e){toast("提取失败："+e.message,5000)}
+  ov(false);
+};
+$("#specText").oninput=e=>{
+  S.spec.text=e.target.value;
+  if(S.spec.locked){S.spec.locked=false;toast("已自动解锁：改了内容记得再锁定")}
+  renderSpec();checkRun();
+};
+$("#btnSpecLock").onclick=()=>{
+  if(!S.spec.text.trim())return;
+  S.spec.locked=!S.spec.locked;
+  renderSpec();checkRun();
+  toast(S.spec.locked?"🔒 规格卡已锁定：全组每条提示词注入同一份产品定义":"已解锁，可继续编辑");
+};
+
+/* ---------- ⑤ 结果区 ---------- */
+function stepCard(st,stepsArr,onRerun){
+  const c=document.createElement("div");c.className="rstep";
+  const img=st.out?(st.out.preview||st.out.url):"";
+  const isPat=st.part==="phone_case"&&st.action==="pattern";
+  c.innerHTML=`<div class="hd"><b>第 ${st.no} 步 · ${st.zh}${isPat?"（最后铺图案）":""}</b><span class="sc">${st.action_zh||st.action}</span></div>
+    <img src="${img}" loading="lazy" ${st.out?`data-big="${st.out.url}"`:""}>
+    <div class="bd">
+      ${st.replay?'<span class="badge ok">⚡ 程序重放·没花钱</span>':
+        (st.kept?'<span class="badge">存档复用·没花钱</span>':
+        (st.composited?'<span class="badge ok">区域外像素已贴回原图</span>':(st.out?'<span class="badge miss">未贴回</span>':'')))}
+      <div class="meta">${st.replay?"直接复用了上次这步的效果（没调 AI）":
+        (st.kept?"这一步沿用了上次的结果":`耗时 ${st.elapsed||"?"}s`)} ·
+        ${st.raw?`<a href="#" data-raw="${st.raw.url}">看AI原图</a> · `:""}
+        ${st.out?`<a href="#" data-dl="${st.out.url}">下载</a>`:""}</div>
+      <details style="margin-top:5px"><summary>提示词</summary>
+        <div class="meta" style="white-space:pre-wrap">${esc(st.prompt||"")}</div></details></div>
+    ${(st.out&&onRerun)?`<div class="ft" style="display:flex;gap:6px">
+      <button class="sm" data-act="replay" style="flex:1">🎯 只重跑这步·后面不动</button>
+      <button class="sm primary" data-act="chain" style="flex:1">↻ 重跑此步及之后</button></div>`:""}`;
+  if(st.out){
+    c.querySelector("img").onclick=()=>big(st.out.url);
+    c.querySelector("[data-raw]")?.addEventListener("click",e=>{e.preventDefault();big(st.raw.url)});
+    c.querySelector("[data-dl]").onclick=e=>{e.preventDefault();dl(st.out.url,st.out.file)};
+  }
+  c.querySelectorAll(".ft button").forEach(b=>b.onclick=()=>{
+    const replay=(b.dataset.act==="replay");
+    const prev=[];
+    const upto=replay?stepsArr.length:(st.no-1);
+    for(let i=0;i<upto;i++)prev.push(stepsArr[i]&&stepsArr[i].out&&stepsArr[i].out.path);
+    onRerun(st.no-1,prev,replay);
+  });
+  return c;
+}
+function dl(u,name){const a=document.createElement("a");a.href=u;a.download=name||u.split("/").pop();a.click()}
+/* entry.result → 最终成品（layered=final / fusion=results[0] / 兜底最后一个有输出的步） */
+function finalOf(e){
+  const r=(e&&e.result)||{};
+  if(r.final)return r.final;
+  const rs=r.results||[];if(rs.length)return rs[0];
+  const ss=(r.steps||[]).filter(s=>s.out);if(ss.length)return ss[ss.length-1].out;
+  return null;
+}
+/* 单张重做的锚点：组内其他张最新成品（图1 成品优先，与组执行链式锚定一致）；无成品 → 另一张原图兜底 */
+function siblingFor(job,k){
+  if(!job)return null;
+  const ents=(job.result&&job.result.images)||job.images||[];
+  const cands=[];
+  ents.forEach(e=>{if(e&&e.status==="done"){const f=finalOf(e);if(f&&f.path)cands.push({i:(e.index||1)-1,f})}});
+  const one=cands.find(c=>c.i===0)||cands[0]||null;
+  if(one&&one.i!==k)return one.f.path;
+  const pl=(job.payload&&job.payload.images)||[];
+  if(pl.length>1){const alt=pl[k===0?1:0];if(alt&&alt.path)return alt.path}
+  return null;
+}
+/* 单张重做：job=组任务详情（内存 groupLast 或历史展开的） */
+async function redoGroupImg(k,job){
+  if(!job)return;
+  const pl=(job.payload&&job.payload.images||[])[k];
+  if(!pl)return toast("找不到该张的设置");
+  const sib=siblingFor(job,k);
+  if(!sib)return toast("组里只有这一张 / 找不到锚点——请直接用「▶ 只执行当前张」",5000);
+  const m=S.imgs[k];
+  const useNow=m&&m.path===pl.path&&!imgReady(k); /* 内存里还在且就绪 → 用当前设置 */
+  const payload={base_img:pl.path,base_url:pl.base_url,base_name:pl.name,
+    mode:(job.payload&&job.payload.mode)||job.mode||"layered",
+    steps:useNow?buildSteps(k):(pl.steps||[]),
+    spec:(S.spec.text.trim()||job.spec||((job.result||{}).spec)||""),
+    features:featuresText(),
+    sibling:sib,group_id:job.id,img_index:k,session:"G",
+    note:"重做图"+(k+1)+(useNow?"（用当前设置）":"")};
+  try{
+    const r=await(await API.groupRedo(payload)).json();
+    if(r.error)throw new Error(r.error);
+    if(m&&!m.jobId)m.jobId=r.job_id;
+    pollNow();
+    toast("已在后台重做这一张——锚点=组内其余成品的最新图，材质/款式/图案/细节保持一致 🎯 其余张零消耗",5000);
+  }catch(e){toast("启动失败："+e.message,6000)}
+}
+/* ---------- 验证门 · 贴回图案（2026-10-12 语义翻转） ---------- */
+/* 判断一个任务是不是「换壳任务」（手机壳带了出干净壳的材质动作）→ 结果卡给贴回按钮 */
+function isSwapJob(job){
+  const pl=(job&&job.payload)||{};
+  const hit=sts=>(sts||[]).some(s=>s&&s.part==="phone_case"&&["material","material_pick"].includes(s.action));
+  if(hit(pl.steps))return true;
+  return (pl.images||[]).some(g=>hit(g&&g.steps));
+}
+/* 构造贴回图案步：restore=引用原图案，provide=用上传的图案（没传返回 null） */
+function patStepFor(origPath){
+  const pc=S.parts.phone_case||newPart();
+  const restore=(pc.patSrc||"restore")==="restore";
+  if(!restore&&!pc.refPat.length)return null;
+  const act=restore?"pattern_restore":"pattern";
+  const refs=restore?[{path:origPath,tag:"pattern"}]:pc.refPat.map(r=>({path:r.path,tag:"pattern"}));
+  return {part:"phone_case",action:act,desc:(pc.patDesc||"").trim(),
+    prompt:(pc.patPrompt&&pc.patPrompt.trim())?pc.patPrompt.trim():(tpl("phone_case",act)||""),
+    refs,bbox:[0,0,0,0]};
+}
+/* 单张贴回：base=换壳成品（干净壳），图案引用原图或上传图案，另发一个融合任务 */
+async function pasteBack(basePath,baseUrl,origPath,specFallback){
+  const st=patStepFor(origPath);
+  if(!st)return toast("铺图案选了「提供图案贴回」：先在「🎨 铺图案」版块传图案参考图",5000);
+  const pl={mode:"fusion",base_img:basePath,base_url:baseUrl,session:"G",
+    n:parseInt($("#nSel").value,10),steps:[st],note:"贴回图案（基于换壳结果）"};
+  const spec=(S.spec.text.trim()||specFallback||"");if(spec)pl.spec=spec;
+  const ft=featuresText();if(ft)pl.features=ft;
+  const id=await postJob(pl);
+  if(id)toast("贴回已开跑：以你选中的干净壳为底，只把图案贴回去——到「📜 生图记录」看结果 🚀",4500);
+}
+/* 全组贴回：每张干净壳成品 + 各自原图案（restore）或同一图案（provide）；图1 成品当锚点串行 */
+async function groupPasteBack(job){
+  const pc=S.parts.phone_case||newPart();
+  if((pc.patSrc||"restore")!=="restore"&&!pc.refPat.length)
+    return toast("铺图案选了「提供图案贴回」：先在「🎨 铺图案」版块传图案参考图",5000);
+  const pl=(job.payload&&job.payload.images)||[];
+  const ents=((job.result||{}).images)||(job.images)||[];
+  const images=[];
+  pl.forEach((g,k)=>{
+    const e=ents[k]||{};
+    if(e.status!=="done")return;
+    const fin=finalOf(e);if(!fin||!fin.path)return;
+    const st=patStepFor(g.path);if(!st)return;
+    images.push({path:fin.path,name:(g.name||"")+"·贴回",base_url:fin.url,steps:[st]});
+  });
+  if(!images.length)return toast("没有可贴回的成品（成功的张都还没出图？）",5000);
+  const payload={mode:"fusion",session:"G",note:"全组贴回图案（基于换壳结果）",
+    spec:(S.spec.text.trim()||job.spec||((job.result||{}).spec)||""),
+    features:featuresText(),
+    n:parseInt($("#nSel").value,10),images};
+  try{
+    const r=await(await API.groupRun(payload)).json();
+    if(r.error)throw new Error(r.error);
+    S.watchGroup=r.job_id;S.groupLast=null;
+    pollNow();
+    toast(`全组贴回 ${r.n_images} 张串行开跑（图1 成品当锚点）——页面可以关 🚀`,5000);
+  }catch(e){toast("启动失败："+e.message,6000)}
+}
+/* 组任务结果：按角度分组渲染（含 running 子格） */
+function groupCard(e,k,job){
+  const c=document.createElement("div");c.className="rstep";
+  const fin=finalOf(e);
+  const st=e.status==="done"?'<span class="badge ok">完成'+(e.elapsed?` · ${e.elapsed}s`:"")+'</span>':
+    (e.status==="error"?'<span class="badge miss">失败</span>':'<span class="badge pend">⏳ '+(e.status||"排队")+'</span>');
+  const img=fin?(fin.preview||fin.url):"";
+  c.innerHTML=`<div class="hd"><b>图 ${(e.index||k+1)}</b><span class="sc">${esc(e.name||"")}</span>${st}</div>
+    ${e.status==="error"?`<div class="bd"><div class="meta" style="color:var(--bad);white-space:pre-wrap">${esc(e.error||"任务失败")}</div></div>`:
+      (fin?`<img src="${img}" loading="lazy">
+    <div class="bd">
+      <div class="meta"><a href="#" data-dl="${fin.url}">下载成品</a> · 锚点：${k===0?"本图（图1）= 组锚点":"组内其余成品（视觉锁）"}</div>
+    </div>`:`<div class="bd"><div class="meta">还没有成品</div></div>`)}
+    <div class="ft" style="display:flex;gap:6px">
+      <button class="sm primary" data-redo style="flex:1">↻ 单独重做这张</button>
+      ${(isSwapJob(job)&&fin)?`<button class="sm ghost" data-pb title="材质没问题 → 把图案贴回这张干净壳">✅ 贴回</button>`:""}
+      ${fin?`<button class="sm ghost" data-dl2 style="flex:0 0 auto">下载</button>`:""}
+    </div>`;
+  if(fin){
+    c.querySelector("img").onclick=()=>big(fin.url);
+    c.querySelector("[data-dl]").onclick=ev=>{ev.preventDefault();dl(fin.url,fin.file)};
+    c.querySelector("[data-dl2]").onclick=()=>dl(fin.url,fin.file);
+  }
+  c.querySelector("[data-redo]").onclick=()=>redoGroupImg(k,job);
+  const pb=c.querySelector("[data-pb]");
+  if(pb)pb.onclick=()=>{
+    const pl=(job.payload&&job.payload.images||[])[k];
+    if(!pl)return toast("找不到该张的原图路径");
+    pasteBack(fin.path,fin.url,pl.path,job.spec||((job.result||{}).spec)||"");
+  };
+  return c;
+}
+function renderResultSection(){
+  const card=$("#cardResult");
+  /* 1) 跑着的组任务（detect / run） */
+  const rg=(S.jobs||[]).find(j=>j.status==="running"&&(j.kind==="group_run"||j.kind==="group_detect"));
+  if(rg){
+    card.style.display="block";
+    $("#resMeta").textContent=(rg.kind==="group_detect"?"批量识别":"全组执行")+` · 后台任务 #${rg.id.slice(-6)}`;
+    const host=$("#resultBody");host.innerHTML="";
+    const pg=document.createElement("div");pg.className="prog";
+    pg.innerHTML=`⏳ ${esc(rg.progress||"排队中…")}<br><span class="hint" style="color:#3b5bdb">任务在服务端后台跑——页面可以关；完成后这里和底部「生图记录」都能看到</span>`;
+    host.appendChild(pg);
+    const det=S.hisDetail[rg.id];
+    if(rg.kind==="group_run"&&det){
+      const ents=(det.result&&det.result.images)||det.images||[];
+      const pl=(det.payload&&det.payload.images)||[];
+      const n=Math.max(ents.length,pl.length);
+      for(let k=0;k<n;k++)host.appendChild(groupCard(ents[k]||{status:"pending",index:k+1,name:(pl[k]||{}).name||""},k,det));
+    }
+    $("#resultExtra").innerHTML="";
+    return;
+  }
+  /* 2) 当前张单张任务 / 单张重做 */
+  const m=im();
+  const sj=m&&m.jobId?runningJobOf(m.jobId):null;
+  if(sj){
+    card.style.display="block";
+    $("#resMeta").textContent=`图 ${groupList().findIndex(x=>x.k===S.cur)+1||"－"} · 后台任务 #${sj.id.slice(-6)}`;
+    const host=$("#resultBody");host.innerHTML="";
+    const pg=document.createElement("div");pg.className="prog";
+    pg.innerHTML=`⏳ ${esc(sj.progress||"排队中…")}<br><span class="hint" style="color:#3b5bdb">任务在服务端后台跑——页面可以关；完成后这里和底部「生图记录」都能看到</span>`;
+    host.appendChild(pg);
+    const det=S.hisDetail[sj.id];
+    (det&&(det.steps||[])).forEach(st=>host.appendChild(stepCard(st,det.steps,null)));
+    $("#resultExtra").innerHTML="";
+    return;
+  }
+  const lastRun=m&&m.lastRun;
+  /* 3) 组结果（groupLast 优先，其次当前张单张结果） */
+  const showGroup=S.groupLast&&!lastRun;
+  const job=showGroup?S.groupLast:lastRun;
+  if(!job){card.style.display="none";return}
+  card.style.display="block";
+  const r=job.result||{};
+  if(showGroup){
+    $("#resMeta").textContent=`产品组 · ${(job.mode==="fusion"||r.mode==="fusion")?"整图融合":"分层管线"} · ${(r.images||[]).length} 张 · ${job.elapsed||"?"}s · 规格卡${(job.spec||r.spec)?"✅":"—"}`;
+    const host=$("#resultBody");host.innerHTML="";
+    const ents=(r.images||job.images||[]);
+    ents.forEach((e,k)=>host.appendChild(groupCard(e,k,job)));
+    const ex=$("#resultExtra");ex.innerHTML="";
+    if(isSwapJob(job)&&ents.some(e=>e&&e.status==="done")){
+      const bt=document.createElement("button");bt.className="sm primary";
+      bt.textContent="🚀 全部贴回（每张干净壳 + 原图案，图1 成品当锚点）";
+      bt.onclick=()=>groupPasteBack(job);
+      ex.appendChild(bt);
+    }
+    if(r.spec){
+      const p=document.createElement("details");
+      p.innerHTML=`<summary>查看规格卡</summary><div class="meta" style="white-space:pre-wrap;padding:6px">${esc(r.spec)}</div>`;
+      ex.appendChild(p);
+    }
+    return;
+  }
+  if(!r||r.error){
+    $("#resMeta").textContent="当前张 · 失败";
+    $("#resultBody").innerHTML=`<div class="prog" style="color:var(--bad);background:#fef2f2;border-color:#fecaca">❌ ${esc(r.error||job.error||"任务失败")}<br><span class="hint">已出的步骤结果在底部「生图记录」里，可从失败那一步接着重跑</span></div>`;
+    $("#resultExtra").innerHTML="";
+    return;
+  }
+  $("#resMeta").textContent=`图 ${groupList().findIndex(x=>x.k===S.cur)+1||"－"} · ${r.mode==="fusion"?"整图融合":"分层管线"} · ${r.model||""} · ${r.elapsed}s`;
+  const host=$("#resultBody");host.innerHTML="";
+  const ex=$("#resultExtra");ex.innerHTML="";
+  if(r.mode==="fusion"){
+    const swap=isSwapJob(job);
+    (r.results||[]).forEach((it,i)=>{
+      const c=document.createElement("div");c.className="rstep";
+      c.innerHTML=`<div class="hd"><b>融合结果 ${i+1}</b><span class="sc">${swap?"干净壳 · 待验材质":"整图重绘"}</span></div>
+        <img src="${it.preview||it.url}" loading="lazy" data-big="${it.url}">
+        <div class="bd"><div class="meta">${swap?"验材质：不对就「↻ 再次生成」换锚点重跑，不花贴回的钱；对了点下方「✅ 贴回」":"区域外不做像素级保证"}</div>
+          <div class="meta"><a href="#" data-dl="${it.url}">下载</a></div></div>
+        <div class="ft" style="display:flex;gap:6px">
+          ${swap?`<button class="sm primary" data-pb style="flex:1">✅ 用这张贴回图案</button>`:""}
+          <button class="sm ghost" data-dl2="${it.url}" style="${swap?"flex:0 0 auto":"width:100%"}">下载此图</button></div>`;
+      host.appendChild(c);
+      c.querySelector("img").onclick=()=>big(it.url);
+      c.querySelectorAll("[data-dl],[data-dl2]").forEach(el=>el.onclick=e=>{e.preventDefault();dl(it.url)});
+      const pb=c.querySelector("[data-pb]");
+      if(pb)pb.onclick=()=>pasteBack(it.path,it.url,(job.payload||{}).base_img,job.spec||(r.spec||""));
+    });
+    const p=document.createElement("details");
+    p.innerHTML=`<summary>查看融合提示词</summary><div class="meta" style="white-space:pre-wrap;padding:6px">${esc(r.prompt||"")}</div>`;
+    ex.appendChild(p);
+    return;
+  }
+  (r.steps||[]).forEach(st=>{
+    host.appendChild(stepCard(st,r.steps,(fi,prev,replay)=>{
+      const p2=buildPayload(S.cur);
+      p2.session="G";
+      rerunFrom(p2,fi,prev,`重跑自 ${job.id} 第 ${fi+1} 步（用当前设置）`,replay);
+    }));
+  });
+}
+
+/* ---------- ⑥ 生图记录 ---------- */
+async function ensureDetail(id){
+  const j=(S.jobs||[]).find(x=>x.id===id);
+  const need=!S.hisDetail[id]||(j&&j.status==="running");
+  if(!need)return;
+  try{
+    const r=await(await API.job(id)).json();
+    if(!r.error)S.hisDetail[id]=r;
+  }catch(e){}
+}
+function fmtTime(ts){const d=new Date((ts||0)*1000);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
+function renderHistory(){
+  const host=$("#hisBody");
+  $("#hisMeta").textContent=`最近 ${S.jobs.length} 条 · 双击缩略图放大 · 只保留 7 天`;
+  /* 工具栏：有记录才显示；全选/删除选中只绑一次 */
+  const bar=$("#hisBar");
+  bar.style.display=S.jobs.length?"flex":"none";
+  if(S.jobs.length&&!bar._bind){
+    bar._bind=1;
+    $("#hisAll").onchange=e=>{
+      S.hisSel.clear();
+      if(e.target.checked)S.jobs.filter(j=>j.status!=="running").forEach(j=>S.hisSel.add(j.id));
+      renderHistory();
+    };
+    $("#hisDelSel").onclick=async(e)=>{
+      const ids=[...S.hisSel];
+      if(!ids.length)return toast("先勾选要删的记录",3000);
+      if(!armConfirm(e.currentTarget))return;
+      try{
+        const r=await(await API.jobsDel({ids})).json();
+        if(r.error)throw new Error(r.error);
+        ids.forEach(id=>{delete S.hisDetail[id];S.hisOpen.delete(id)});
+        S.jobs=S.jobs.filter(j=>!S.hisSel.has(j.id));
+        S.hisSel.clear();
+        renderHistory();
+        toast(r.msg||`已删 ${r.deleted} 条`);
+      }catch(e){toast("删除失败："+e.message,5000)}
+    };
+  }
+  const selN=[...S.hisSel].filter(id=>S.jobs.some(j=>j.id===id)).length;
+  $("#hisSelMeta").textContent=selN?`已选 ${selN} 条`:"未选中";
+  $("#hisAll").checked=selN>0&&selN===S.jobs.filter(j=>j.status!=="running").length;
+  host.innerHTML="";
+  if(!S.jobs.length){
+    host.innerHTML=`<p class="hint">还没有生图记录。执行一次后这里会出现历史（存在服务器上，页面关掉再回来也在）。</p>`;
+    return;
+  }
+  S.jobs.forEach(j=>{
+    const st=j.status==="done"?`<span class="badge ok">完成 · ${j.elapsed||"?"}s</span>`:
+      (j.status==="running"?`<span class="badge pend">⏳ ${esc(j.progress||"排队中…")}</span>`:
+       `<span class="badge miss">失败${j.elapsed?` · ${j.elapsed}s`:""}</span>`);
+    let title;
+    if(j.kind==="group_run")title=`📦 组任务 · ${j.n_images}张 · ${j.mode==="fusion"?"整图融合":"分层管线"}${j.spec_locked?" · 🔒规格卡":""}`;
+    else if(j.kind==="group_detect")title=`🔍 批量识别 · ${j.n_images}张`;
+    else if(j.img_index!=null)title=`🎯 单张重做 · 图${j.img_index+1}${j.mode==="fusion"?" · 整图融合":" · 分层管线"}`;
+    else title=`${j.session==="G"?"":""}任务${j.mode==="fusion"?" · 整图融合":" · 分层管线"}`;
+    const row=document.createElement("div");
+    row.className="jobrow "+j.status;
+    row.innerHTML=`
+      <div class="hd">
+        <input type="checkbox" class="hck" data-ck="${j.id}" style="align-self:center"
+          ${S.hisSel.has(j.id)?"checked":""} ${j.status==="running"?"disabled":""} title="选中这条">
+        ${j.thumb?`<img class="jt" src="${j.thumb}" loading="lazy" title="看大图">`:""}
+        <b>${title}</b>
+        ${st}
+        <span class="meta">${fmtTime(j.created)}${j.n_steps?` · ${j.n_steps} 步`:""}${j.note?` · ${esc(j.note)}`:""}</span>
+        <span style="flex:1"></span>
+        <button class="sm" data-view="${j.id}">${S.hisOpen.has(j.id)?"▲ 收起":"▼ 查看"}</button>
+        <button class="sm primary" data-regen="${j.id}" ${j.status==="running"?"disabled":""}>↻ 再次生成</button>
+        <button class="sm" data-del="${j.id}" style="color:#b91c1c" ${j.status==="running"?"disabled":""} title="删除这条记录（连同生成的图片）">🗑</button>
+      </div>
+      ${j.error?`<div class="meta" style="color:var(--bad)">${esc(j.error)}</div>`:""}
+      <div class="hbody" data-body="${j.id}" style="display:none"></div>`;
+    host.appendChild(row);
+    const jt=row.querySelector(".jt");
+    if(jt)jt.onclick=()=>big(j.thumb);
+    const ck=row.querySelector("[data-ck]");
+    if(ck)ck.onchange=e=>{
+      if(e.target.checked)S.hisSel.add(j.id);else S.hisSel.delete(j.id);
+      const n=[...S.hisSel].filter(id=>S.jobs.some(x=>x.id===id)).length;
+      $("#hisSelMeta").textContent=n?`已选 ${n} 条`:"未选中";
+      $("#hisAll").checked=n>0&&n===S.jobs.filter(x=>x.status!=="running").length;
+    };
+    const db=row.querySelector("[data-del]");
+    if(db)db.onclick=async()=>{
+      if(!armConfirm(db))return;
+      try{
+        const r=await(await API.jobDel(j.id)).json();
+        if(r.error)throw new Error(r.error);
+        delete S.hisDetail[j.id];S.hisOpen.delete(j.id);S.hisSel.delete(j.id);
+        S.jobs=S.jobs.filter(x=>x.id!==j.id);
+        renderHistory();
+        toast(r.msg||"已删除");
+      }catch(e){toast("删除失败："+e.message,5000)}
+    };
+    row.querySelector("[data-view]").onclick=async()=>{
+      if(S.hisOpen.has(j.id)){S.hisOpen.delete(j.id)}
+      else{S.hisOpen.add(j.id);await ensureDetail(j.id)}
+      renderHistory();
+    };
+    const rg2=row.querySelector("[data-regen]");
+    if(rg2)rg2.onclick=async()=>{
+      const dj=S.hisDetail[j.id]||await(await API.job(j.id)).json();
+      if(dj.error)return toast("拿不到该次任务的设置",4000);
+      const p=JSON.parse(JSON.stringify(dj.payload||{}));
+      try{
+        if(j.kind==="group_run"){
+          const r=await(await API.groupRun(p)).json();
+          if(r.error)throw new Error(r.error);
+          S.watchGroup=r.job_id;S.groupLast=null;pollNow();
+          toast(`已用该次的全部设置对 ${r.n_images} 张原样再跑 🚀`);
+          return;
+        }
+        if(j.kind==="group_detect"){
+          const r=await(await API.groupDetect(p)).json();
+          if(r.error)throw new Error(r.error);
+          S.watchGroup=r.job_id;pollNow();
+          toast("已重新批量识别 🚀");
+          return;
+        }
+        if(j.img_index!=null&&p.sibling){ /* 单张重做 */
+          const r=await(await API.groupRedo(p)).json();
+          if(r.error)throw new Error(r.error);
+          pollNow();toast("已原样重做该张 🚀");
+          return;
+        }
+        delete p.from_index;delete p.prev_outputs;delete p.replay_after;
+        p.note="再次生成自 "+j.id.slice(-6);
+        const id2=await postJob(p);
+        if(id2)toast("已用该次的全部设置原样再跑一遍 🚀");
+      }catch(e){toast("启动失败："+e.message,5000)}
+    };
+  });
+  /* 已展开的记录填充明细 */
+  S.hisOpen.forEach(id=>{
+    const b=host.querySelector(`[data-body="${id}"]`);
+    if(!b)return;
+    b.style.display="block";
+    const j=S.hisDetail[id];
+    if(!j){b.innerHTML=`<div class="meta">加载中…</div>`;return}
+    b.innerHTML="";
+    if(j.status==="running"){
+      const pg=document.createElement("div");pg.className="prog";
+      pg.textContent="⏳ "+(j.progress||"排队中…");
+      b.appendChild(pg);
+    }
+    const r=j.result||{};
+    const grid=document.createElement("div");grid.className="hsteps";
+    if(j.kind==="group_run"){
+      /* 组任务：每张一张子卡（成品 + 单独重做这张） */
+      const ents=(r.images||j.images||[]);
+      ents.forEach((e,k)=>grid.appendChild(groupCard(e,k,j)));
+      b.appendChild(grid);
+      if(isSwapJob(j)&&ents.some(e=>e&&e.status==="done")){
+        const bt=document.createElement("button");bt.className="sm primary";
+        bt.textContent="🚀 全部贴回（每张干净壳 + 原图案，图1 成品当锚点）";
+        bt.onclick=()=>groupPasteBack(j);
+        b.appendChild(bt);
+      }
+      if(r.spec){
+        const p=document.createElement("details");
+        p.innerHTML=`<summary>查看规格卡</summary><div class="meta" style="white-space:pre-wrap;padding:6px">${esc(r.spec)}</div>`;
+        b.appendChild(p);
+      }
+      return;
+    }
+    if(j.kind==="group_detect"){
+      (r.items||j.steps||[]).forEach(it=>{
+        const found=(it.parts||[]).filter(p=>p.present).map(p=>META[p.id]?META[p.id].zh:p.id);
+        const d=document.createElement("div");d.className="rstep";
+        d.innerHTML=`<div class="hd"><b>图 ${it.index}</b><span class="sc">${esc(it.name||"")}</span>
+            ${it.error?'<span class="badge miss">失败</span>':`<span class="badge ok">${found.length}/4 部位</span>`}</div>
+          <div class="bd"><div class="meta">${it.error?esc(it.error):(found.length?esc(found.join("、")):"没识别到部位")}
+            · 耗时 ${it.elapsed||"?"}s</div>
+            <div class="ft" style="border:none;padding:8px 0 0">
+            <button class="sm ghost" data-apply style="width:100%">应用到当前组（写回识别框）</button></div></div>`;
+        d.querySelector("[data-apply]").onclick=()=>{
+          if(it.error)return toast("该张识别失败");
+          const k=S.imgs.findIndex(m=>m&&m.path===it.image);
+          if(k<0)return toast("当前组里没有这张图（路径对不上），需重新上传后手动识别",5000);
+          applyDetect(S.imgs[k],it.parts);
+          renderAll();
+          toast(`已把图 ${it.index} 的识别框写回当前组`);
+        };
+        grid.appendChild(d);
+      });
+      b.appendChild(grid);
+      return;
+    }
+    if(r.steps){
+      r.steps.forEach(st=>grid.appendChild(stepCard(st,r.steps,(fi,prev,replay)=>{
+        rerunFrom(j.payload,fi,prev,`重跑自 ${j.id.slice(-6)} 第 ${fi+1} 步${replay?"（只重跑这步）":""}`,replay);
+      })));
+    }else if(r.results){
+      const swap=isSwapJob(j);
+      r.results.forEach((it,i)=>{
+        const c=document.createElement("div");c.className="rstep";
+        c.innerHTML=`<div class="hd"><b>融合结果 ${i+1}</b><span class="sc">${swap?"干净壳 · 待验材质":"整图重绘"}</span></div>
+          <img src="${it.preview||it.url}" loading="lazy">
+          <div class="ft" style="display:flex;gap:6px">
+            ${swap?`<button class="sm primary" data-pb style="flex:1">✅ 用这张贴回图案</button>`:""}
+            <button class="sm ghost" style="${swap?"flex:0 0 auto":"width:100%"}">下载此图</button></div>`;
+        c.querySelector("img").onclick=()=>big(it.url);
+        c.querySelector(".ft button.ghost").onclick=()=>dl(it.url,it.file);
+        const pb=c.querySelector("[data-pb]");
+        if(pb)pb.onclick=()=>pasteBack(it.path,it.url,(j.payload||{}).base_img,j.spec||(r.spec||""));
+        grid.appendChild(c);
+      });
+    }else if(j.steps&&j.steps.length){
+      j.steps.forEach(st=>grid.appendChild(stepCard(st,j.steps,(fi,prev,replay)=>{
+        rerunFrom(j.payload,fi,prev,`重跑自 ${j.id.slice(-6)} 第 ${fi+1} 步${replay?"（只重跑这步）":""}`,replay);
+      })));
+    }else if(!j.error){
+      grid.innerHTML=`<div class="meta">暂无步骤结果</div>`;
+    }
+    b.appendChild(grid);
+    if(r.prompt){
+      const p=document.createElement("details");
+      p.innerHTML=`<summary>查看融合提示词</summary><div class="meta" style="white-space:pre-wrap;padding:6px">${esc(r.prompt||"")}</div>`;
+      b.appendChild(p);
+    }
+  });
+}
+
+/* ---------- 轮询：组任务/单张任务接管（页面重开也能接上） ---------- */
+let pollBusy=false;
+async function pollNow(){
+  if(pollBusy)return;
+  pollBusy=true;
+  try{
+    const r=await(await API.jobs()).json();
+    if(r.error)throw new Error(r.error);
+    S.jobs=r.jobs||[];
+    /* 组任务：跑着就盯着；发现结束 → 接管 */
+    const rg=S.jobs.find(j=>j.status==="running"&&(j.kind==="group_run"||j.kind==="group_detect"));
+    if(rg){S.watchGroup=rg.id;ensureDetail(rg.id)}
+    else if(S.watchGroup){
+      const j=S.jobs.find(x=>x.id===S.watchGroup);
+      if(!j||j.status!=="running"){await handleGroupDone(S.watchGroup);S.watchGroup=null}
+    }
+    /* 页面重开：最近一次完成的组结果接上（结果区可看、可单张重做） */
+    if(!S.groupLast&&!S.watchGroup){
+      const dg=S.jobs.find(j=>j.status==="done"&&j.kind==="group_run");
+      if(dg)loadGroupLast(dg.id,true);
+    }
+    /* 各槽单张任务接管（页面没关时） */
+    S.imgs.forEach((m,k)=>{
+      if(m&&m.jobId){
+        const j=S.jobs.find(x=>x.id===m.jobId);
+        if(j&&j.status!=="running"){m.jobId=null;loadJobIntoImg(k,j.id)}
+        else if(j&&j.status==="running")ensureDetail(m.jobId);
+      }
+    });
+    renderHistory();renderGbar();checkRun();
+    if($("#cardResult").style.display!=="none"||(S.watchGroup)||(im()&&im().jobId))renderResultSection();
+  }catch(e){}
+  pollBusy=false;
+}
+async function handleGroupDone(id){
+  try{
+    const r=await(await API.job(id)).json();
+    if(r.error)return;
+    S.hisDetail[id]=r;
+    if(r.kind==="group_detect"&&r.status==="done"){
+      let n=0;const fails=[];
+      (r.result.items||[]).forEach(it=>{
+        const k=S.imgs.findIndex(m=>m&&m.path===it.image);
+        if(k<0)return;
+        if(it.error){fails.push(`图${k+1}`);return}
+        applyDetect(S.imgs[k],it.parts);n++
+      });
+      renderAll();
+      if(fails.length)toast(`批量识别：${n} 张成功，${fails.length} 张失败（${fails.join("、")}，网络瞬断）——点缩略图切到失败那张，点「🔍 识别当前张」补跑`,8000);
+      else if(n)toast(`批量识别完成（${r.elapsed}s）：${n} 张识别框已写回，点缩略图逐张检查微调`,4200);
+      else toast("批量识别全没成功：网络或接口异常——稍后点「🔍 识别当前张」逐张补跑",6000);
+    }
+    if(r.kind==="group_run"){
+      S.groupLast=r;
+      if(r.status==="done"){
+        const ok=(r.result.images||[]).filter(e=>e.status==="done").length;
+        toast(`全组任务完成（${r.elapsed}s）：${ok}/${(r.result.images||[]).length} 张成功——哪张不满意点「↻ 单独重做这张」`,5000);
+      }else{
+        toast("组任务失败："+(r.error||"").slice(0,90),6000);
+      }
+      renderAll();
+    }
+  }catch(e){}
+}
+async function loadGroupLast(id,quiet){
+  try{
+    const r=await(await API.job(id)).json();
+    if(r.error)return;
+    S.hisDetail[id]=r;
+    if(r.kind==="group_run"&&r.status==="done"){S.groupLast=r;renderResultSection()}
+  }catch(e){}
+}
+async function loadJobIntoImg(k,id){
+  try{
+    const r=await(await API.job(id)).json();
+    if(r.error)return;
+    S.hisDetail[id]=r;
+    if(S.imgs[k])S.imgs[k].lastRun=r;
+    if(k===S.cur)renderResultSection();
+    if(r.status==="done")toast(`图 ${groupList().findIndex(x=>x.k===k)+1||k+1} 任务完成，耗时 ${r.elapsed}s`);
+    else toast(`图 ${groupList().findIndex(x=>x.k===k)+1||k+1} 任务失败：${(r.error||"").slice(0,90)}`,6000);
+  }catch(e){}
+}
+
+function big(u){$("#bigSrc").src=u;$("#bigimg").style.display="flex"}
+$("#bigimg").onclick=()=>$("#bigimg").style.display="none";
+
+// 线上挂在 /duotu/ 下（Caddy 剥前缀），本地直接是 / —— 本页即首页，无需返回链接
+
+/* ---------- 🤖 AI 接口设置 ---------- */
+async function aiLoad(){
+  const r=await(await API.conf()).json().catch(()=>({}));
+  const c=r.conf||r;
+  $("#aiModelIn").value=c.model||"gpt-image-2";
+  $("#aiVisionIn").value=c.vision||"gpt-5.4";
+  $("#aiKeyIn").value="";
+  $("#aiHint").textContent=(c.api_key?("✅ Key 已配置（…"+(c.api_key||"").slice(-4)+"）"):"还没配 Key")+" · 生图 "+(c.model||"gpt-image-2");
+}
+$("#aikey").onclick=()=>{
+  const b=$("#aiBox");
+  b.style.display=b.style.display==="none"?"":"none";
+  b.scrollIntoView({behavior:"smooth",block:"center"});
+  if(b.style.display!=="none")aiLoad();
+};
+$("#aiSave").onclick=async()=>{
+  const d={};
+  if($("#aiKeyIn").value.trim())d.api_key=$("#aiKeyIn").value.trim();
+  if($("#aiModelIn").value.trim())d.model=$("#aiModelIn").value.trim();
+  if($("#aiVisionIn").value.trim())d.vision=$("#aiVisionIn").value.trim();
+  if(!Object.keys(d).length){$("#aiHint").textContent="没改任何东西";return;}
+  const r=await(await API.saveConf(d)).json().catch(()=>({}));
+  if(r.error){$("#aiHint").textContent="保存失败："+r.error;return;}
+  $("#vm").value=$("#aiVisionIn").value.trim()||"gpt-5.4";
+  $("#aiHint").textContent="✅ 已保存";
+  aiLoad();
+  // 同步顶栏状态
+  try{
+    const c2=(await(await API.conf()).json().catch(()=>({}))).conf||{};
+    const k=(c2.api_key||"");
+    $("#keyState").innerHTML=k?`✅ AI Key 已配置（…${esc(k.slice(-4))}） · 生图 <b>${esc(c2.model||"gpt-image-2")}</b>`:"⚠️ 还没配 AI Key，点顶栏「🤖 AI 接口设置」填一次";
+  }catch(e){}
+};
+
+/* ---------- 初始化 ---------- */
+(async function init(){
+  await loadLib();
+  ORDER.forEach(id=>{S.parts[id]=newPart();S.parts[id].id=id;});
+  try{
+    const r=await(await API.conf()).json();
+    const c=r.conf||r;
+    const vm=c.vision||"gpt-5.4";
+    $("#vm").value=vm;
+    const k=(c.api_key||"");
+    $("#keyState").innerHTML=k?`✅ AI Key 已配置（…${esc(k.slice(-4))}） · 生图 <b>${esc(c.model||"gpt-image-2")}</b>`:
+      '⚠️ 还没配 AI Key，点顶栏「🤖 AI 接口设置」填一次';
+  }catch(e){}
+  renderAll();
+  await pollNow();
+  setInterval(pollNow,2500);
+})();
+</script>
+</body>
+</html>
